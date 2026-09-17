@@ -69,7 +69,7 @@ export default function Verify() {
                 value={inputId}
                 onChange={(e) => setInputId(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
-                className="w-full rounded-xl border border-white/[0.06] bg-bg py-3 pl-10 pr-4 text-sm text-text placeholder-muted/40 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
+                className="w-full rounded-xl border border-white/[0.06] bg-bg py-3 pl-10 pr-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
               />
             </div>
             <Button

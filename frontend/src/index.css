@@ -1,6 +1,30 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@theme {
+  --color-bg: #0a0a0a;
+  --color-surface: #111111;
+  --color-surface2: #1a1a1a;
+  --color-border: #222222;
+  --color-text: #f0ece4;
+  --color-muted: #888888;
+  --color-accent: #c8f060;
+  --color-accent2: #60d0f0;
+  --color-accent3: #f0a060;
+  --color-accent4: #d060f0;
+
+  --font-sans: 'Instrument Sans', system-ui, sans-serif;
+  --font-mono: 'DM Mono', monospace;
+  --font-serif: 'DM Serif Display', serif;
+
+  --radius-card: 24px;
+  --radius-button: 16px;
+
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --shadow-card-hover: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 20px rgba(200, 240, 96, 0.15);
+
+  --animate-fade-in: fadeIn 0.4s ease-out;
+}
 
 @layer base {
   html {
@@ -144,6 +168,17 @@
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes modalEnter {

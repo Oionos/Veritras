@@ -404,7 +404,7 @@ export default function Products() {
               placeholder="Search by product name..."
               value={serverSearch}
               onChange={(e) => handleSearchChange(e.target.value)}
-              className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 pl-10 pr-4 text-sm text-text placeholder-muted/40 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
+              className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 pl-10 pr-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -415,7 +415,7 @@ export default function Products() {
                 setLimit(Number(e.target.value))
                 setPage(1)
               }}
-              className="rounded-xl border border-white/[0.06] bg-bg py-2.5 pl-3 pr-8 text-sm text-text outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
+              className="rounded-xl border border-white/[0.06] bg-bg py-2.5 pl-3 pr-8 text-sm text-text outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
             >
               <option value={10}>10</option>
               <option value={25}>25</option>
@@ -592,7 +592,7 @@ export default function Products() {
               value={searchId}
               onChange={(e) => setSearchId(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleLookupSearch()}
-              className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 pl-10 pr-4 text-sm text-text placeholder-muted/40 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
+              className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 pl-10 pr-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
             />
           </div>
           <Button onClick={handleLookupSearch} disabled={loadingDetail} className="min-w-[120px]">
@@ -705,7 +705,7 @@ export default function Products() {
                         onChange={(e) => setCpLocation(e.target.value)}
                         placeholder="e.g., Port of Rotterdam"
                         disabled={cpPending || cpConfirming}
-                        className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
+                        className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
                       />
                     </div>
 
@@ -718,7 +718,7 @@ export default function Products() {
                         value={cpStatus}
                         onChange={(e) => setCpStatus(Number(e.target.value) as ShipmentStatus)}
                         disabled={cpPending || cpConfirming}
-                        className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
+                        className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
                       >
                         {(Object.entries(StatusLabels) as [string, string][]).map(([val, label]) => (
                           <option key={val} value={val}>
@@ -739,7 +739,7 @@ export default function Products() {
                         placeholder="Any additional notes..."
                         rows={2}
                         disabled={cpPending || cpConfirming}
-                        className="w-full resize-none rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
+                        className="w-full resize-none rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
                       />
                     </div>
 
@@ -804,7 +804,7 @@ export default function Products() {
                         }}
                         placeholder="0x..."
                         disabled={txPending || txConfirming}
-                        className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 font-mono text-sm text-text placeholder-muted/40 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
+                        className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 font-mono text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
                       />
                       {txHandlerError && (
                         <p className="mt-1 text-xs text-red-400">{txHandlerError}</p>
@@ -965,7 +965,7 @@ export default function Products() {
               <input
                 {...register('name')}
                 placeholder="e.g., Organic Coffee Beans"
-                className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
+                className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
               />
               {errors.name && (
                 <p className="mt-1 text-xs text-red-400">{errors.name.message}</p>
@@ -979,7 +979,7 @@ export default function Products() {
               <input
                 {...register('manufacturer_address')}
                 placeholder="0x..."
-                className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
+                className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
               />
               {errors.manufacturer_address && (
                 <p className="mt-1 text-xs text-red-400">{errors.manufacturer_address.message}</p>
@@ -994,7 +994,7 @@ export default function Products() {
                 {...register('description')}
                 rows={2}
                 placeholder="Brief description of the product..."
-                className="w-full resize-none rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
+                className="w-full resize-none rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
               />
               {errors.description && (
                 <p className="mt-1 text-xs text-red-400">{errors.description.message}</p>
@@ -1008,7 +1008,7 @@ export default function Products() {
               <input
                 {...register('metadata_uri')}
                 placeholder="https://..."
-                className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
+                className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
               />
               {errors.metadata_uri && (
                 <p className="mt-1 text-xs text-red-400">{errors.metadata_uri.message}</p>

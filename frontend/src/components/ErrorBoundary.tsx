@@ -29,7 +29,7 @@ export default class ErrorBoundary extends Component<Props, State> {
           <h1 className="mb-4 text-2xl font-semibold">Something went wrong</h1>
           <button
             onClick={() => window.location.reload()}
-            className="rounded-full bg-gradient-to-r from-accent/90 to-accent2/80 px-8 py-3.5 text-sm font-semibold text-bg transition-all hover:scale-[1.02]"
+            className="rounded-full bg-linear-to-r from-accent/90 to-accent2/80 px-8 py-3.5 text-sm font-semibold text-bg transition-all hover:scale-[1.02]"
           >
             Reload
           </button>

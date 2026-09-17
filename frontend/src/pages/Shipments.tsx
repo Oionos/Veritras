@@ -292,7 +292,7 @@ export default function Shipments() {
                 setServerSearch(e.target.value)
                 setPage(1)
               }}
-              className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 pl-10 pr-4 text-sm text-text placeholder-muted/40 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
+              className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 pl-10 pr-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
             />
           </div>
           <div className="flex items-center gap-2">
@@ -304,7 +304,7 @@ export default function Shipments() {
                 setStatusFilter(e.target.value)
                 setPage(1)
               }}
-              className="rounded-xl border border-white/[0.06] bg-bg py-2.5 pl-3 pr-8 text-sm text-text outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
+              className="rounded-xl border border-white/[0.06] bg-bg py-2.5 pl-3 pr-8 text-sm text-text outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
             >
               {statusOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -321,7 +321,7 @@ export default function Shipments() {
                 setLimit(Number(e.target.value))
                 setPage(1)
               }}
-              className="rounded-xl border border-white/[0.06] bg-bg py-2.5 pl-3 pr-8 text-sm text-text outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
+              className="rounded-xl border border-white/[0.06] bg-bg py-2.5 pl-3 pr-8 text-sm text-text outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
             >
               <option value={10}>10</option>
               <option value={25}>25</option>
@@ -533,7 +533,7 @@ export default function Shipments() {
                         onChange={(e) => setCpLocation(e.target.value)}
                         placeholder="e.g., Port of Rotterdam"
                         disabled={cpPending || cpConfirming}
-                        className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
+                        className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
                       />
                     </div>
 
@@ -546,7 +546,7 @@ export default function Shipments() {
                         value={cpStatus}
                         onChange={(e) => setCpStatus(Number(e.target.value) as ShipmentStatus)}
                         disabled={cpPending || cpConfirming}
-                        className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
+                        className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
                       >
                         {(Object.entries(StatusLabels) as [string, string][]).map(([val, label]) => (
                           <option key={val} value={val}>
@@ -567,7 +567,7 @@ export default function Shipments() {
                         placeholder="Any additional notes..."
                         rows={2}
                         disabled={cpPending || cpConfirming}
-                        className="w-full resize-none rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
+                        className="w-full resize-none rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
                       />
                     </div>
 
@@ -644,7 +644,7 @@ export default function Shipments() {
                         }}
                         placeholder="0x..."
                         disabled={txPending || txConfirming}
-                        className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 font-mono text-sm text-text placeholder-muted/40 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
+                        className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 font-mono text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
                       />
                       {txHandlerError && (
                         <p className="mt-1 text-xs text-red-400">{txHandlerError}</p>
@@ -735,7 +735,7 @@ export default function Shipments() {
               <input
                 {...register('origin')}
                 placeholder="Origin location"
-                className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
+                className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
               />
               {errors.origin && (
                 <p className="mt-1 text-xs text-red-400">{errors.origin.message}</p>
@@ -748,7 +748,7 @@ export default function Shipments() {
               <input
                 {...register('destination')}
                 placeholder="Destination location"
-                className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
+                className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
               />
               {errors.destination && (
                 <p className="mt-1 text-xs text-red-400">{errors.destination.message}</p>
@@ -764,7 +764,7 @@ export default function Shipments() {
               {...register('notes')}
               rows={3}
               placeholder="Additional notes..."
-              className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-none transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
+              className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
             />
             {errors.notes && (
               <p className="mt-1 text-xs text-red-400">{errors.notes.message}</p>

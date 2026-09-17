@@ -107,7 +107,7 @@ function ProvenanceChain() {
       <div
         role="list"
         aria-label="Product journey checkpoints"
-        className="flex gap-2 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex gap-2 overflow-x-auto pb-2 [-ms-overflow-style:none] scrollbar-none [&::-webkit-scrollbar]:hidden"
       >
         {PROVENANCE_CHECKPOINTS.map((cp, i) => (
           <div key={cp.name} className="flex shrink-0 items-center">
@@ -157,7 +157,7 @@ function ProvenanceChain() {
             {/* Connector line between checkpoints */}
             {i < PROVENANCE_CHECKPOINTS.length - 1 && (
               <div className="relative mx-1 hidden h-px w-6 shrink-0 sm:block">
-                <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-white/5" />
+                <div className="absolute inset-0 bg-linear-to-r from-white/10 to-white/5" />
                 <motion.div
                   initial={{ scaleX: 0 }}
                   animate={{ scaleX: 1 }}
@@ -166,7 +166,7 @@ function ProvenanceChain() {
                     duration: 0.6,
                     ease: 'easeOut',
                   }}
-                  className="absolute inset-0 origin-left bg-gradient-to-r from-accent/40 to-accent2/40"
+                  className="absolute inset-0 origin-left bg-linear-to-r from-accent/40 to-accent2/40"
                 />
                 <motion.span
                   aria-hidden="true"
@@ -197,12 +197,12 @@ function AnimatedHeroBanner() {
   const routePulses = [
     {
       className:
-        'left-[38%] top-[56%] h-px w-[34%] rotate-[18deg] from-accent/0 via-accent/70 to-accent/0',
+        'left-[38%] top-[56%] h-px w-[34%] rotate-18 from-accent/0 via-accent/70 to-accent/0',
       delay: 0,
     },
     {
       className:
-        'left-[52%] top-[41%] h-px w-[28%] -rotate-[24deg] from-accent2/0 via-accent2/70 to-accent2/0',
+        'left-[52%] top-[41%] h-px w-[28%] rotate-[-24deg] from-accent2/0 via-accent2/70 to-accent2/0',
       delay: 1.4,
     },
     {
@@ -247,7 +247,7 @@ function AnimatedHeroBanner() {
         className="absolute inset-0 h-full w-full object-cover object-center"
       />
 
-      <div className="absolute inset-0 bg-gradient-to-r from-bg via-bg/70 to-bg/10" />
+      <div className="absolute inset-0 bg-linear-to-r from-bg via-bg/70 to-bg/10" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_47%,transparent_0%,rgba(10,10,10,0.22)_43%,rgba(10,10,10,0.72)_78%)]" />
 
       {routePulses.map((pulse) => (
@@ -262,7 +262,7 @@ function AnimatedHeroBanner() {
             repeat: Infinity,
             ease: 'easeInOut',
           }}
-          className={`absolute origin-left bg-gradient-to-r ${pulse.className}`}
+          className={`absolute origin-left bg-linear-to-r ${pulse.className}`}
         />
       ))}
 
@@ -299,7 +299,7 @@ export default function PremiumHero() {
   const navigate = useNavigate()
 
   return (
-    <section className="relative flex min-h-[100dvh] flex-col justify-center overflow-hidden px-6 py-20 sm:px-12 lg:px-20">
+    <section className="relative flex min-h-dvh flex-col justify-center overflow-hidden px-6 py-20 sm:px-12 lg:px-20">
       {/* Ambient glow orbs */}
       <div className="pointer-events-none absolute right-0 top-1/4 h-[600px] w-[600px] rounded-full bg-accent/5 blur-[120px]" />
       <div className="pointer-events-none absolute -left-32 bottom-1/4 h-[400px] w-[400px] rounded-full bg-accent2/5 blur-[100px]" />
@@ -327,12 +327,12 @@ export default function PremiumHero() {
           initial="hidden"
           animate="visible"
           variants={fadeIn}
-          className="break-words font-serif leading-[1.05] tracking-tight"
+          className="wrap-break-word font-serif leading-[1.05] tracking-tight"
         >
           <span className="block text-[clamp(3.5rem,10vw,8rem)] text-text">
             Track
           </span>
-          <span className="block pb-2 text-[clamp(3.5rem,10vw,8rem)] bg-gradient-to-r from-accent via-accent2 to-accent3 bg-clip-text text-transparent">
+          <span className="block pb-2 text-[clamp(3.5rem,10vw,8rem)] bg-linear-to-r from-accent via-accent2 to-accent3 bg-clip-text text-transparent">
             Beyond
           </span>
           <span className="block mt-2 text-[clamp(1.2rem,3vw,2.5rem)] uppercase tracking-[0.3em] text-muted">
@@ -363,7 +363,7 @@ export default function PremiumHero() {
         >
           <button
             onClick={() => navigate('/verify')}
-            className="group inline-flex items-center gap-3 rounded-full bg-gradient-to-r from-accent/90 to-accent2/80 px-8 py-3.5 text-sm font-semibold text-bg shadow-[0_0_30px_rgba(200,240,96,0.2)] transition-all hover:shadow-[0_0_40px_rgba(200,240,96,0.35)] hover:scale-[1.02]"
+            className="group inline-flex items-center gap-3 rounded-full bg-linear-to-r from-accent/90 to-accent2/80 px-8 py-3.5 text-sm font-semibold text-bg shadow-[0_0_30px_rgba(200,240,96,0.2)] transition-all hover:shadow-[0_0_40px_rgba(200,240,96,0.35)] hover:scale-[1.02]"
           >
             Verify Product
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />

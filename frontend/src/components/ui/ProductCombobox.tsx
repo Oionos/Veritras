@@ -70,7 +70,7 @@ export function ProductCombobox({ value, onChange, disabled, error }: ProductCom
         className={[
           'w-full rounded-button border px-3 py-2 text-sm',
           'bg-surface text-text placeholder:text-muted',
-          'border-border focus:border-accent focus:outline-none',
+          'border-border focus:border-accent focus:outline-hidden',
           'disabled:cursor-not-allowed disabled:opacity-50',
           error ? 'border-red-500' : '',
         ].join(' ')}

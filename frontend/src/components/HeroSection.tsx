@@ -69,7 +69,7 @@ export default function HeroSection() {
         className="max-w-4xl font-serif text-5xl leading-[1.1] tracking-tight text-text sm:text-6xl md:text-7xl lg:text-8xl"
       >
         <span className="block">Track</span>
-        <span className="block bg-gradient-to-r from-accent via-accent2 to-accent3 bg-clip-text text-transparent">
+        <span className="block bg-linear-to-r from-accent via-accent2 to-accent3 bg-clip-text text-transparent">
           Beyond
         </span>
         <span className="block text-3xl uppercase tracking-[0.2em] text-muted sm:text-4xl md:text-5xl">
@@ -100,7 +100,7 @@ export default function HeroSection() {
       >
         <button
           onClick={() => navigate('/products')}
-          className="group relative flex items-center gap-2 rounded-full bg-gradient-to-r from-accent/20 to-accent2/20 px-8 py-4 text-sm font-medium text-text backdrop-blur-sm transition-all hover:scale-105 hover:shadow-[0_0_30px_rgba(200,240,96,0.2)] border border-accent/20"
+          className="group relative flex items-center gap-2 rounded-full bg-linear-to-r from-accent/20 to-accent2/20 px-8 py-4 text-sm font-medium text-text backdrop-blur-sm transition-all hover:scale-105 hover:shadow-[0_0_30px_rgba(200,240,96,0.2)] border border-accent/20"
         >
           Explore Now
           <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
@@ -152,7 +152,7 @@ export default function HeroSection() {
             </div>
             <h3 className="mb-2 text-sm font-semibold text-text">{feature.title}</h3>
             <p className="text-xs leading-relaxed text-muted">{feature.desc}</p>
-            <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-accent/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+            <div className="absolute inset-0 rounded-2xl bg-linear-to-br from-accent/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
           </motion.div>
         ))}
       </motion.div>

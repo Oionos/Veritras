@@ -249,7 +249,7 @@ export default function Dashboard() {
                   >
                     {/* Gradient background on hover */}
                     <div
-                      className={`absolute inset-0 bg-gradient-to-br ${kpi.gradient} opacity-0 transition-opacity duration-500 group-hover:opacity-100`}
+                      className={`absolute inset-0 bg-linear-to-br ${kpi.gradient} opacity-0 transition-opacity duration-500 group-hover:opacity-100`}
                     />
                     
                     {/* Halo ring */}
@@ -299,7 +299,7 @@ export default function Dashboard() {
                       
                       {/* Bottom accent line */}
                       <div
-                        className="mt-4 h-px w-full bg-gradient-to-r opacity-40"
+                        className="mt-4 h-px w-full bg-linear-to-r opacity-40"
                         style={{
                           backgroundImage: `linear-gradient(to right, ${kpi.color}30, transparent)`,
                         }}
