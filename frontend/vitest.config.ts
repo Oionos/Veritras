@@ -27,7 +27,10 @@ export default defineConfig({
       ],
       thresholds: {
         statements: 60,
-        branches: 62,
+        // Lowered 62 -> 52 on Vitest 4: AST-aware v8 remapping counts branch
+        // points differently (measured actual dropped 69.57% -> 56.36% with
+        // no test changes). Still set ~4pt below the new measured actual.
+        branches: 52,
         functions: 45,
         lines: 60,
       },
