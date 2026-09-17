@@ -22,14 +22,22 @@ export default defineConfig(({ mode }) => ({
   build: {
     outDir: 'dist',
     sourcemap: mode === 'development',
-    rollupOptions: {
+    // Vite 8 (Rolldown): object-form output.manualChunks was removed, so the
+    // five vendor bundles are expressed as codeSplitting groups instead.
+    rolldownOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-vendor': ['framer-motion', 'lucide-react'],
-          'web3-vendor': ['wagmi', 'viem', '@rainbow-me/rainbowkit'],
-          'charts-vendor': ['recharts'],
-          'query-vendor': ['@tanstack/react-query'],
+        codeSplitting: {
+          groups: [
+            { name: 'react-vendor', test: /node_modules\/(?:react|react-dom|react-router-dom)\// },
+            { name: 'ui-vendor', test: /node_modules\/(?:framer-motion|lucide-react)\// },
+            { name: 'web3-vendor', test: /node_modules\/(?:wagmi|viem|@rainbow-me\/rainbowkit)\// },
+            { name: 'charts-vendor', test: /node_modules\/recharts\// },
+            {
+              name: 'query-vendor',
+              test: /node_modules\/@tanstack\/(?:react-query|query-core)\//,
+              priority: 10,
+            },
+          ],
         },
       },
     },
