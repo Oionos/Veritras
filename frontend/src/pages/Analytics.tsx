@@ -254,7 +254,7 @@ export default function Analytics() {
                           backdropFilter: 'blur(20px)',
                         }}
                         itemStyle={{ color: '#f0ece4' }}
-                        formatter={(value: number) => [`${value} days`, 'Avg Delay']}
+                        formatter={(value) => [`${value ?? 0} days`, 'Avg Delay']}
                       />
                       <Bar dataKey="delay" fill="#60d0f0" radius={[0, 4, 4, 0]} />
                     </BarChart>
