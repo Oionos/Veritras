@@ -106,6 +106,11 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install npm 11
+        # npm 10 (bundled with Node 22) rejects npm 11-written lockfiles with
+        # spurious "Missing: X from lock file" errors during npm ci.
+        run: npm install -g npm@11.17.0
+
       - name: Cache node_modules
         uses: actions/cache@v4
         with:
@@ -138,6 +143,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Install npm 11
+        # npm 10 (bundled with Node 22) rejects npm 11-written lockfiles with
+        # spurious "Missing: X from lock file" errors during npm ci.
+        run: npm install -g npm@11.17.0
 
       - name: Cache node_modules
         uses: actions/cache@v4
@@ -174,6 +184,11 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install npm 11
+        # npm 10 (bundled with Node 22) rejects npm 11-written lockfiles with
+        # spurious "Missing: X from lock file" errors during npm ci.
+        run: npm install -g npm@11.17.0
+
       - name: Cache node_modules
         uses: actions/cache@v4
         with:
@@ -206,6 +221,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Install npm 11
+        # npm 10 (bundled with Node 22) rejects npm 11-written lockfiles with
+        # spurious "Missing: X from lock file" errors during npm ci.
+        run: npm install -g npm@11.17.0
 
       - name: Cache node_modules
         uses: actions/cache@v4
@@ -260,6 +280,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Install npm 11
+        # npm 10 (bundled with Node 22) rejects npm 11-written lockfiles with
+        # spurious "Missing: X from lock file" errors during npm ci.
+        run: npm install -g npm@11.17.0
 
       - name: Cache node_modules
         uses: actions/cache@v4
