@@ -12,6 +12,8 @@ make testing-check
 make testing-status
 ```
 
+Compose builds missing images on first use and reuses them afterward. Run `make testing-build` explicitly after changing dependencies or Dockerfiles. This avoids repeatedly copying large images on a `vfs` Docker daemon. In the managed workspace, frontend source updates reload automatically; use `make testing-restart-api` after changing Python code.
+
 | Service | URL |
 | --- | --- |
 | Frontend | http://localhost:13000 |
