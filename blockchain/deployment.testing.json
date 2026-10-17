@@ -1,0 +1,19 @@
+{
+  "network": "sepolia",
+  "chainId": "11155111",
+  "deployer": "0x92e60687dc691BcB49A990961A9C3AeC962Fd033",
+  "startBlock": 11936014,
+  "deploymentBlocks": {
+    "ProductRegistry": 11936014,
+    "ShipmentTracker": 11936015
+  },
+  "contracts": {
+    "ProductRegistry": "0xCf9C169752E1B7AF9A0A54C3086dBa11A2DeE285",
+    "ShipmentTracker": "0xF5A251812Ec9A7645c29c63656EfB6b307360fDE"
+  },
+  "timestamp": "2026-10-17T19:06:25.896Z",
+  "deploymentTransactions": {
+    "ProductRegistry": "0x196341ce35a556b36d989ec322faf4ab0ce7db58f49f73bd3bd25515058b2635",
+    "ShipmentTracker": "0x09fccc403bc9c9038c4c0f75aa5434f34ae9e9f0a859d6a66e2f053428f1601a"
+  }
+}

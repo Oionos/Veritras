@@ -28,7 +28,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 
 from app.core.database import Base
 from app.models.product import Product
-from app.models.shipment import Checkpoint, CustodyTransfer
+from app.models.shipment import Checkpoint, CustodyTransfer, Shipment
 from app.services.indexer import (
     EventIndexer,
     bytes32_to_hex,
@@ -92,6 +92,8 @@ def _product_registered_event():
 
 def _checkpoint_event():
     return {
+        "address": _HANDLER,
+        "logIndex": 1,
         "args": {
             "productId": _PRODUCT_ID_BYTES,
             "location": "Warehouse A",
@@ -107,6 +109,8 @@ def _checkpoint_event():
 
 def _custody_event():
     return {
+        "address": _HANDLER,
+        "logIndex": 2,
         "args": {
             "productId": _PRODUCT_ID_BYTES,
             "from": _FROM_ADDR,
@@ -400,3 +404,70 @@ def test_process_delivery_completed():
     assert checkpoints[0].location == "Warehouse A"
     assert checkpoints[0].handler_address == _HANDLER
     assert checkpoints[0].block_number == _BLOCK
+
+
+@pytest.mark.parametrize('model,event_factory,method', [
+    (Checkpoint, _checkpoint_event, '_process_checkpoint_recorded'),
+    (CustodyTransfer, _custody_event, '_process_custody_transferred'),
+])
+def test_history_replay_in_a_new_indexer_does_not_duplicate(model, event_factory, method):
+    with _make_session() as db:
+        _insert_parent_product(db)
+    with patch('app.services.indexer.SessionLocal', side_effect=_make_session):
+        for _ in range(2):
+            indexer = EventIndexer(shipment_tracker_address=_HANDLER)
+            getattr(indexer, method)(event_factory())
+    with _make_session() as db:
+        rows = db.query(model).all()
+        assert len(rows) == 1
+        assert rows[0].source_event_id.endswith(':' + str(event_factory()['logIndex']))
+
+
+@pytest.mark.parametrize('model,event_factory,method', [
+    (Checkpoint, _checkpoint_event, '_process_checkpoint_recorded'),
+    (CustodyTransfer, _custody_event, '_process_custody_transferred'),
+])
+def test_distinct_logs_in_one_transaction_are_preserved(model, event_factory, method):
+    with _make_session() as db:
+        _insert_parent_product(db)
+    first = event_factory()
+    second = event_factory()
+    second['logIndex'] += 1
+    with patch('app.services.indexer.SessionLocal', side_effect=_make_session):
+        indexer = EventIndexer(shipment_tracker_address=_HANDLER)
+        getattr(indexer, method)(first)
+        getattr(indexer, method)(second)
+    with _make_session() as db:
+        assert db.query(model).count() == 2
+
+
+@pytest.mark.parametrize('event_factory,method', [
+    (_checkpoint_event, '_process_checkpoint_recorded'),
+    (_custody_event, '_process_custody_transferred'),
+])
+def test_history_event_without_log_identity_is_rejected(event_factory, method):
+    event = event_factory()
+    del event['logIndex']
+    indexer = EventIndexer(shipment_tracker_address=_HANDLER)
+    with pytest.raises(ValueError, match='log index'):
+        getattr(indexer, method)(event)
+
+
+def test_checkpoint_replay_does_not_regress_latest_shipment_status():
+    with _make_session() as db:
+        product_id = _insert_parent_product(db)
+        db.add(Shipment(shipment_id='SHIP-REPLAY', product_id=product_id,
+                        origin='Factory', destination='Depot', status='0'))
+        db.commit()
+    first = _checkpoint_event()
+    delivered = _checkpoint_event()
+    delivered['logIndex'] += 1
+    delivered['args']['status'] = 3
+    with patch('app.services.indexer.SessionLocal', side_effect=_make_session):
+        indexer = EventIndexer(shipment_tracker_address=_HANDLER)
+        indexer._process_checkpoint_recorded(first)
+        indexer._process_checkpoint_recorded(delivered)
+        indexer._process_checkpoint_recorded(first)
+    with _make_session() as db:
+        assert db.query(Checkpoint).count() == 2
+        assert db.query(Shipment).one().status == '3'

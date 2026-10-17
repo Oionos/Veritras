@@ -8,6 +8,7 @@ from typing import Dict, Optional
 
 from web3 import Web3
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from datetime import datetime, timezone
 
 from app.core.config import settings
@@ -287,6 +288,14 @@ class EventIndexer:
         finally:
             db.close()
 
+    def _history_event_id(self, event: Dict) -> str:
+        """Identify a log across restarts; a transaction can contain many logs."""
+        address = event.get("address", self.shipment_tracker_address)
+        log_index = event.get("logIndex")
+        if not Web3.is_address(address) or type(log_index) is not int or log_index < 0:
+            raise ValueError("History event requires its emitter and log index")
+        return f"{settings.chain_id}:{address.lower()}:{Web3.to_hex(event['transactionHash']).lower()}:{log_index}"
+
     def _process_checkpoint_recorded(self, event: Dict):
         """Persist a CheckpointRecorded event to the database."""
         args = event["args"]
@@ -298,9 +307,12 @@ class EventIndexer:
         notes = args.get("notes", "")
         block_number = event["blockNumber"]
         tx_hash = Web3.to_hex(event["transactionHash"])
+        source_event_id = self._history_event_id(event)
 
         db = SessionLocal()
         try:
+            if db.query(Checkpoint).filter(Checkpoint.source_event_id == source_event_id).first():
+                return
             product = find_product(db, args["productId"])
             if product:
                 product_id = product.product_id
@@ -313,12 +325,19 @@ class EventIndexer:
                 timestamp=timestamp,
                 block_number=block_number,
                 tx_hash=tx_hash,
+                source_event_id=source_event_id,
             )
             db.add(checkpoint)
             for shipment in db.query(Shipment).filter(Shipment.product_id == product_id).all():
                 shipment.status = status
             db.commit()
             logger.info(f"Indexed CheckpointRecorded: {product_id} at {location}")
+        except IntegrityError:
+            db.rollback()
+            # Overlapping deploys can observe the same log. The unique index
+            # makes the checkpoint and its shipment update commit once.
+            if not db.query(Checkpoint).filter(Checkpoint.source_event_id == source_event_id).first():
+                raise
         except Exception as e:
             db.rollback()
             logger.error(f"Error processing CheckpointRecorded: {e}")
@@ -335,9 +354,12 @@ class EventIndexer:
         timestamp = timestamp_to_datetime(args["timestamp"])
         block_number = event["blockNumber"]
         tx_hash = Web3.to_hex(event["transactionHash"])
+        source_event_id = self._history_event_id(event)
 
         db = SessionLocal()
         try:
+            if db.query(CustodyTransfer).filter(CustodyTransfer.source_event_id == source_event_id).first():
+                return
             product = find_product(db, args["productId"])
             if product:
                 product_id = product.product_id
@@ -348,10 +370,15 @@ class EventIndexer:
                 timestamp=timestamp,
                 block_number=block_number,
                 tx_hash=tx_hash,
+                source_event_id=source_event_id,
             )
             db.add(transfer)
             db.commit()
             logger.info(f"Indexed CustodyTransferred: {product_id} from {from_addr} to {to_addr}")
+        except IntegrityError:
+            db.rollback()
+            if not db.query(CustodyTransfer).filter(CustodyTransfer.source_event_id == source_event_id).first():
+                raise
         except Exception as e:
             db.rollback()
             logger.error(f"Error processing CustodyTransferred: {e}")

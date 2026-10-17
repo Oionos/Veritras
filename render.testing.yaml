@@ -4,13 +4,14 @@ services:
     name: veritras-api-testing
     runtime: docker
     plan: free
-    branch: codex/isolated-testing-environment
-    rootDir: backend
-    dockerfilePath: ./Dockerfile
-    autoDeploy: false
+    region: singapore
+    branch: testing
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    autoDeployTrigger: commit
     healthCheckPath: /health/live
-    # Migrations run before starting the API. Do not stamp an existing database.
-    dockerCommand: sh -c 'alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000'
+    # Docker CMD migrates a fresh/versioned database and respects Render's PORT.
+    # The existing service is configured through MCP/Dashboard, not Blueprint sync.
     envVars:
       - key: ENVIRONMENT
         value: testing
@@ -18,9 +19,15 @@ services:
         value: "11155111"
       - key: JWT_SECRET_KEY
         generateValue: true
+      - key: JWT_ISSUER
+        value: veritras-testing-api
+      - key: JWT_AUDIENCE
+        value: veritras-testing-web
       - key: DATABASE_URL
         sync: false
       - key: CORS_ORIGINS
+        sync: false
+      - key: SIWE_ORIGINS
         sync: false
       - key: SEPOLIA_RPC_URL
         sync: false
@@ -33,4 +40,4 @@ services:
       - key: INDEXER_ENABLED
         value: "true"
       - key: INDEXER_POLL_INTERVAL
-        value: "15"
+        value: "30"
