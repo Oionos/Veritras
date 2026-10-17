@@ -25,6 +25,8 @@ Render's existing testing service is managed through its Dashboard/MCP configura
 
 - Sepolia transactions use test ETH from a free faucet. Real ETH is not required.
 - The Neon organization is on its free plan, and the Render service uses free compute. No paid upgrade was selected. Provider quotas still apply.
+- Render grants 750 free instance hours per workspace per month, shared by its free web services, including production. Sleeping services do not consume these hours. Exhausting the allowance suspends all free web services until the next month; do not add continuous keep-alive pings for testing.
+- Render bandwidth and build-pipeline overages can be billed if the account permits them. Free compute does not impose a universal billing cap; review account spending limits if a strict zero-cost ceiling is required.
 - Render free compute sleeps when idle; the first request can take longer. Indexing runs while the service is awake. This environment does not promise continuous background indexing.
 - Database credentials and a separate random JWT key are stored only in the testing Render service. Its issuer/audience are `veritras-testing-api` / `veritras-testing-web`.
 - Vercel's Preview variables contain the testing API, chain, and contract addresses. Production has separate values. The WalletConnect project ID is public browser configuration shared between environments.
