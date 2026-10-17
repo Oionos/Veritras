@@ -50,3 +50,11 @@ class Shipment(Base):
     tx_hash = Column(String, nullable=False, default="0x")
 
     product = relationship("Product", backref="shipments")
+
+    @property
+    def owner_address(self):
+        return self.product.owner_address if self.product else None
+
+    @property
+    def ownership_source(self):
+        return self.product.ownership_source if self.product else None

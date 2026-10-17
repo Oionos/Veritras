@@ -1,5 +1,5 @@
-from pydantic import BaseModel, ConfigDict, Field
-from typing import List, Optional
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from typing import List, Optional, Literal
 from datetime import datetime
 
 
@@ -44,21 +44,30 @@ class ShipmentBase(BaseModel):
 
 
 class ShipmentCreate(ShipmentBase):
-    pass
+    status: Literal["0"] = "0"
+    model_config = ConfigDict(extra='forbid')
 
 
 class ShipmentUpdate(BaseModel):
     origin: Optional[str] = Field(default=None, max_length=200)
     destination: Optional[str] = Field(default=None, max_length=200)
-    status: Optional[str] = Field(default=None, max_length=50)
     notes: Optional[str] = Field(default=None, max_length=1000)
 
-    model_config = ConfigDict(extra='ignore')
+    model_config = ConfigDict(extra='forbid')
+
+    @field_validator("origin", "destination")
+    @classmethod
+    def location_cannot_be_null(cls, value):
+        if value is None or not value.strip():
+            raise ValueError("Location must not be empty")
+        return value
 
 
 class ShipmentResponse(ShipmentBase):
     id: int
     shipment_id: str = Field(..., max_length=100)
+    owner_address: Optional[str] = None
+    ownership_source: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     block_number: int

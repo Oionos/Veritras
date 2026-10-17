@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { toProductBytes32 as toBytes32 } from '@/utils/productId'
 import { useAccount } from 'wagmi'
+import { useAuth } from '@/hooks/useAuth'
+import { ownsRecord } from '@/utils/permissions'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -22,6 +24,7 @@ import { useRegisterProduct } from '@/hooks/useRegisterProduct'
 import {
   useRecordCheckpoint,
   useTransferCustody,
+  useShipmentPermissions,
   ShipmentStatus,
   StatusLabels,
 } from '@/hooks/useShipmentTracker'
@@ -56,12 +59,13 @@ const statusLabels: Record<string, string> = {
   '3': 'Delivered',
 }
 
-const statusVariant: Record<string, 'default' | 'blue' | 'orange' | 'success'> = {
-  '0': 'default',
-  '1': 'blue',
-  '2': 'orange',
-  '3': 'success',
-}
+const statusVariant: Record<string, 'default' | 'blue' | 'orange' | 'success'> =
+  {
+    '0': 'default',
+    '1': 'blue',
+    '2': 'orange',
+    '3': 'success',
+  }
 
 const DEFAULT_LIMIT = 10
 
@@ -75,6 +79,9 @@ function isValidEthAddress(value: string): boolean {
 
 export default function Products() {
   const { isConnected } = useAccount()
+  const auth = useAuth()
+  const activeWallet = useRef(auth.address)
+  activeWallet.current = auth.address
 
   // ── Pagination / table state ──────────────────────────────────────────────
   const [page, setPage] = useState(1)
@@ -163,17 +170,23 @@ export default function Products() {
     data: paginatedData,
     isLoading: tableLoading,
     error: tableError,
-  } = useProductsPaginated(page, limit, debouncedSearch || undefined, sortBy ?? undefined, sortOrder)
+  } = useProductsPaginated(
+    page,
+    limit,
+    debouncedSearch || undefined,
+    sortBy ?? undefined,
+    sortOrder,
+  )
 
   const createProduct = useCreateProduct()
   const updateProduct = useUpdateProduct()
 
   const rawItems: Product[] = Array.isArray(paginatedData)
     ? paginatedData
-    : paginatedData?.items ?? []
+    : (paginatedData?.items ?? [])
   const totalRaw = Array.isArray(paginatedData)
     ? paginatedData.length
-    : paginatedData?.total ?? 0
+    : (paginatedData?.total ?? 0)
 
   const totalPages = Math.max(1, Math.ceil(totalRaw / limit))
 
@@ -183,17 +196,14 @@ export default function Products() {
     error: productError,
   } = useProduct(submittedId)
 
-  const {
-    data: historyData,
-    isLoading: historyLoading,
-  } = useProductHistory(submittedId)
+  const { data: historyData, isLoading: historyLoading } =
+    useProductHistory(submittedId)
 
-  const {
-    data: transfersData,
-    isLoading: transfersLoading,
-  } = useProductTransfers(submittedId)
+  const { data: transfersData, isLoading: transfersLoading } =
+    useProductTransfers(submittedId)
 
   const product = productDetail?.product
+  const permissions = useShipmentPermissions(product?.product_id)
   const history: Checkpoint[] = historyData ?? []
   const transfers: CustodyTransfer[] = transfersData ?? []
   const isDelivered = history.some((c) => c.status === '3')
@@ -201,7 +211,8 @@ export default function Products() {
 
   const isNotFound =
     productError instanceof Error &&
-    (productError.message.includes('404') || productError.message.includes('not found'))
+    (productError.message.includes('404') ||
+      productError.message.includes('not found'))
 
   // ── Form ──────────────────────────────────────────────────────────────────
   const {
@@ -252,10 +263,17 @@ export default function Products() {
   const closeModal = useCallback(() => {
     // If the user bails out of the blockchain step without registering on-chain,
     // show a nudge so they know the product is saved and can be registered later.
-    if (createdProduct !== null && modalStep === 'blockchain' && !registerSuccess) {
-      toast.info('Product saved. Register it on-chain later from the product list.', {
-        description: createdProduct.product_id,
-      })
+    if (
+      createdProduct !== null &&
+      modalStep === 'blockchain' &&
+      !registerSuccess
+    ) {
+      toast.info(
+        'Product saved. Register it on-chain later from the product list.',
+        {
+          description: createdProduct.product_id,
+        },
+      )
     }
     setModalOpen(false)
     setEditingProduct(null)
@@ -263,6 +281,14 @@ export default function Products() {
     setCreatedProduct(null)
     reset()
   }, [reset, createdProduct, modalStep, registerSuccess])
+
+  useEffect(() => {
+    setModalOpen(false)
+    setEditingProduct(null)
+    setCreatedProduct(null)
+    setModalStep('form')
+    reset()
+  }, [auth.address, reset])
 
   // ── Auto-close modal after successful blockchain registration ─────────────
   useEffect(() => {
@@ -275,14 +301,27 @@ export default function Products() {
   }, [registerSuccess, modalStep, closeModal])
 
   const openAddModal = () => {
+    if (!auth.isAuthenticated) return
     setEditingProduct(null)
     setModalStep('form')
     setCreatedProduct(null)
-    reset({ name: '', manufacturer_address: '', description: '', metadata_uri: '' })
+    reset({
+      name: '',
+      manufacturer_address: auth.address || '',
+      description: '',
+      metadata_uri: '',
+    })
     setModalOpen(true)
   }
 
   const openEditModal = (productItem: Product) => {
+    if (
+      !ownsRecord(productItem, auth.address) ||
+      productItem.block_number !== 0 ||
+      productItem.tx_hash !== '0x' ||
+      productItem.ownership_source !== 'signed_draft'
+    )
+      return
     setEditingProduct(productItem)
     setModalStep('form')
     setCreatedProduct(null)
@@ -300,21 +339,35 @@ export default function Products() {
     setSubmittedId(productId)
     setShowCheckpointForm(false)
     setShowTransferForm(false)
-    setTimeout(() => detailSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+    setTimeout(
+      () =>
+        detailSectionRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        }),
+      50,
+    )
   }
 
   const onSubmit = async (formData: ProductFormData) => {
+    if (!auth.isAuthenticated) return
+    const wallet = auth.address
     try {
       if (editingProduct) {
         // Edit flow: single-step, no blockchain step
         await updateProduct.mutateAsync({
           product_id: editingProduct.product_id,
-          data: formData,
+          data: {
+            name: formData.name,
+            description: formData.description,
+            metadata_uri: formData.metadata_uri,
+          },
         })
         closeModal()
       } else {
         // Create flow: step 1 — DB record
         const newProduct = await createProduct.mutateAsync(formData)
+        if (activeWallet.current !== wallet) return
         setCreatedProduct(newProduct)
         setModalStep('blockchain')
       }
@@ -324,13 +377,13 @@ export default function Products() {
   }
 
   const handleRegisterOnChain = () => {
-    if (!createdProduct) return
+    if (!createdProduct || !ownsRecord(createdProduct, auth.address)) return
     const productIdBytes32 = toBytes32(createdProduct.product_id)
     registerOnChain(
       productIdBytes32,
       createdProduct.name,
       createdProduct.description ?? '',
-      createdProduct.metadata_uri ?? ''
+      createdProduct.metadata_uri ?? '',
     )
   }
 
@@ -372,15 +425,26 @@ export default function Products() {
             Products
           </h1>
           <p className="max-w-xl text-sm leading-relaxed text-muted">
-            Browse registered products, manage records, or search by ID to inspect
-            blockchain history and custody transfers.
+            Browse registered products, manage records, or search by ID to
+            inspect blockchain history and custody transfers.
           </p>
         </div>
-        <Button onClick={openAddModal} className="gap-2">
+        <Button
+          onClick={openAddModal}
+          disabled={!auth.isAuthenticated}
+          className="gap-2"
+        >
           <Plus className="h-4 w-4" />
           Add Product
         </Button>
       </div>
+
+      {!auth.isAuthenticated && (
+        <p className="text-sm text-muted">
+          Connect your wallet and sign in to create products or edit your
+          drafts.
+        </p>
+      )}
 
       {/* ─── Filters ───────────────────────────────────────────────── */}
       <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 backdrop-blur-2xl">
@@ -420,7 +484,9 @@ export default function Products() {
           <div>
             <p className="font-medium text-red-400">Failed to load products</p>
             <p className="text-sm text-red-400/70">
-              {tableError instanceof Error ? tableError.message : 'Please try again later.'}
+              {tableError instanceof Error
+                ? tableError.message
+                : 'Please try again later.'}
             </p>
           </div>
         </div>
@@ -448,7 +514,11 @@ export default function Products() {
                 : 'Register your first product to start tracking its journey'}
             </p>
             {!serverSearch && (
-              <Button onClick={openAddModal} className="mt-4 gap-2">
+              <Button
+                onClick={openAddModal}
+                disabled={!auth.isAuthenticated}
+                className="mt-4 gap-2"
+              >
                 <Plus className="h-4 w-4" />
                 Register Product
               </Button>
@@ -477,9 +547,15 @@ export default function Products() {
                       <ArrowUpDown className="h-3 w-3" />
                     </button>
                   </th>
-                  <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-muted/60">Manufacturer</th>
-                  <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-muted/60">Registered</th>
-                  <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-muted/60">Actions</th>
+                  <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-muted/60">
+                    Manufacturer
+                  </th>
+                  <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-muted/60">
+                    Registered
+                  </th>
+                  <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-muted/60">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.04]">
@@ -507,13 +583,18 @@ export default function Products() {
                         >
                           <Eye className="h-4 w-4" />
                         </button>
-                        <button
-                          onClick={() => openEditModal(item)}
-                          className="rounded-lg p-2 text-muted/40 transition-colors hover:bg-white/[0.04] hover:text-text"
-                          aria-label={`Edit ${item.product_id}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
+                        {ownsRecord(item, auth.address) &&
+                          item.ownership_source === 'signed_draft' &&
+                          item.block_number === 0 &&
+                          item.tx_hash === '0x' && (
+                            <button
+                              onClick={() => openEditModal(item)}
+                              className="rounded-lg p-2 text-muted/40 transition-colors hover:bg-white/[0.04] hover:text-text"
+                              aria-label={`Edit ${item.product_id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                          )}
                       </div>
                     </td>
                   </tr>
@@ -583,7 +664,11 @@ export default function Products() {
               className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 pl-10 pr-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
             />
           </div>
-          <Button onClick={handleLookupSearch} disabled={loadingDetail} className="min-w-[120px]">
+          <Button
+            onClick={handleLookupSearch}
+            disabled={loadingDetail}
+            className="min-w-[120px]"
+          >
             {loadingDetail ? <LoadingSpinner size="sm" /> : 'Search'}
           </Button>
         </div>
@@ -596,7 +681,8 @@ export default function Products() {
           <div>
             <p className="font-medium text-red-400">Product Not Found</p>
             <p className="text-sm text-red-400/70">
-              No product with ID &quot;{submittedId}&quot; was found on the blockchain.
+              No product with ID &quot;{submittedId}&quot; was found on the
+              blockchain.
             </p>
           </div>
         </div>
@@ -609,7 +695,9 @@ export default function Products() {
           <div>
             <p className="font-medium text-red-400">Error</p>
             <p className="text-sm text-red-400/70">
-              {productError instanceof Error ? productError.message : 'Failed to load product'}
+              {productError instanceof Error
+                ? productError.message
+                : 'Failed to load product'}
             </p>
           </div>
         </div>
@@ -646,23 +734,32 @@ export default function Products() {
               </div>
               <div className="rounded-xl bg-white/[0.03] p-4 text-center">
                 <ShieldCheck className="mx-auto h-8 w-8 text-muted" />
-                <p className="mt-2 text-xs font-medium text-muted">Check registration on the Verify page</p>
+                <p className="mt-2 text-xs font-medium text-muted">
+                  Check registration on the Verify page
+                </p>
               </div>
             </div>
           </Card>
 
           {/* ─── Blockchain Actions ─────────────────────────────────── */}
+          <p className="text-sm text-muted">
+            Checkpoint and custody actions are available to the current handler.
+            The manufacturer records the first checkpoint.
+          </p>
           {isConnected ? (
             <div className="space-y-3">
               {/* Record Checkpoint */}
               <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-2xl">
                 <button
                   onClick={() => setShowCheckpointForm((v) => !v)}
+                  disabled={!permissions.canRecord}
                   className="flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-white/[0.02]"
                 >
                   <div className="flex items-center gap-3">
                     <MapPin className="h-4 w-4 text-accent" />
-                    <span className="text-sm font-medium text-text">Record Checkpoint</span>
+                    <span className="text-sm font-medium text-text">
+                      Record Checkpoint
+                    </span>
                   </div>
                   {showCheckpointForm ? (
                     <ChevronUp className="h-4 w-4 text-muted/60" />
@@ -682,71 +779,82 @@ export default function Products() {
                     className="overflow-hidden"
                   >
                     <div className="border-t border-white/[0.06] px-5 pb-5 pt-4 space-y-4">
-                    {/* Location */}
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text">
-                        Location <span className="text-red-400">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={cpLocation}
-                        onChange={(e) => setCpLocation(e.target.value)}
-                        placeholder="e.g., Port of Rotterdam"
-                        disabled={cpPending || cpConfirming}
-                        className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
-                      />
-                    </div>
+                      {/* Location */}
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-text">
+                          Location <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={cpLocation}
+                          onChange={(e) => setCpLocation(e.target.value)}
+                          placeholder="e.g., Port of Rotterdam"
+                          disabled={cpPending || cpConfirming}
+                          className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
+                        />
+                      </div>
 
-                    {/* Status */}
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text">
-                        Status
-                      </label>
-                      <select
-                        value={cpStatus}
-                        onChange={(e) => setCpStatus(Number(e.target.value) as ShipmentStatus)}
-                        disabled={cpPending || cpConfirming}
-                        className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
-                      >
-                        {(Object.entries(StatusLabels) as [string, string][]).map(([val, label]) => (
-                          <option key={val} value={val}>
-                            {label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                      {/* Status */}
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-text">
+                          Status
+                        </label>
+                        <select
+                          value={cpStatus}
+                          onChange={(e) =>
+                            setCpStatus(
+                              Number(e.target.value) as ShipmentStatus,
+                            )
+                          }
+                          disabled={cpPending || cpConfirming}
+                          className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
+                        >
+                          {(
+                            Object.entries(StatusLabels) as [string, string][]
+                          ).map(([val, label]) => (
+                            <option key={val} value={val}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                    {/* Notes */}
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text">
-                        Notes <span className="text-muted">(optional)</span>
-                      </label>
-                      <textarea
-                        value={cpNotes}
-                        onChange={(e) => setCpNotes(e.target.value)}
-                        placeholder="Any additional notes..."
-                        rows={2}
-                        disabled={cpPending || cpConfirming}
-                        className="w-full resize-none rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
-                      />
-                    </div>
+                      {/* Notes */}
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-text">
+                          Notes <span className="text-muted">(optional)</span>
+                        </label>
+                        <textarea
+                          value={cpNotes}
+                          onChange={(e) => setCpNotes(e.target.value)}
+                          placeholder="Any additional notes..."
+                          rows={2}
+                          disabled={cpPending || cpConfirming}
+                          className="w-full resize-none rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
+                        />
+                      </div>
 
-                    <div className="flex justify-end">
-                      <Button
-                        onClick={handleSubmitCheckpoint}
-                        disabled={cpPending || cpConfirming || !cpLocation.trim()}
-                      >
-                        {(cpPending || cpConfirming) && (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        )}
-                        {cpPending
-                          ? 'Submitting...'
-                          : cpConfirming
-                          ? 'Confirming...'
-                          : 'Submit Checkpoint'}
-                      </Button>
+                      <div className="flex justify-end">
+                        <Button
+                          onClick={handleSubmitCheckpoint}
+                          disabled={
+                            cpPending ||
+                            cpConfirming ||
+                            !cpLocation.trim() ||
+                            !permissions.canRecord
+                          }
+                        >
+                          {(cpPending || cpConfirming) && (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          )}
+                          {cpPending
+                            ? 'Submitting...'
+                            : cpConfirming
+                              ? 'Confirming...'
+                              : 'Submit Checkpoint'}
+                        </Button>
+                      </div>
                     </div>
-                  </div>
                   </motion.div>
                 )}
               </div>
@@ -755,11 +863,14 @@ export default function Products() {
               <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-2xl">
                 <button
                   onClick={() => setShowTransferForm((v) => !v)}
+                  disabled={!permissions.canTransfer}
                   className="flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-white/[0.02]"
                 >
                   <div className="flex items-center gap-3">
                     <ArrowRight className="h-4 w-4 text-accent" />
-                    <span className="text-sm font-medium text-text">Transfer Custody</span>
+                    <span className="text-sm font-medium text-text">
+                      Transfer Custody
+                    </span>
                   </div>
                   {showTransferForm ? (
                     <ChevronUp className="h-4 w-4 text-muted/60" />
@@ -779,42 +890,50 @@ export default function Products() {
                     className="overflow-hidden"
                   >
                     <div className="border-t border-white/[0.06] px-5 pb-5 pt-4 space-y-4">
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text">
-                        New Handler Address <span className="text-red-400">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={txHandler}
-                        onChange={(e) => {
-                          setTxHandler(e.target.value)
-                          setTxHandlerError('')
-                        }}
-                        placeholder="0x..."
-                        disabled={txPending || txConfirming}
-                        className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 font-mono text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
-                      />
-                      {txHandlerError && (
-                        <p className="mt-1 text-xs text-red-400">{txHandlerError}</p>
-                      )}
-                    </div>
-
-                    <div className="flex justify-end">
-                      <Button
-                        onClick={handleTransferCustody}
-                        disabled={txPending || txConfirming || !txHandler.trim()}
-                      >
-                        {(txPending || txConfirming) && (
-                          <Loader2 className="h-4 w-4 animate-spin" />
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-text">
+                          New Handler Address{' '}
+                          <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={txHandler}
+                          onChange={(e) => {
+                            setTxHandler(e.target.value)
+                            setTxHandlerError('')
+                          }}
+                          placeholder="0x..."
+                          disabled={txPending || txConfirming}
+                          className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 font-mono text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
+                        />
+                        {txHandlerError && (
+                          <p className="mt-1 text-xs text-red-400">
+                            {txHandlerError}
+                          </p>
                         )}
-                        {txPending
-                          ? 'Submitting...'
-                          : txConfirming
-                          ? 'Confirming...'
-                          : 'Transfer'}
-                      </Button>
+                      </div>
+
+                      <div className="flex justify-end">
+                        <Button
+                          onClick={handleTransferCustody}
+                          disabled={
+                            txPending ||
+                            txConfirming ||
+                            !txHandler.trim() ||
+                            !permissions.canTransfer
+                          }
+                        >
+                          {(txPending || txConfirming) && (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          )}
+                          {txPending
+                            ? 'Submitting...'
+                            : txConfirming
+                              ? 'Confirming...'
+                              : 'Transfer'}
+                        </Button>
+                      </div>
                     </div>
-                  </div>
                   </motion.div>
                 )}
               </div>
@@ -822,15 +941,20 @@ export default function Products() {
           ) : (
             <div className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-5 py-4 text-sm text-muted backdrop-blur-2xl">
               <LinkIcon className="h-4 w-4 shrink-0 text-muted/40" />
-              Connect your wallet to record checkpoints or transfer custody on-chain.
+              Connect your wallet to record checkpoints or transfer custody
+              on-chain.
             </div>
           )}
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <Card className="lg:col-span-2">
-              <h3 className="mb-6 font-semibold text-text">Shipment Timeline</h3>
+              <h3 className="mb-6 font-semibold text-text">
+                Shipment Timeline
+              </h3>
               {history.length === 0 ? (
-                <p className="text-sm text-muted">No checkpoint history available.</p>
+                <p className="text-sm text-muted">
+                  No checkpoint history available.
+                </p>
               ) : (
                 <div className="relative space-y-0">
                   <div className="absolute left-[19px] top-2 bottom-2 w-px bg-white/[0.06]" />
@@ -845,41 +969,49 @@ export default function Products() {
                         ease: [0.23, 1, 0.32, 1],
                       }}
                     >
-                    <div className="relative flex gap-4 pb-8 last:pb-0">
-                      <div
-                        className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 ${
-                          checkpoint.status === '3'
-                            ? 'border-accent bg-accent/10'
-                            : 'border-white/[0.1] bg-white/[0.04]'
-                        }`}
-                      >
-                        {checkpoint.status === '3' ? (
-                          <CheckCircle2 className="h-4 w-4 text-accent" />
-                        ) : (
-                          <div className="h-2.5 w-2.5 rounded-full bg-muted/40" />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1 space-y-1 pt-1">
-                        <div className="flex items-center justify-between">
-                          <p className="font-medium text-text">
-                            {checkpoint.notes || statusLabels[checkpoint.status] || 'Update'}
-                          </p>
-                          <span className="font-mono text-xs text-muted/60">
-                            {formatDate(checkpoint.timestamp)}
-                          </span>
+                      <div className="relative flex gap-4 pb-8 last:pb-0">
+                        <div
+                          className={`relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 ${
+                            checkpoint.status === '3'
+                              ? 'border-accent bg-accent/10'
+                              : 'border-white/[0.1] bg-white/[0.04]'
+                          }`}
+                        >
+                          {checkpoint.status === '3' ? (
+                            <CheckCircle2 className="h-4 w-4 text-accent" />
+                          ) : (
+                            <div className="h-2.5 w-2.5 rounded-full bg-muted/40" />
+                          )}
                         </div>
-                        <p className="flex items-center gap-1 text-sm text-muted">
-                          <MapPin className="h-3 w-3" />
-                          {checkpoint.location}
-                        </p>
-                        <Badge variant={statusVariant[checkpoint.status] || 'default'} className="mt-1">
-                          {statusLabels[checkpoint.status] || checkpoint.status}
-                        </Badge>
-                        <p className="font-mono text-xs text-muted/40">
-                          By {formatAddress(checkpoint.handler_address)}
-                        </p>
+                        <div className="min-w-0 flex-1 space-y-1 pt-1">
+                          <div className="flex items-center justify-between">
+                            <p className="font-medium text-text">
+                              {checkpoint.notes ||
+                                statusLabels[checkpoint.status] ||
+                                'Update'}
+                            </p>
+                            <span className="font-mono text-xs text-muted/60">
+                              {formatDate(checkpoint.timestamp)}
+                            </span>
+                          </div>
+                          <p className="flex items-center gap-1 text-sm text-muted">
+                            <MapPin className="h-3 w-3" />
+                            {checkpoint.location}
+                          </p>
+                          <Badge
+                            variant={
+                              statusVariant[checkpoint.status] || 'default'
+                            }
+                            className="mt-1"
+                          >
+                            {statusLabels[checkpoint.status] ||
+                              checkpoint.status}
+                          </Badge>
+                          <p className="font-mono text-xs text-muted/40">
+                            By {formatAddress(checkpoint.handler_address)}
+                          </p>
+                        </div>
                       </div>
-                    </div>
                     </motion.div>
                   ))}
                 </div>
@@ -887,9 +1019,13 @@ export default function Products() {
             </Card>
 
             <Card>
-              <h3 className="mb-6 font-semibold text-text">Custody Transfers</h3>
+              <h3 className="mb-6 font-semibold text-text">
+                Custody Transfers
+              </h3>
               {transfers.length === 0 ? (
-                <p className="text-sm text-muted">No custody transfers available.</p>
+                <p className="text-sm text-muted">
+                  No custody transfers available.
+                </p>
               ) : (
                 <div className="space-y-3">
                   {transfers.map((transfer) => (
@@ -898,9 +1034,13 @@ export default function Products() {
                       className="rounded-xl bg-white/[0.02] p-3 transition-colors hover:bg-white/[0.04]"
                     >
                       <div className="flex items-center gap-2 text-xs text-muted">
-                        <span className="font-mono">{formatAddress(transfer.from_address)}</span>
+                        <span className="font-mono">
+                          {formatAddress(transfer.from_address)}
+                        </span>
                         <ArrowRight className="h-3 w-3 text-accent" />
-                        <span className="font-mono">{formatAddress(transfer.to_address)}</span>
+                        <span className="font-mono">
+                          {formatAddress(transfer.to_address)}
+                        </span>
                       </div>
                       <p className="mt-2 text-xs text-muted/50">
                         {formatDate(transfer.timestamp)}
@@ -917,7 +1057,9 @@ export default function Products() {
       {!product && !loadingDetail && !productError && !submittedId && (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/[0.06] bg-white/[0.02] py-16 text-center backdrop-blur-xl">
           <Package className="h-12 w-12 text-muted/20" />
-          <p className="mt-4 text-sm text-muted">Enter a product ID to view its details</p>
+          <p className="mt-4 text-sm text-muted">
+            Enter a product ID to view its details
+          </p>
         </div>
       )}
 
@@ -933,8 +1075,8 @@ export default function Products() {
           modalStep === 'blockchain'
             ? 'Register on Blockchain'
             : editingProduct
-            ? 'Edit Product'
-            : 'Add Product'
+              ? 'Edit Product'
+              : 'Add Product'
         }
       >
         {/* ── Step 1: Form ── */}
@@ -942,7 +1084,9 @@ export default function Products() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {mutationError && (
               <div className="rounded-xl border border-red-500/20 bg-red-500/[0.06] p-3 text-sm text-red-400">
-                {mutationError instanceof Error ? mutationError.message : 'An error occurred'}
+                {mutationError instanceof Error
+                  ? mutationError.message
+                  : 'An error occurred'}
               </div>
             )}
 
@@ -956,7 +1100,9 @@ export default function Products() {
                 className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
               />
               {errors.name && (
-                <p className="mt-1 text-xs text-red-400">{errors.name.message}</p>
+                <p className="mt-1 text-xs text-red-400">
+                  {errors.name.message}
+                </p>
               )}
             </div>
 
@@ -966,11 +1112,15 @@ export default function Products() {
               </label>
               <input
                 {...register('manufacturer_address')}
+                readOnly
+                aria-label="Manufacturer address from your signed-in wallet"
                 placeholder="0x..."
                 className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
               />
               {errors.manufacturer_address && (
-                <p className="mt-1 text-xs text-red-400">{errors.manufacturer_address.message}</p>
+                <p className="mt-1 text-xs text-red-400">
+                  {errors.manufacturer_address.message}
+                </p>
               )}
             </div>
 
@@ -985,7 +1135,9 @@ export default function Products() {
                 className="w-full resize-none rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
               />
               {errors.description && (
-                <p className="mt-1 text-xs text-red-400">{errors.description.message}</p>
+                <p className="mt-1 text-xs text-red-400">
+                  {errors.description.message}
+                </p>
               )}
             </div>
 
@@ -999,7 +1151,9 @@ export default function Products() {
                 className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
               />
               {errors.metadata_uri && (
-                <p className="mt-1 text-xs text-red-400">{errors.metadata_uri.message}</p>
+                <p className="mt-1 text-xs text-red-400">
+                  {errors.metadata_uri.message}
+                </p>
               )}
             </div>
 
@@ -1046,7 +1200,9 @@ export default function Products() {
               <div className="space-y-4">
                 <p className="text-sm text-muted">
                   Register{' '}
-                  <span className="font-mono text-text">{createdProduct.product_id}</span>{' '}
+                  <span className="font-mono text-text">
+                    {createdProduct.product_id}
+                  </span>{' '}
                   on the Sepolia blockchain to anchor it on-chain.
                 </p>
 
@@ -1055,7 +1211,9 @@ export default function Products() {
                   <div className="flex items-center gap-2 rounded-xl border border-accent/20 bg-accent/[0.06] px-4 py-3 text-xs">
                     <LinkIcon className="h-3.5 w-3.5 shrink-0 text-accent" />
                     <span className="text-muted">Transaction submitted!</span>
-                    <span className="font-mono text-accent break-all">{registerHash}</span>
+                    <span className="font-mono text-accent break-all">
+                      {registerHash}
+                    </span>
                   </div>
                 )}
 
@@ -1073,14 +1231,16 @@ export default function Products() {
                     onClick={handleRegisterOnChain}
                     disabled={registerBusy || registerSuccess}
                   >
-                    {registerBusy && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {registerBusy && (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    )}
                     {registerPending
                       ? 'Submitting...'
                       : registerConfirming
-                      ? 'Confirming...'
-                      : registerSuccess
-                      ? 'Registered!'
-                      : 'Register on Blockchain'}
+                        ? 'Confirming...'
+                        : registerSuccess
+                          ? 'Registered!'
+                          : 'Register on Blockchain'}
                   </Button>
                 </div>
               </div>
@@ -1088,7 +1248,8 @@ export default function Products() {
               <div className="space-y-4">
                 <div className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-sm text-muted">
                   <LinkIcon className="h-4 w-4 shrink-0 text-muted/40" />
-                  Connect your wallet to register this product on the blockchain.
+                  Connect your wallet to register this product on the
+                  blockchain.
                 </div>
                 <div className="flex justify-end">
                   <Button type="button" onClick={closeModal}>

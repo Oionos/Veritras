@@ -4,6 +4,7 @@ from web3 import Web3
 from web3.logs import DISCARD
 
 from app.core.config import settings
+from app.core.product_id import canonical_product_id
 from app.services.indexer import load_abi
 
 
@@ -21,13 +22,10 @@ def verify_registration(product) -> bool:
         return False
     if receipt["blockNumber"] != product.block_number:
         return False
-    if product.product_id.startswith("0x") and len(product.product_id) == 66:
-        canonical_id = bytes.fromhex(product.product_id[2:])
-    else:
-        encoded = product.product_id.encode("utf-8")
-        if len(encoded) > 32:
-            return False
-        canonical_id = encoded.ljust(32, b"\x00")
+    try:
+        canonical_id = canonical_product_id(product.product_id)
+    except ValueError:
+        return False
     contract = w3.eth.contract(address=registry, abi=load_abi("ProductRegistry"))
     return any(
         log["address"].lower() == registry.lower()

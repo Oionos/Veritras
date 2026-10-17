@@ -1,3 +1,9 @@
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => ({ token: 'test-token', address: '0x1234567890123456789012345678901234567890', isAuthenticated: true, isLoggingIn: false, loginError: null, login: vi.fn(), logout: vi.fn() }),
+  getAuthToken: () => null,
+  clearAuthToken: vi.fn(),
+}))
+
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen, fireEvent, waitFor } from '@testing-library/react'
 import Products from './Products'
@@ -35,6 +41,7 @@ vi.mock('@/hooks/useRegisterProduct', () => ({
 }))
 
 vi.mock('@/hooks/useShipmentTracker', () => ({
+  useShipmentPermissions: () => ({ canRecord: true, canTransfer: true }),
   useRecordCheckpoint: () => ({
     record: vi.fn(),
     hash: undefined,
@@ -97,7 +104,7 @@ describe('Products form validation', () => {
   const openAddModal = () =>
     fireEvent.click(screen.getByRole('button', { name: /add product/i }))
 
-  it('shows name and address errors when the form is submitted completely empty', async () => {
+  it('shows the name error while manufacturer comes from the signed-in wallet', async () => {
     renderWithProviders(<Products />)
     openAddModal()
 
@@ -105,7 +112,6 @@ describe('Products form validation', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Name must be at least 2 characters')).toBeInTheDocument()
-      expect(screen.getByText('Must be a valid Ethereum address')).toBeInTheDocument()
     })
   })
 
@@ -145,22 +151,12 @@ describe('Products form validation', () => {
     })
   })
 
-  it('shows address format error for an invalid Ethereum address', async () => {
+  it('manufacturer address is supplied by the signed-in wallet and is read-only', () => {
     renderWithProviders(<Products />)
     openAddModal()
-
-    fireEvent.change(screen.getByPlaceholderText('e.g., Organic Coffee Beans'), {
-      target: { value: 'Valid Product Name' },
-    })
-    fireEvent.change(screen.getByPlaceholderText('0x...'), {
-      target: { value: 'not-an-ethereum-address' },
-    })
-
-    fireEvent.click(screen.getByRole('button', { name: 'Create Product' }))
-
-    await waitFor(() => {
-      expect(screen.getByText('Must be a valid Ethereum address')).toBeInTheDocument()
-    })
+    const input = screen.getByPlaceholderText('0x...')
+    expect(input).toHaveValue(VALID_ADDRESS)
+    expect(input).toHaveAttribute('readonly')
   })
 
   it('shows metadata_uri error when an invalid URL is entered', async () => {

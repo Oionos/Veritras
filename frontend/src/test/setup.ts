@@ -25,6 +25,7 @@ vi.mock('wagmi', async (importOriginal) => {
 
 // ── Global useShipmentTracker mock ────────────────────────────────────────────
 vi.mock('@/hooks/useShipmentTracker', () => ({
+  useShipmentPermissions: () => ({ canRecord: false, canTransfer: false }),
   useRecordCheckpoint: () => ({
     record: vi.fn(),
     hash: undefined,

@@ -17,21 +17,36 @@ async function main() {
   assert.equal(health.environment, 'testing');
   assert.equal(health.chain_id, 31337);
   const [manufacturer, handler] = await ethers.getSigners();
-  const { nonce } = await api('/auth/nonce');
-  const message = `localhost:13000 wants you to sign in with your Ethereum account:\n${manufacturer.address}\n\nSign in to Veritras\n\nURI: http://localhost:13000\nVersion: 1\nChain ID: 31337\nNonce: ${nonce}\nIssued At: ${new Date().toISOString()}`;
+  const { message } = await api('/auth/challenge', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ address: manufacturer.address }),
+  });
+  const signature = await manufacturer.signMessage(message);
   const auth = await api('/auth/verify', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, signature: await manufacturer.signMessage(message) }),
+    body: JSON.stringify({ message, signature }),
   });
   assert.ok(auth.access_token);
+  const replay = await fetch(`${base}/auth/verify`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, signature }),
+  });
+  assert.equal(replay.status, 401, 'A signed challenge must be consumed exactly once');
   const json = (body: unknown) => ({ method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth.access_token}` }, body: JSON.stringify(body) });
   const draft = await api('/products/', json({ name: 'Isolated testing item', manufacturer_address: manufacturer.address }));
+  assert.equal(draft.owner_address, manufacturer.address.toLowerCase());
+  assert.equal(draft.ownership_source, 'signed_draft');
+  assert.equal((await fetch(`${base}/products/`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Anonymous write' }),
+  })).status, 401);
   assert.equal((await api(`/products/${draft.product_id}/verify`)).is_registered, false);
   const shipment = await api('/shipments/', json({ product_id: draft.product_id, origin: 'Test factory', destination: 'Test depot' }));
   const id = ethers.encodeBytes32String(draft.product_id);
   const registry = await ethers.getContractAt('ProductRegistry', manifest.contracts.ProductRegistry);
   const tracker = await ethers.getContractAt('ShipmentTracker', manifest.contracts.ShipmentTracker);
   await (await registry.registerProduct(id, draft.name, '', '')).wait();
+  const edit = { ...json({ name: 'Cannot change a registered name' }), method: 'PUT' };
+  assert.equal((await fetch(`${base}/products/${draft.product_id}`, edit)).status, 409);
   await (await tracker.recordCheckpoint(id, 'Test factory', 0, 'Created')).wait();
   await (await tracker.recordCheckpoint(id, 'Test route', 1, 'Departed')).wait();
   await (await tracker.transferCustody(id, handler.address)).wait();

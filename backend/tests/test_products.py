@@ -14,9 +14,11 @@ def seeded_products(db_session):
         description="A test product",
         metadata_uri="ipfs://test",
         manufacturer_address="0x1234567890123456789012345678901234567890",
+        owner_address="0x1234567890123456789012345678901234567890",
+        ownership_source="signed_draft",
         registered_at=datetime.now(timezone.utc),
-        block_number=100,
-        tx_hash="0xtesttx",
+        block_number=0,
+        tx_hash="0x",
     )
     db_session.add(product)
     db_session.commit()
@@ -27,7 +29,7 @@ def test_post_product_creates_product_successfully(client_fixture, seeded_produc
     """Regression test: POST /products must not return 405 Method Not Allowed."""
     payload = {
         "name": "Organic Coffee Beans",
-        "manufacturer_address": "0x0987654321098765432109876543210987654321",
+        "manufacturer_address": "0x1234567890123456789012345678901234567890",
         "description": "Premium organic coffee",
         "metadata_uri": "https://example.com/coffee",
     }

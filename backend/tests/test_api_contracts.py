@@ -21,9 +21,11 @@ def seeded_product(db_session):
         description="For contract tests",
         metadata_uri="ipfs://contract",
         manufacturer_address="0x1234567890123456789012345678901234567890",
+        owner_address="0x1234567890123456789012345678901234567890",
+        ownership_source="signed_draft",
         registered_at=datetime.now(timezone.utc),
-        block_number=100,
-        tx_hash="0xcontracttx",
+        block_number=0,
+        tx_hash="0x",
     )
     db_session.add(product)
     db_session.commit()

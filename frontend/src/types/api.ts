@@ -13,11 +13,31 @@ export interface paths {
         };
         /**
          * Get Nonce
-         * @description Generate a random nonce for SIWE authentication.
+         * @description Compatibility nonce endpoint; scope and expiry remain server controlled.
          */
         get: operations["get_nonce_auth_nonce_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/challenge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Challenge
+         * @description Issue the exact message the requested wallet must sign.
+         */
+        post: operations["challenge_auth_challenge_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -33,10 +53,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Verify
-         * @description Verify a SIWE signature and return a JWT access token.
-         */
+        /** Verify */
         post: operations["verify_auth_verify_post"];
         delete?: never;
         options?: never;
@@ -121,7 +138,7 @@ export interface paths {
         };
         /**
          * Get All Shipments
-         * @description List all shipments with optional search, status filter, sorting, and pagination.
+         * @description List all shipments with optional status filter, search, sorting, and pagination.
          */
         get: operations["get_all_shipments_shipments__get"];
         put?: never;
@@ -316,6 +333,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/health/indexer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Health Indexer
+         * @description Expose blockchain indexer status and last processed block.
+         */
+        get: operations["health_indexer_health_indexer_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Health Live */
+        get: operations["health_live_health_live_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Health Ready */
+        get: operations["health_ready_health_ready_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -369,6 +440,34 @@ export interface components {
             severity: string;
             /** Flagged At */
             flagged_at: string;
+        };
+        /** ChallengeRequest */
+        ChallengeRequest: {
+            /** Address */
+            address: string;
+        };
+        /** ChallengeResponse */
+        ChallengeResponse: {
+            /** Nonce */
+            nonce: string;
+            /** Domain */
+            domain: string;
+            /** Uri */
+            uri: string;
+            /** Chain Id */
+            chain_id: number;
+            /**
+             * Issued At
+             * Format: date-time
+             */
+            issued_at: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Message */
+            message: string;
         };
         /** CheckpointResponse */
         CheckpointResponse: {
@@ -458,6 +557,22 @@ export interface components {
         NonceResponse: {
             /** Nonce */
             nonce: string;
+            /** Domain */
+            domain: string;
+            /** Uri */
+            uri: string;
+            /** Chain Id */
+            chain_id: number;
+            /**
+             * Issued At
+             * Format: date-time
+             */
+            issued_at: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
         };
         /** ProductCreate */
         ProductCreate: {
@@ -468,7 +583,7 @@ export interface components {
             /** Metadata Uri */
             metadata_uri?: string | null;
             /** Manufacturer Address */
-            manufacturer_address: string;
+            manufacturer_address?: string | null;
         };
         /** ProductListResponse */
         ProductListResponse: {
@@ -491,6 +606,10 @@ export interface components {
             product_id: string;
             /** Manufacturer Address */
             manufacturer_address: string;
+            /** Owner Address */
+            owner_address?: string | null;
+            /** Ownership Source */
+            ownership_source?: string | null;
             /**
              * Registered At
              * Format: date-time
@@ -505,8 +624,6 @@ export interface components {
         ProductUpdate: {
             /** Name */
             name?: string | null;
-            /** Manufacturer Address */
-            manufacturer_address?: string | null;
             /** Description */
             description?: string | null;
             /** Metadata Uri */
@@ -523,8 +640,9 @@ export interface components {
             /**
              * Status
              * @default 0
+             * @constant
              */
-            status: string;
+            status: "0";
             /** Notes */
             notes?: string | null;
         };
@@ -554,6 +672,10 @@ export interface components {
             id: number;
             /** Shipment Id */
             shipment_id: string;
+            /** Owner Address */
+            owner_address?: string | null;
+            /** Ownership Source */
+            ownership_source?: string | null;
             /**
              * Created At
              * Format: date-time
@@ -575,8 +697,6 @@ export interface components {
             origin?: string | null;
             /** Destination */
             destination?: string | null;
-            /** Status */
-            status?: string | null;
             /** Notes */
             notes?: string | null;
         };
@@ -609,6 +729,13 @@ export interface components {
              * @default bearer
              */
             token_type: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Address */
+            address: string;
         };
     };
     responses: never;
@@ -635,6 +762,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NonceResponse"];
+                };
+            };
+        };
+    };
+    challenge_auth_challenge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChallengeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChallengeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1143,6 +1303,66 @@ export interface operations {
         };
     };
     analytics_events_analytics_events_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    health_indexer_health_indexer_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    health_live_health_live_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    health_ready_health_ready_get: {
         parameters: {
             query?: never;
             header?: never;

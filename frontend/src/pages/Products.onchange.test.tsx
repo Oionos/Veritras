@@ -1,3 +1,9 @@
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => ({ token: 'test-token', address: '0x1234567890123456789012345678901234567890', isAuthenticated: true, isLoggingIn: false, loginError: null, login: vi.fn(), logout: vi.fn() }),
+  getAuthToken: () => null,
+  clearAuthToken: vi.fn(),
+}))
+
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen, fireEvent, waitFor } from '@testing-library/react'
 import Products from './Products'
@@ -35,6 +41,7 @@ vi.mock('@/hooks/useRegisterProduct', () => ({
 }))
 
 vi.mock('@/hooks/useShipmentTracker', () => ({
+  useShipmentPermissions: () => ({ canRecord: true, canTransfer: true }),
   useRecordCheckpoint: () => ({
     record: vi.fn(),
     hash: undefined,

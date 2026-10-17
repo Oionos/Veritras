@@ -18,6 +18,7 @@ __pycache__/
 *.so
 .Python
 .venv/
+.venv-*/
 venv/
 ENV/
 env/
@@ -102,6 +103,8 @@ deployed-contracts.json
 scripts/
 !blockchain/scripts/
 !blockchain/scripts/*.ts
+!frontend/scripts/
+!frontend/scripts/*.mjs
 docs/
 AGENTS.md
 

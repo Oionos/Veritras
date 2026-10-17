@@ -1,12 +1,37 @@
 import { appEnvironment } from '@/config/runtime'
-import { useCallback, useEffect, useState } from 'react'
+import { rainbowKitConfig } from '@/config/wagmi'
+import { useCallback, useEffect, useSyncExternalStore } from 'react'
 import { useAccount, useSignMessage } from 'wagmi'
+import { getAccount } from 'wagmi/actions'
+import type { components } from '@/types/api'
+import {
+  bindSessionWallet,
+  clearAuthToken,
+  sessionGeneration,
+  sessionSnapshot,
+  storeAuthToken,
+  subscribeSession,
+  tokenClaims,
+  updateSession,
+} from './authSession'
 
-const AUTH_TOKEN_KEY = 'veritras_auth_token'
-const API_URL = appEnvironment.apiUrl
+export { clearAuthToken } from './authSession'
+export function getAuthToken(): string | null {
+  const account = getAccount(rainbowKitConfig)
+  bindSessionWallet(account.address, account.chainId, account.status)
+  const token = sessionSnapshot().token
+  const claims = token && tokenClaims(token)
+  return account.status === 'connected' &&
+    claims &&
+    claims.sub.toLowerCase() === account.address?.toLowerCase() &&
+    account.chainId === appEnvironment.chainId
+    ? token
+    : null
+}
 
 export interface AuthState {
   token: string | null
+  address: string | null
   isAuthenticated: boolean
   isLoggingIn: boolean
   loginError: string | null
@@ -14,109 +39,145 @@ export interface AuthState {
   logout: () => void
 }
 
+let pendingLogin: Promise<void> | null = null
+
 export function useAuth(): AuthState {
-  const { address, isConnected } = useAccount()
+  const { address, chainId, status } = useAccount()
   const { signMessageAsync } = useSignMessage()
+  const state = useSyncExternalStore(
+    subscribeSession,
+    sessionSnapshot,
+    sessionSnapshot,
+  )
+  const claims = state.token && tokenClaims(state.token)
+  const isAuthenticated = !!(
+    claims &&
+    status === 'connected' &&
+    claims.sub.toLowerCase() === address?.toLowerCase() &&
+    chainId === appEnvironment.chainId
+  )
 
-  const [token, setToken] = useState<string | null>(() => {
-    return localStorage.getItem(AUTH_TOKEN_KEY)
-  })
-  const [isLoggingIn, setIsLoggingIn] = useState(false)
-  const [loginError, setLoginError] = useState<string | null>(null)
-
-  const isAuthenticated = !!token
-
-  // Listen for auth logout events triggered by 401 responses in useApi
   useEffect(() => {
-    const handleLogout = () => {
-      setToken(null)
-    }
-    window.addEventListener('veritras:logout', handleLogout)
-    return () => window.removeEventListener('veritras:logout', handleLogout)
-  }, [])
-
-  // Sync token state with localStorage changes from other tabs
-  useEffect(() => {
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === AUTH_TOKEN_KEY) {
-        setToken(e.newValue)
-      }
-    }
-    window.addEventListener('storage', handleStorage)
-    return () => window.removeEventListener('storage', handleStorage)
-  }, [])
+    bindSessionWallet(address, chainId, status)
+  }, [address, chainId, status])
 
   const login = useCallback(async () => {
-    if (!isConnected || !address) {
-      setLoginError('Wallet not connected')
-      return
-    }
-
-    setIsLoggingIn(true)
-    setLoginError(null)
-
-    try {
-      // 1. Fetch nonce from backend
-      const nonceRes = await fetch(`${API_URL}/auth/nonce`)
-      if (!nonceRes.ok) {
-        throw new Error('Failed to fetch nonce')
-      }
-      const { nonce } = await nonceRes.json()
-
-      // 2. Create SIWE message (Sepolia chain ID: 11155111)
-      const domain = window.location.host
-      const uri = window.location.origin
-      const issuedAt = new Date().toISOString()
-      const message = `${domain} wants you to sign in with your Ethereum account:\n${address}\n\nSign in to Veritras\n\nURI: ${uri}\nVersion: 1\nChain ID: ${appEnvironment.chainId}\nNonce: ${nonce}\nIssued At: ${issuedAt}`
-
-      // 3. Sign message with wallet
-      const signature = await signMessageAsync({ message })
-
-      // 4. Verify signature and get JWT
-      const verifyRes = await fetch(`${API_URL}/auth/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, signature, address }),
+    if (pendingLogin) return pendingLogin
+    if (
+      !address ||
+      status !== 'connected' ||
+      chainId !== appEnvironment.chainId
+    ) {
+      updateSession({
+        loginError:
+          'Connect your wallet to the selected network before signing in',
       })
-
-      if (!verifyRes.ok) {
-        const errText = await verifyRes.text().catch(() => 'Verification failed')
-        throw new Error(errText)
-      }
-
-      const { access_token: jwt } = await verifyRes.json()
-      if (typeof jwt !== 'string' || !jwt) throw new Error('Invalid sign-in response')
-      localStorage.setItem(AUTH_TOKEN_KEY, jwt)
-      setToken(jwt)
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Login failed'
-      setLoginError(message)
-      throw err
-    } finally {
-      setIsLoggingIn(false)
+      throw new Error(
+        'Connect your wallet to the selected network before signing in',
+      )
     }
-  }, [isConnected, address, signMessageAsync])
-
-  const logout = useCallback(() => {
-    localStorage.removeItem(AUTH_TOKEN_KEY)
-    setToken(null)
-  }, [])
+    const wallet = address.toLowerCase()
+    const attempt = sessionGeneration()
+    const checkWallet = () => {
+      const current = getAccount(rainbowKitConfig)
+      if (
+        sessionGeneration() !== attempt ||
+        current.status !== 'connected' ||
+        current.address?.toLowerCase() !== wallet ||
+        current.chainId !== appEnvironment.chainId
+      ) {
+        throw new Error('Wallet changed during sign-in. Please sign in again.')
+      }
+    }
+    updateSession({ isLoggingIn: true, loginError: null })
+    pendingLogin = (async () => {
+      try {
+        const response = await fetch(
+          `${appEnvironment.apiUrl}/auth/challenge`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ address }),
+            cache: 'no-store',
+          },
+        )
+        if (!response.ok)
+          throw new Error('Could not create a sign-in challenge')
+        const challenge: components['schemas']['ChallengeResponse'] =
+          await response.json()
+        const expiry = Date.parse(challenge.expires_at)
+        if (
+          challenge.uri !== window.location.origin ||
+          challenge.domain !== window.location.host ||
+          challenge.chain_id !== appEnvironment.chainId ||
+          typeof challenge.message !== 'string' ||
+          !challenge.message.startsWith(
+            `${window.location.host} wants you to sign in with your Ethereum account:\n`,
+          ) ||
+          challenge.message.split('\n')[1]?.toLowerCase() !== wallet ||
+          !Number.isFinite(expiry) ||
+          expiry <= Date.now()
+        ) {
+          throw new Error(
+            'Sign-in challenge does not match this app and wallet',
+          )
+        }
+        checkWallet()
+        const signature = await signMessageAsync({
+          message: challenge.message,
+        })
+        checkWallet()
+        const verify = await fetch(`${appEnvironment.apiUrl}/auth/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: challenge.message, signature }),
+          cache: 'no-store',
+        })
+        if (!verify.ok)
+          throw new Error(
+            'Sign-in was rejected. Please request a new challenge.',
+          )
+        const result: components['schemas']['VerifyResponse'] =
+          await verify.json()
+        const jwt =
+          typeof result.access_token === 'string' &&
+          tokenClaims(result.access_token)
+        if (
+          !jwt ||
+          jwt.sub.toLowerCase() !== wallet ||
+          result.token_type !== 'bearer' ||
+          typeof result.address !== 'string' ||
+          result.address.toLowerCase() !== wallet ||
+          !Number.isFinite(Date.parse(result.expires_at)) ||
+          Date.parse(result.expires_at) <= Date.now()
+        ) {
+          throw new Error('Invalid sign-in response')
+        }
+        checkWallet()
+        storeAuthToken(result.access_token)
+      } catch (error) {
+        if (sessionGeneration() === attempt) {
+          updateSession({
+            loginError:
+              error instanceof Error ? error.message : 'Sign-in failed',
+          })
+        }
+        throw error
+      } finally {
+        pendingLogin = null
+        updateSession({ isLoggingIn: false })
+      }
+    })()
+    return pendingLogin
+  }, [address, chainId, status, signMessageAsync])
 
   return {
-    token,
+    token: isAuthenticated ? state.token : null,
+    address: isAuthenticated && claims ? claims.sub : null,
     isAuthenticated,
-    isLoggingIn,
-    loginError,
+    isLoggingIn: state.isLoggingIn,
+    loginError: state.loginError,
     login,
-    logout,
+    logout: clearAuthToken,
   }
-}
-
-export function getAuthToken(): string | null {
-  return localStorage.getItem(AUTH_TOKEN_KEY)
-}
-
-export function clearAuthToken(): void {
-  localStorage.removeItem(AUTH_TOKEN_KEY)
-  window.dispatchEvent(new CustomEvent('veritras:logout'))
 }

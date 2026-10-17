@@ -59,11 +59,11 @@ Preview builds fail closed if `VITE_APP_ENV` is not `testing`, if test contract/
 
 This first increment provides isolated local services and hosted configuration, indexer ABI/startup fixes, bounded polling, retry/health reporting, stable bytes32 handling, draft reconciliation, delivery checkpoint deduplication, shipment-status updates, and receipt checks before verification. The login response field now matches the API.
 
-The complete implementation plan remains in `IMPLEMENTATION_PLAN.md`. Object-level API permissions, full SIWE scope/session validation, a transactional database event journal/cursor, reorganization recovery, metadata event handling, and revised analytics remain subsequent increments. Do not treat the local smoke check as coverage of those unimplemented guarantees. The file-based cursor still requires a persistent volume for hosted restarts; Render's free filesystem is ephemeral. Production replay/backfill waits for the durable-indexing increment.
+The complete implementation plan remains in `IMPLEMENTATION_PLAN.md`. The authentication increment now implements object-level API permissions and SIWE scope/session validation. A transactional database event journal/cursor, reorganization recovery, metadata event handling, and revised analytics remain subsequent increments. Do not treat the local smoke check as coverage of those unimplemented guarantees. The file-based cursor still requires a persistent volume for hosted restarts; Render's free filesystem is ephemeral. Production replay/backfill waits for the durable-indexing increment.
 
 Hosted Neon/Render resources and a usable Vercel preview must be recorded here after successful provisioning. A template alone does not establish a hosted testing environment.
 
-Current hosted access blockers: the managed environment has no Neon/Render credentials. The Vercel connector returns HTTP 403 for team `hoppaysamas-projects`, including project inspection; no hosted variable was changed. Completing hosted setup requires access to that team or configuring the Preview values manually in the Vercel dashboard.
+Neon and Render connectors are now available. An isolated Neon branch, `codex-wallet-auth-20261018`, was used to rehearse the authentication migration and has an expiry. A complete hosted preview still needs a separate testing API and Sepolia contracts. The last Vercel connector inspection returned HTTP 403 for team `hoppaysamas-projects`; completing hosted preview setup requires access to that team or configuring Preview values manually in the Vercel dashboard.
 
 ## Shipping this increment on main
 
@@ -71,7 +71,7 @@ Vercel uses `frontend/build-vercel.mjs`. Only a Vercel **Production** build rece
 
 The backend Docker image defaults `INDEXER_ENABLED=false`, and the production Render Blueprint records the same setting. This keeps the repaired file-based indexer from automatically replaying history into the live database on an ephemeral filesystem. The local and hosted testing configurations explicitly enable indexing. Registration verification continues to check receipts directly when indexing is disabled; newly submitted chain events will not appear automatically in the API until durable indexing is released and enabled. `/health/ready` reports indexing as disabled. Render's Blueprint uses `/health/live` for platform liveness.
 
-The observed live Render service still reports `ENVIRONMENT=development`; synchronize its production settings and strong JWT secret in Render separately. No schema migration or database backfill is part of this increment's production deployment. The current schema must be reconciled with Alembic before future migrations.
+The first release retained Render's legacy `ENVIRONMENT=development` setting and did not migrate the database. The authentication release requires production scope, a strong JWT key, and the reviewed Alembic adoption/additive migration described in `AUTHENTICATION.md`. Backfill remains disabled.
 
 ## Validation recorded on October 17, 2026
 
@@ -88,3 +88,16 @@ The observed live Render service still reports `ENVIRONMENT=development`; synchr
 | Contract deployment rerun | Reused the existing local deployment |
 
 The local readiness check reported `environment: testing`, chain `31337`, and a current indexer with zero lag. This validates the local stack. Hosted preview provisioning and GitHub-hosted CI execution are separate checks.
+
+## Authentication increment
+
+The wallet-authentication increment adds explicit ownership and database-backed sign-in challenges. See `AUTHENTICATION.md` before upgrading an existing database. Testing Compose uses an explicit local `SIWE_ORIGINS`; public reads remain anonymous, while API writes require a signed-in owner. Legacy records do not gain ownership from their former manufacturer field.
+
+With the user's authorization, 187 backend tests, 191 frontend tests, and 23 mocked browser tests passed. The real PostgreSQL/Hardhat smoke journey and real Chromium wallet journey also passed, including a persisted challenge verified after an API restart. The isolated CI workflow runs both real journeys. Run the wallet journey after starting the stack:
+
+```sh
+cd frontend
+node scripts/check-local-auth.mjs
+```
+
+Use `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium` if relying on system Chromium. The script only accepts fixed local testing URLs and chain 31337. It creates testing records without clearing the database.

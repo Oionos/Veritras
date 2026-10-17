@@ -54,6 +54,7 @@ services:
       DATABASE_URL: postgresql://veritras_test:local-testing-only@postgres:5432/veritras_test
       JWT_SECRET_KEY: local-testing-only-not-for-hosting-7fa8cb32026e4a53a3a48647
       CORS_ORIGINS: http://localhost:13000,http://127.0.0.1:13000
+      SIWE_ORIGINS: http://localhost:13000,http://127.0.0.1:13000
       SEPOLIA_RPC_URL: http://blockchain:8545
       CHAIN_ID: "31337"
       INDEXER_ENABLED: "true"

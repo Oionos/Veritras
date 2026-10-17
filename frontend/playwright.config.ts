@@ -9,6 +9,9 @@ export default defineConfig({
   reporter: 'list',
   timeout: 30000,
   use: {
+    launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
+      ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH }
+      : {},
     baseURL: 'http://localhost:3001',
     trace: 'on-first-retry',
   },
