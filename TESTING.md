@@ -61,6 +61,8 @@ The complete implementation plan remains in `IMPLEMENTATION_PLAN.md`. Object-lev
 
 Hosted Neon/Render resources and a usable Vercel preview must be recorded here after successful provisioning. A template alone does not establish a hosted testing environment.
 
+Current hosted access blockers: the managed environment has no Neon/Render credentials. The Vercel connector can inspect `veritras`, but updating its branch-specific Preview variables returned HTTP 403 for team `hoppaysamas-projects`; no variable was changed. Completing hosted setup requires write access to that team or configuring the Preview values manually in the Vercel dashboard. Production settings were not modified.
+
 ## Validation recorded on October 17, 2026
 
 | Check | Result |
