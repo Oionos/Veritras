@@ -42,6 +42,8 @@ In a managed cloud workspace, Make automatically adds `compose.testing.cloud.yml
 
 ## Hosted Vercel Preview + Render + Neon
 
+The shared hosted environment is now provisioned separately from production. See [HOSTED_TESTING.md](HOSTED_TESTING.md) for resource IDs, URLs, contracts, cost boundaries, origin configuration, and the feature → testing → main workflow. The instructions below also describe how to create another isolated environment.
+
 Hosted provisioning requires connected Neon/Render accounts or `NEON_API_KEY` and `RENDER_API_KEY` added through the cloud environment's secret settings. Do not paste keys into chat or commit them. A separate funded Sepolia test signer and RPC are also needed to deploy the hosted test contracts; alternatively, supply an already deployed test-contract manifest.
 
 1. Create a Neon branch for testing. Use its own endpoint in the testing backend's `DATABASE_URL`; do not reuse the production endpoint. Prefer schema-only or sanitized data for public demonstrations.
@@ -61,9 +63,9 @@ This first increment provides isolated local services and hosted configuration, 
 
 The complete implementation plan remains in `IMPLEMENTATION_PLAN.md`. The authentication increment now implements object-level API permissions and SIWE scope/session validation. A transactional database event journal/cursor, reorganization recovery, metadata event handling, and revised analytics remain subsequent increments. Do not treat the local smoke check as coverage of those unimplemented guarantees. The file-based cursor still requires a persistent volume for hosted restarts; Render's free filesystem is ephemeral. Production replay/backfill waits for the durable-indexing increment.
 
-Hosted Neon/Render resources and a usable Vercel preview must be recorded here after successful provisioning. A template alone does not establish a hosted testing environment.
+Hosted resource IDs, endpoints, deployed contracts, and the workflow are recorded in `HOSTED_TESTING.md`. A template alone does not establish a hosted testing environment; inspect both live deployments and readiness before testing.
 
-Neon and Render connectors are now available. An isolated Neon branch, `codex-wallet-auth-20261018`, was used to rehearse the authentication migration and has an expiry. A complete hosted preview still needs a separate testing API and Sepolia contracts. The last Vercel connector inspection returned HTTP 403 for team `hoppaysamas-projects`; completing hosted preview setup requires access to that team or configuring Preview values manually in the Vercel dashboard.
+Neon, Render, and Vercel connectors are available. The temporary `codex-wallet-auth-20261018` Neon branch was used for the earlier migration rehearsal and expires independently of the hosted environment. The persistent hosted testing project has a fresh database, a separate Render API, and distinct Sepolia contracts. Production and Preview frontend values are scoped separately; see `HOSTED_TESTING.md` for exact preview-origin registration and Deployment Protection.
 
 ## Shipping this increment on main
 
