@@ -69,6 +69,7 @@ Current hosted access blockers: the managed environment has no Neon/Render crede
 | --- | --- |
 | Backend unit/API suite with locked dependencies | 152 passed |
 | Frontend unit suite | 177 passed; relevant suites rerun after UI/config updates |
+| Existing Playwright browser regression suite | 23 passed |
 | Smart-contract suite | 40 passed |
 | Frontend production build | Passed |
 | Actual Preview build with a live API target, including CI mode | Rejected as intended |

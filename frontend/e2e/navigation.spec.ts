@@ -27,7 +27,7 @@ test('nav links navigate to the correct pages', async ({ page }) => {
 
   // Navigate to Verify
   await page.getByRole('link', { name: 'Verify' }).first().click()
-  await expect(page.getByText('Verify Authenticity')).toBeVisible()
+  await expect(page.getByText('Verify Registration')).toBeVisible()
 })
 
 test('Veritras logo navigates back to the Dashboard from a sub-page', async ({ page }) => {
