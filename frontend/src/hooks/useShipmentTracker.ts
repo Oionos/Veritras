@@ -1,3 +1,4 @@
+import { appEnvironment } from '@/config/runtime'
 import { useCallback } from 'react'
 import {
   useWriteContract,
@@ -40,6 +41,7 @@ export function useRecordCheckpoint() {
       writeContract(
         {
           abi: shipmentTrackerAbi,
+          chainId: appEnvironment.chainId,
           address: SHIPMENT_TRACKER_ADDRESS as `0x${string}`,
           functionName: 'recordCheckpoint',
           args: [productId, location, status, notes],
@@ -88,6 +90,7 @@ export function useTransferCustody() {
       writeContract(
         {
           abi: shipmentTrackerAbi,
+          chainId: appEnvironment.chainId,
           address: SHIPMENT_TRACKER_ADDRESS as `0x${string}`,
           functionName: 'transferCustody',
           args: [productId, newHandler],

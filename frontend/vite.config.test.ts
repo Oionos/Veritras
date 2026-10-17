@@ -1,8 +1,9 @@
 // @vitest-environment node
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import config from './vite.config'
 
 describe('vite.config.ts', () => {
+  vi.stubEnv('CI', 'true')
   const resolved =
     typeof config === 'function'
       ? config({ command: 'build', mode: 'production' })

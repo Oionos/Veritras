@@ -53,7 +53,7 @@ describe('Verify', () => {
   it('shows initial helper state before search', () => {
     renderWithProviders(<Verify />)
 
-    expect(screen.getByText('Enter a product ID to verify its authenticity')).toBeInTheDocument()
+    expect(screen.getByText('Enter a product ID to check its blockchain registration and recorded history.')).toBeInTheDocument()
   })
 
   it('displays verification result when product is authentic', async () => {
@@ -64,7 +64,7 @@ describe('Verify', () => {
     fireEvent.click(screen.getByRole('button', { name: /verify/i }))
 
     await waitFor(() => {
-      expect(screen.getByText('Authentic Product Verified')).toBeInTheDocument()
+      expect(screen.getByText('Blockchain Registration Confirmed')).toBeInTheDocument()
       expect(screen.getByText('Verified')).toBeInTheDocument()
       // Checkpoint count appears twice (banner + details card)
       expect(screen.getAllByText('5')).toHaveLength(2)
@@ -88,7 +88,7 @@ describe('Verify', () => {
     fireEvent.click(screen.getByRole('button', { name: /verify/i }))
 
     await waitFor(() => {
-      expect(screen.getByText('Verification Failed')).toBeInTheDocument()
+      expect(screen.getByText('Registration Not Confirmed')).toBeInTheDocument()
     })
   })
 })

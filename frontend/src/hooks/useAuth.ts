@@ -1,8 +1,9 @@
+import { appEnvironment } from '@/config/runtime'
 import { useCallback, useEffect, useState } from 'react'
 import { useAccount, useSignMessage } from 'wagmi'
 
 const AUTH_TOKEN_KEY = 'veritras_auth_token'
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API_URL = appEnvironment.apiUrl
 
 export interface AuthState {
   token: string | null
@@ -66,7 +67,7 @@ export function useAuth(): AuthState {
       const domain = window.location.host
       const uri = window.location.origin
       const issuedAt = new Date().toISOString()
-      const message = `${domain} wants you to sign in with your Ethereum account:\n${address}\n\nSign in to Veritras\n\nURI: ${uri}\nVersion: 1\nChain ID: 11155111\nNonce: ${nonce}\nIssued At: ${issuedAt}`
+      const message = `${domain} wants you to sign in with your Ethereum account:\n${address}\n\nSign in to Veritras\n\nURI: ${uri}\nVersion: 1\nChain ID: ${appEnvironment.chainId}\nNonce: ${nonce}\nIssued At: ${issuedAt}`
 
       // 3. Sign message with wallet
       const signature = await signMessageAsync({ message })
@@ -83,7 +84,8 @@ export function useAuth(): AuthState {
         throw new Error(errText)
       }
 
-      const { token: jwt } = await verifyRes.json()
+      const { access_token: jwt } = await verifyRes.json()
+      if (typeof jwt !== 'string' || !jwt) throw new Error('Invalid sign-in response')
       localStorage.setItem(AUTH_TOKEN_KEY, jwt)
       setToken(jwt)
     } catch (err) {

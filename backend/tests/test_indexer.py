@@ -386,6 +386,9 @@ def test_process_delivery_completed():
             product_registry_address="0x" + "0" * 40,
             shipment_tracker_address="0x" + "0" * 40,
         )
+        event = _checkpoint_event()
+        event["args"]["status"] = 3
+        indexer._process_checkpoint_recorded(event)
         indexer._process_delivery_completed(_delivery_event())
 
     verify_session = _make_session()
@@ -394,6 +397,6 @@ def test_process_delivery_completed():
 
     assert len(checkpoints) == 1
     assert checkpoints[0].status == "3"
-    assert checkpoints[0].location == "Delivery"
+    assert checkpoints[0].location == "Warehouse A"
     assert checkpoints[0].handler_address == _HANDLER
     assert checkpoints[0].block_number == _BLOCK

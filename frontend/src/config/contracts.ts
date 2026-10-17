@@ -1,10 +1,7 @@
-export const PRODUCT_REGISTRY_ADDRESS =
-  import.meta.env.VITE_PRODUCT_REGISTRY_CONTRACT ||
-  '0x1F76018532D619194f6628ADc186e3c86FcB5AaA'
+import { appEnvironment } from './runtime'
 
-export const SHIPMENT_TRACKER_ADDRESS =
-  import.meta.env.VITE_SHIPMENT_TRACKER_CONTRACT ||
-  '0x95b09C0aeD53f6b63C072F4ecaC18861FcbBFB30'
+export const PRODUCT_REGISTRY_ADDRESS = appEnvironment.productRegistry
+export const SHIPMENT_TRACKER_ADDRESS = appEnvironment.shipmentTracker
 
 export const productRegistryAbi = [
   {

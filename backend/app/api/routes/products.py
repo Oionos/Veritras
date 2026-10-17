@@ -16,6 +16,7 @@ from app.schemas.product import (
 )
 from app.schemas.shipment import CheckpointResponse, CustodyTransferResponse
 from app.services.events import broadcaster
+from app.services.verification import verify_registration
 
 router = APIRouter()
 
@@ -129,9 +130,13 @@ def verify_product(product_id: str, db: Session = Depends(get_db)):
         is not None
     )
 
+    try:
+        registered = verify_registration(product)
+    except Exception:
+        raise HTTPException(status_code=503, detail="Registration evidence is temporarily unavailable")
     return {
         "product_id": product_id,
-        "is_registered": True,
+        "is_registered": registered,
         "is_delivered": is_delivered,
         "checkpoint_count": checkpoint_count,
     }

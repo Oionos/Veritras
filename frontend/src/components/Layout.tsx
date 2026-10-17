@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import LoadingSpinner from './ui/LoadingSpinner'
 import ConnectAndAuth from './ConnectAndAuth'
 import BrandLogo from './BrandLogo'
+import { appEnvironment } from '@/config/runtime'
 
 const navItems = [
   { to: '/', label: 'Dashboard' },
@@ -45,6 +46,11 @@ export default function Layout() {
             <span className="font-serif text-xl tracking-wider text-text">
               Veritras
             </span>
+            {appEnvironment.name === 'testing' && (
+              <span className="rounded border border-amber-400/40 px-2 py-1 text-[10px] font-medium text-amber-300">
+                Testing · {appEnvironment.chainId === 31337 ? 'Local chain' : 'Sepolia'}
+              </span>
+            )}
           </NavLink>
 
           {/* Desktop Navigation - Center */}

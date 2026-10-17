@@ -46,14 +46,14 @@ export default function Verify() {
         <div className="flex items-center gap-4">
           <div className="h-px w-8 bg-accent/40" />
           <span className="text-xs font-semibold uppercase tracking-[0.2em] text-accent/60">
-            Authenticity Check
+            Registration Evidence
           </span>
         </div>
         <h1 className="font-serif text-3xl leading-[1.1] tracking-tight text-text sm:text-4xl">
-          Verify Authenticity
+          Verify Registration
         </h1>
         <p className="max-w-xl text-sm leading-relaxed text-muted">
-          Enter a product ID to verify its authenticity and view its complete blockchain history.
+          Enter a product ID to check its blockchain registration and recorded history.
         </p>
       </div>
 
@@ -100,9 +100,9 @@ export default function Verify() {
         >
           <XCircle className="h-5 w-5 shrink-0 text-red-400" />
           <div>
-            <p className="font-medium text-red-400">Verification Failed</p>
+            <p className="font-medium text-red-400">Registration Not Confirmed</p>
             <p className="text-sm text-red-400/70">
-              Product ID not found on the blockchain. This may indicate a counterfeit product.
+              No confirmed registration evidence is available for this ID. The item may be a draft or still awaiting synchronization.
             </p>
           </div>
         </motion.div>
@@ -138,9 +138,9 @@ export default function Verify() {
             <div className="flex items-center gap-3 rounded-2xl border border-accent/20 bg-accent/[0.06] p-6 backdrop-blur-xl">
               <CheckCircle2 className="h-8 w-8 shrink-0 text-accent" />
               <div>
-                <p className="font-semibold text-accent">Authentic Product Verified</p>
+                <p className="font-semibold text-accent">Blockchain Registration Confirmed</p>
                 <p className="text-sm text-accent/70">
-                  This product has been verified on the blockchain with{' '}
+                  Registration was confirmed from its transaction receipt, with{' '}
                   <span className="font-mono">{verifyResult.checkpoint_count}</span> checkpoint(s)
                 </p>
               </div>

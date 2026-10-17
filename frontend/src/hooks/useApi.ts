@@ -1,9 +1,10 @@
+import { appEnvironment } from '@/config/runtime'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Product, Shipment } from '@/types'
 import type { components } from '@/types/api'
 import { getAuthToken, clearAuthToken } from './useAuth'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API_URL = appEnvironment.apiUrl
 
 async function fetchApi(endpoint: string, options?: RequestInit) {
   const token = getAuthToken()

@@ -18,8 +18,8 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {},
     localhost: {
-      url: "http://127.0.0.1:8545",
-      accounts: process.env.LOCALHOST_PRIVATE_KEY ? [process.env.LOCALHOST_PRIVATE_KEY] : [],
+      url: process.env.LOCAL_RPC_URL || "http://127.0.0.1:8545",
+      accounts: process.env.LOCALHOST_PRIVATE_KEY ? [process.env.LOCALHOST_PRIVATE_KEY] : "remote",
     },
     sepolia: {
       url: process.env.SEPOLIA_RPC_URL || "",
