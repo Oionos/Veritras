@@ -8,7 +8,7 @@ from app.core.config import settings
 from app.core.database import Base
 
 # Import all models so they are registered with Base.metadata
-from app.models import product, shipment  # noqa: F401
+from app.models import product, shipment, auth  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -16,11 +16,11 @@ config = context.config
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
-if config.config_file_name is not None:
+if config.config_file_name is not None and config.attributes.get("configure_logger", True):
     fileConfig(config.config_file_name)
 
 # Set the database URL dynamically from application settings.
-config.set_main_option("sqlalchemy.url", settings.database_url)
+config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
 
 # Target metadata for autogenerate support
 target_metadata = Base.metadata
@@ -62,6 +62,13 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    supplied_connection = config.attributes.get("connection")
+    if supplied_connection is not None:
+        context.configure(connection=supplied_connection, target_metadata=target_metadata)
+        with context.begin_transaction():
+            context.run_migrations()
+        return
+
     if settings.database_url.startswith("sqlite"):
         connectable = create_engine(
             settings.database_url,

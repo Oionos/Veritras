@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/useAuth'
 
 export default function ConnectAndAuth() {
   const { isConnected } = useAccount()
-  const { isAuthenticated, isLoggingIn, loginError, login } = useAuth()
+  const { isAuthenticated, isLoggingIn, loginError, login, logout } = useAuth()
 
   useEffect(() => {
     if (loginError) {
@@ -55,10 +55,14 @@ export default function ConnectAndAuth() {
       )}
 
       {isConnected && isAuthenticated && (
-        <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400">
+        <button
+          onClick={logout}
+          title="Clear this browser's sign-in session"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400"
+        >
           <Shield className="h-3.5 w-3.5" />
-          Authenticated
-        </span>
+          Sign out
+        </button>
       )}
     </div>
   )

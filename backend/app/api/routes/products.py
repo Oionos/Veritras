@@ -2,6 +2,9 @@ import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
+from web3 import Web3
+from app.core.auth import get_current_user
+from app.core.permissions import require_editable_draft
 from typing import List, Optional
 
 from app.core.database import get_db
@@ -54,14 +57,19 @@ async def create_product(
     request: Request,
     product_in: ProductCreate,
     db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
 ):
     """Create a new product."""
+    if product_in.manufacturer_address and product_in.manufacturer_address.lower() != current_user:
+        raise HTTPException(status_code=403, detail="Manufacturer must match the signed-in wallet")
     product = Product(
         product_id=f"PROD-{uuid.uuid4().hex[:8].upper()}",
         name=product_in.name,
         description=product_in.description,
         metadata_uri=product_in.metadata_uri,
-        manufacturer_address=product_in.manufacturer_address,
+        manufacturer_address=Web3.to_checksum_address(current_user),
+        owner_address=current_user,
+        ownership_source="signed_draft",
         registered_at=datetime.now(timezone.utc),
         block_number=0,
         tx_hash="0x",
@@ -83,12 +91,14 @@ def update_product(
     product_id: str,
     product_in: ProductUpdate,
     db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
 ):
     """Update an existing product."""
-    product = db.query(Product).filter(Product.product_id == product_id).first()
+    product = db.query(Product).filter(Product.product_id == product_id).with_for_update().first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
+    require_editable_draft(product, current_user)
     update_data = product_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(product, field, value)

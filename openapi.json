@@ -11,7 +11,7 @@
           "auth"
         ],
         "summary": "Get Nonce",
-        "description": "Generate a random nonce for SIWE authentication.",
+        "description": "Compatibility nonce endpoint; scope and expiry remain server controlled.",
         "operationId": "get_nonce_auth_nonce_get",
         "responses": {
           "200": {
@@ -27,13 +27,54 @@
         }
       }
     },
+    "/auth/challenge": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Challenge",
+        "description": "Issue the exact message the requested wallet must sign.",
+        "operationId": "challenge_auth_challenge_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChallengeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChallengeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/auth/verify": {
       "post": {
         "tags": [
           "auth"
         ],
         "summary": "Verify",
-        "description": "Verify a SIWE signature and return a JWT access token.",
         "operationId": "verify_auth_verify_post",
         "requestBody": {
           "content": {
@@ -107,8 +148,12 @@
             "required": false,
             "schema": {
               "anyOf": [
-                { "type": "string" },
-                { "type": "null" }
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
               ],
               "title": "Search"
             }
@@ -119,8 +164,12 @@
             "required": false,
             "schema": {
               "anyOf": [
-                { "type": "string" },
-                { "type": "null" }
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
               ],
               "title": "Sort By"
             }
@@ -131,9 +180,14 @@
             "required": false,
             "schema": {
               "anyOf": [
-                { "type": "string" },
-                { "type": "null" }
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
               ],
+              "default": "asc",
               "title": "Sort Order"
             }
           }
@@ -168,6 +222,11 @@
         "summary": "Create Product",
         "description": "Create a new product.",
         "operationId": "create_product_products__post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -210,6 +269,11 @@
         "summary": "Update Product",
         "description": "Update an existing product.",
         "operationId": "update_product_products__product_id__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "product_id",
@@ -349,7 +413,7 @@
           "shipments"
         ],
         "summary": "Get All Shipments",
-        "description": "List all shipments with optional search, status filter, sorting, and pagination.",
+        "description": "List all shipments with optional status filter, search, sorting, and pagination.",
         "operationId": "get_all_shipments_shipments__get",
         "parameters": [
           {
@@ -397,8 +461,12 @@
             "required": false,
             "schema": {
               "anyOf": [
-                { "type": "string" },
-                { "type": "null" }
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
               ],
               "title": "Search"
             }
@@ -409,8 +477,12 @@
             "required": false,
             "schema": {
               "anyOf": [
-                { "type": "string" },
-                { "type": "null" }
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
               ],
               "title": "Sort By"
             }
@@ -421,9 +493,14 @@
             "required": false,
             "schema": {
               "anyOf": [
-                { "type": "string" },
-                { "type": "null" }
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
               ],
+              "default": "desc",
               "title": "Sort Order"
             }
           }
@@ -458,6 +535,11 @@
         "summary": "Create Shipment",
         "description": "Create a new shipment.",
         "operationId": "create_shipment_shipments__post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -500,6 +582,11 @@
         "summary": "Update Shipment",
         "description": "Update an existing shipment.",
         "operationId": "update_shipment_shipments__shipment_id__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "shipment_id",
@@ -873,6 +960,55 @@
         }
       }
     },
+    "/health/indexer": {
+      "get": {
+        "summary": "Health Indexer",
+        "description": "Expose blockchain indexer status and last processed block.",
+        "operationId": "health_indexer_health_indexer_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/live": {
+      "get": {
+        "summary": "Health Live",
+        "operationId": "health_live_health_live_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "summary": "Health Ready",
+        "operationId": "health_ready_health_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "summary": "Health Check",
@@ -944,6 +1080,65 @@
           "flagged_at"
         ],
         "title": "AnomalyResponse"
+      },
+      "ChallengeRequest": {
+        "properties": {
+          "address": {
+            "type": "string",
+            "pattern": "^0x[a-fA-F0-9]{40}$",
+            "title": "Address"
+          }
+        },
+        "type": "object",
+        "required": [
+          "address"
+        ],
+        "title": "ChallengeRequest"
+      },
+      "ChallengeResponse": {
+        "properties": {
+          "nonce": {
+            "type": "string",
+            "title": "Nonce"
+          },
+          "domain": {
+            "type": "string",
+            "title": "Domain"
+          },
+          "uri": {
+            "type": "string",
+            "title": "Uri"
+          },
+          "chain_id": {
+            "type": "integer",
+            "title": "Chain Id"
+          },
+          "issued_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Issued At"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "nonce",
+          "domain",
+          "uri",
+          "chain_id",
+          "issued_at",
+          "expires_at",
+          "message"
+        ],
+        "title": "ChallengeResponse"
       },
       "CheckpointResponse": {
         "properties": {
@@ -1184,11 +1379,38 @@
           "nonce": {
             "type": "string",
             "title": "Nonce"
+          },
+          "domain": {
+            "type": "string",
+            "title": "Domain"
+          },
+          "uri": {
+            "type": "string",
+            "title": "Uri"
+          },
+          "chain_id": {
+            "type": "integer",
+            "title": "Chain Id"
+          },
+          "issued_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Issued At"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
           }
         },
         "type": "object",
         "required": [
-          "nonce"
+          "nonce",
+          "domain",
+          "uri",
+          "chain_id",
+          "issued_at",
+          "expires_at"
         ],
         "title": "NonceResponse"
       },
@@ -1224,15 +1446,22 @@
             "title": "Metadata Uri"
           },
           "manufacturer_address": {
-            "type": "string",
-            "pattern": "^0x[a-fA-F0-9]{40}$",
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^0x[a-fA-F0-9]{40}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Manufacturer Address"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
-          "name",
-          "manufacturer_address"
+          "name"
         ],
         "title": "ProductCreate"
       },
@@ -1302,6 +1531,28 @@
             "maxLength": 42,
             "title": "Manufacturer Address"
           },
+          "owner_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Address"
+          },
+          "ownership_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ownership Source"
+          },
           "registered_at": {
             "type": "string",
             "format": "date-time",
@@ -1344,18 +1595,6 @@
             ],
             "title": "Name"
           },
-          "manufacturer_address": {
-            "anyOf": [
-              {
-                "type": "string",
-                "pattern": "^0x[a-fA-F0-9]{40}$"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Manufacturer Address"
-          },
           "description": {
             "anyOf": [
               {
@@ -1381,6 +1620,7 @@
             "title": "Metadata Uri"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "title": "ProductUpdate"
       },
@@ -1403,7 +1643,7 @@
           },
           "status": {
             "type": "string",
-            "maxLength": 50,
+            "const": "0",
             "title": "Status",
             "default": "0"
           },
@@ -1420,6 +1660,7 @@
             "title": "Notes"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "product_id",
@@ -1493,6 +1734,28 @@
             "maxLength": 100,
             "title": "Shipment Id"
           },
+          "owner_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Address"
+          },
+          "ownership_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ownership Source"
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -1554,18 +1817,6 @@
             ],
             "title": "Destination"
           },
-          "status": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 50
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Status"
-          },
           "notes": {
             "anyOf": [
               {
@@ -1579,6 +1830,7 @@
             "title": "Notes"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "title": "ShipmentUpdate"
       },
@@ -1626,10 +1878,14 @@
         "properties": {
           "message": {
             "type": "string",
+            "maxLength": 2048,
+            "minLength": 1,
             "title": "Message"
           },
           "signature": {
             "type": "string",
+            "maxLength": 2048,
+            "minLength": 1,
             "title": "Signature"
           }
         },
@@ -1650,13 +1906,35 @@
             "type": "string",
             "title": "Token Type",
             "default": "bearer"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "address": {
+            "type": "string",
+            "title": "Address"
           }
         },
         "type": "object",
         "required": [
-          "access_token"
+          "access_token",
+          "expires_at",
+          "address"
         ],
         "title": "VerifyResponse"
+      }
+    },
+    "securitySchemes": {
+      "OAuth2PasswordBearer": {
+        "type": "oauth2",
+        "flows": {
+          "password": {
+            "scopes": {},
+            "tokenUrl": "/auth/verify"
+          }
+        }
       }
     }
   }

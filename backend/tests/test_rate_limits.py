@@ -21,7 +21,7 @@ def test_post_products_allows_up_to_limit(client_fixture):
     """30 POST /products requests must all succeed (not 429)."""
     payload = {
         "name": "Test Product",
-        "manufacturer_address": "0xaAbBcCdDeEfF00112233445566778899aAbBcCdD",
+        "manufacturer_address": "0x1234567890123456789012345678901234567890",
     }
     for i in range(30):
         r = client_fixture.post("/products/", json=payload)
@@ -32,7 +32,7 @@ def test_post_products_returns_429_when_limit_exceeded(client_fixture):
     """The 31st POST /products within a minute must return 429."""
     payload = {
         "name": "Test Product",
-        "manufacturer_address": "0xaAbBcCdDeEfF00112233445566778899aAbBcCdD",
+        "manufacturer_address": "0x1234567890123456789012345678901234567890",
     }
     for _ in range(30):
         client_fixture.post("/products/", json=payload)
@@ -51,7 +51,7 @@ def test_post_shipments_returns_429_when_limit_exceeded(client_fixture):
     product = Product(
         product_id="PROD-TEST01",
         name="Seed Product",
-        manufacturer_address="0xaAbBcCdDeEfF00112233445566778899aAbBcCdD",
+        manufacturer_address="0x1234567890123456789012345678901234567890",
         registered_at=datetime.now(timezone.utc),
         block_number=0,
         tx_hash="0x",
@@ -78,7 +78,7 @@ def test_put_shipments_returns_429_when_limit_exceeded(client_fixture):
     The shipment doesn't need to exist — slowapi counts and limits the request
     before the route handler resolves the DB lookup.
     """
-    payload = {"status": "1", "notes": "update"}
+    payload = {"notes": "update"}
     for _ in range(30):
         client_fixture.put("/shipments/SHIP-FAKE99", json=payload)
     r = client_fixture.put("/shipments/SHIP-FAKE99", json=payload)

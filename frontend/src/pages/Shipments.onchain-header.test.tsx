@@ -1,3 +1,9 @@
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => ({ token: 'test-token', address: '0x1234567890123456789012345678901234567890', isAuthenticated: true, isLoggingIn: false, loginError: null, login: vi.fn(), logout: vi.fn() }),
+  getAuthToken: () => null,
+  clearAuthToken: vi.fn(),
+}))
+
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen, fireEvent, waitFor } from '@testing-library/react'
 import Shipments from './Shipments'
@@ -32,6 +38,7 @@ vi.mock('wagmi', async (importOriginal) => {
 })
 
 vi.mock('@/hooks/useShipmentTracker', () => ({
+  useShipmentPermissions: () => ({ canRecord: true, canTransfer: true }),
   useRecordCheckpoint: vi.fn(),
   useTransferCustody: vi.fn(),
   StatusLabels: {
@@ -59,7 +66,7 @@ describe('Shipments on-chain header text', () => {
           {
             id: 1,
             shipment_id: 'SHIP-001',
-            product_id: 'PROD-001',
+            product_id: 'PROD-001', owner_address: '0x1234567890123456789012345678901234567890', ownership_source: 'signed_draft', block_number: 0, tx_hash: '0x',
             origin: 'NYC',
             destination: 'LA',
             status: '1',

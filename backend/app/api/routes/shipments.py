@@ -1,7 +1,9 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from app.core.limiter import limiter
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
+from app.core.auth import get_current_user
+from app.core.permissions import require_product_owner
 from typing import List, Optional
 
 from sqlalchemy import or_
@@ -41,7 +43,7 @@ def get_all_shipments(
     db: Session = Depends(get_db),
 ):
     """List all shipments with optional status filter, search, sorting, and pagination."""
-    query = db.query(Shipment)
+    query = db.query(Shipment).options(joinedload(Shipment.product))
     if status is not None:
         query = query.filter(Shipment.status == status)
     if search:
@@ -64,18 +66,20 @@ async def create_shipment(
     request: Request,
     shipment_in: ShipmentCreate,
     db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
 ):
     """Create a new shipment."""
-    product = db.query(Product).filter(Product.product_id == shipment_in.product_id).first()
+    product = db.query(Product).filter(Product.product_id == shipment_in.product_id).with_for_update().first()
     if not product:
         raise HTTPException(status_code=422, detail="Product not found")
+    require_product_owner(product, current_user)
 
     shipment = Shipment(
         shipment_id=f"SHIP-{uuid.uuid4().hex[:8].upper()}",
         product_id=shipment_in.product_id,
         origin=shipment_in.origin,
         destination=shipment_in.destination,
-        status=shipment_in.status,
+        status="0",
         notes=shipment_in.notes,
     )
     db.add(shipment)
@@ -99,11 +103,16 @@ def update_shipment(
     shipment_id: str,
     shipment_in: ShipmentUpdate,
     db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
 ):
     """Update an existing shipment."""
     shipment = db.query(Shipment).filter(Shipment.shipment_id == shipment_id).first()
     if not shipment:
         raise HTTPException(status_code=404, detail="Shipment not found")
+    product = db.query(Product).filter(Product.product_id == shipment.product_id).with_for_update().first()
+    if not product:
+        raise HTTPException(status_code=409, detail="Shipment product needs reconciliation")
+    require_product_owner(product, current_user)
 
     update_data = shipment_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():

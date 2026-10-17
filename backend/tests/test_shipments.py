@@ -1,7 +1,7 @@
 import pytest
 
 from app.models.product import Product
-from app.models.shipment import Checkpoint, CustodyTransfer
+from app.models.shipment import Checkpoint, CustodyTransfer, Shipment
 from app.schemas.shipment import (
     CheckpointResponse,
     CustodyTransferResponse,
@@ -19,6 +19,8 @@ def seeded_db(db_session):
         description="For shipment tests",
         metadata_uri="ipfs://shipment",
         manufacturer_address="0x1234567890123456789012345678901234567890",
+        owner_address="0x1234567890123456789012345678901234567890",
+        ownership_source="chain_event",
         registered_at=datetime.now(timezone.utc),
         block_number=200,
         tx_hash="0xshipmenttx",
@@ -143,14 +145,13 @@ def test_put_shipment_updates_existing_shipment(client_fixture, seeded_db):
 
     update_payload = {
         "origin": "New Origin",
-        "status": "1",
         "notes": "Updated notes",
     }
     response = client_fixture.put(f"/shipments/{shipment_id}", json=update_payload)
     assert response.status_code == 200
     data = response.json()
     assert data["origin"] == "New Origin"
-    assert data["status"] == "1"
+    assert data["status"] == "0"
     assert data["notes"] == "Updated notes"
     assert data["destination"] == "Old Destination"
     assert data["shipment_id"] == shipment_id
@@ -170,7 +171,6 @@ def test_put_shipment_response_validates_against_schema(client_fixture, seeded_d
 
     update_payload = {
         "origin": "New Origin",
-        "status": "1",
         "notes": "Updated notes",
     }
     response = client_fixture.put(f"/shipments/{shipment_id}", json=update_payload)
@@ -178,7 +178,7 @@ def test_put_shipment_response_validates_against_schema(client_fixture, seeded_d
     data = response.json()
     validated = ShipmentResponse.model_validate(data)
     assert validated.origin == update_payload["origin"]
-    assert validated.status == update_payload["status"]
+    assert validated.status == "0"
     assert validated.created_at is not None
     assert validated.updated_at is not None
 
@@ -195,7 +195,7 @@ def test_get_shipments_returns_paginated_list_with_items_and_total(client_fixtur
             "product_id": "0x" + "b" * 64,
             "origin": f"Origin {i}",
             "destination": f"Destination {i}",
-            "status": str(i),
+            "status": "0",
         })
 
     response = client_fixture.get("/shipments")
@@ -219,8 +219,11 @@ def test_get_shipments_filters_by_status_correctly(client_fixture, seeded_db):
         "product_id": "0x" + "b" * 64,
         "origin": "Warehouse C",
         "destination": "Store D",
-        "status": "1",
+        "status": "0",
     })
+    # Status is projected by the indexer, never supplied as a planning write.
+    seeded_db.query(Shipment).filter(Shipment.origin == "Warehouse C").update({"status": "1"})
+    seeded_db.commit()
 
     response = client_fixture.get("/shipments?status=1")
     assert response.status_code == 200
@@ -271,7 +274,7 @@ def test_get_shipments_response_validates_against_schema(client_fixture, seeded_
             "product_id": "0x" + "b" * 64,
             "origin": f"Origin {i}",
             "destination": f"Destination {i}",
-            "status": str(i),
+            "status": "0",
         })
     response = client_fixture.get("/shipments")
     assert response.status_code == 200
@@ -330,7 +333,7 @@ def test_get_shipments_filters_by_search_origin(client_fixture, seeded_db):
         "product_id": "0x" + "b" * 64,
         "origin": "Gamma Port",
         "destination": "Delta Hub",
-        "status": "1",
+        "status": "0",
     })
     response = client_fixture.get("/shipments?search=Alpha")
     assert response.status_code == 200
@@ -351,7 +354,7 @@ def test_get_shipments_filters_by_search_destination(client_fixture, seeded_db):
         "product_id": "0x" + "b" * 64,
         "origin": "Gamma Port",
         "destination": "Delta Hub",
-        "status": "1",
+        "status": "0",
     })
     response = client_fixture.get("/shipments?search=Delta")
     assert response.status_code == 200

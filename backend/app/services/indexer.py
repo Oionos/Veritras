@@ -266,6 +266,8 @@ class EventIndexer:
                 description=description or None,
                 metadata_uri=metadata_uri or None,
                 manufacturer_address=manufacturer,
+                owner_address=manufacturer.lower(),
+                ownership_source="chain_event",
                 registered_at=timestamp,
                 block_number=block_number,
                 tx_hash=tx_hash,

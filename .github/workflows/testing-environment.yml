@@ -24,6 +24,18 @@ jobs:
         run: make testing-up
       - name: Register, track, transfer, deliver, and verify
         run: make testing-check
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install browser regression dependencies
+        working-directory: frontend
+        run: |
+          npm install -g npm@11.17.0
+          npm ci
+          npx playwright install chromium --with-deps
+      - name: Sign in and enforce ownership in the real browser
+        working-directory: frontend
+        run: node scripts/check-local-auth.mjs
       - name: Show API diagnostics on failure
         if: failure()
         run: docker compose -f compose.testing.yml logs --tail 80 backend deploy-contracts frontend

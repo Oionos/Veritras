@@ -10,8 +10,15 @@ from sqlalchemy.pool import StaticPool
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 # Prevent live RPC connections during tests.
 os.environ["SEPOLIA_RPC_URL"] = ""
+os.environ["ENVIRONMENT"] = "development"
+os.environ["CHAIN_ID"] = "11155111"
+os.environ["SIWE_ORIGINS"] = "http://localhost:5173"
+os.environ.pop("CORS_ORIGINS", None)
+os.environ.pop("CORS_ORIGIN", None)
 
 from app.core.database import Base, get_db
+from app.core.auth import create_access_token
+from app.core.limiter import limiter
 from app.main import app
 import app.main as main_module
 import app.core.database as db_module
@@ -51,5 +58,8 @@ def db_session():
 
 @pytest.fixture(scope="function")
 def client_fixture(db_session):
+    limiter._storage.reset()
     with TestClient(app) as c:
+        c.headers["Authorization"] = "Bearer " + create_access_token("0x1234567890123456789012345678901234567890")
         yield c
+    limiter._storage.reset()

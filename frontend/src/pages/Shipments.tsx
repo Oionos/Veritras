@@ -2,11 +2,17 @@ import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { toProductBytes32 as toBytes32 } from '@/utils/productId'
 import { useAccount } from 'wagmi'
+import { useAuth } from '@/hooks/useAuth'
+import { ownsRecord } from '@/utils/permissions'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import Modal from '@/components/ui/Modal'
-import { useShipments, useCreateShipment, useUpdateShipment } from '@/hooks/useApi'
+import {
+  useShipments,
+  useCreateShipment,
+  useUpdateShipment,
+} from '@/hooks/useApi'
 import { useForm, Controller } from 'react-hook-form'
 import { ProductCombobox } from '@/components/ui/ProductCombobox'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -14,6 +20,7 @@ import { ShipmentSchema, type ShipmentFormData } from '@/schemas'
 import {
   useRecordCheckpoint,
   useTransferCustody,
+  useShipmentPermissions,
   ShipmentStatus,
   StatusLabels,
 } from '@/hooks/useShipmentTracker'
@@ -45,12 +52,13 @@ const statusLabels: Record<string, string> = {
   '3': 'Delivered',
 }
 
-const statusVariant: Record<string, 'default' | 'blue' | 'orange' | 'success'> = {
-  '0': 'default',
-  '1': 'blue',
-  '2': 'orange',
-  '3': 'success',
-}
+const statusVariant: Record<string, 'default' | 'blue' | 'orange' | 'success'> =
+  {
+    '0': 'default',
+    '1': 'blue',
+    '2': 'orange',
+    '3': 'success',
+  }
 
 const statusOptions = [
   { value: 'all', label: 'All Statuses' },
@@ -72,6 +80,7 @@ function isValidEthAddress(value: string): boolean {
 
 export default function Shipments() {
   const { isConnected } = useAccount()
+  const auth = useAuth()
 
   // ── Pagination / table state ──────────────────────────────────────────────
   const [page, setPage] = useState(1)
@@ -85,7 +94,10 @@ export default function Shipments() {
   const [editingShipment, setEditingShipment] = useState<Shipment | null>(null)
 
   // ── Selected shipment for on-chain actions ────────────────────────────────
-  const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(null)
+  const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(
+    null,
+  )
+  const permissions = useShipmentPermissions(selectedShipment?.product_id)
 
   // ── Blockchain action panel state ─────────────────────────────────────────
   const [showCheckpointForm, setShowCheckpointForm] = useState(false)
@@ -143,17 +155,18 @@ export default function Shipments() {
   }, [txSuccess])
 
   // ── API queries ───────────────────────────────────────────────────────────
-  const {
-    data,
-    isLoading,
-    error,
-  } = useShipments(page, limit, statusFilter, debouncedSearch || undefined)
+  const { data, isLoading, error } = useShipments(
+    page,
+    limit,
+    statusFilter,
+    debouncedSearch || undefined,
+  )
 
   const createShipment = useCreateShipment()
   const updateShipment = useUpdateShipment()
 
-  const shipments: Shipment[] = Array.isArray(data) ? data : data?.items ?? []
-  const total = Array.isArray(data) ? data.length : data?.total ?? 0
+  const shipments: Shipment[] = Array.isArray(data) ? data : (data?.items ?? [])
+  const total = Array.isArray(data) ? data.length : (data?.total ?? 0)
   const totalPages = Math.max(1, Math.ceil(total / limit))
 
   // ── Form ──────────────────────────────────────────────────────────────────
@@ -174,14 +187,23 @@ export default function Shipments() {
     },
   })
 
+  useEffect(() => {
+    setModalOpen(false)
+    setEditingShipment(null)
+    setSelectedShipment(null)
+    reset()
+  }, [auth.address, reset])
+
   // ── Handlers ──────────────────────────────────────────────────────────────
   const openAddModal = () => {
+    if (!auth.isAuthenticated) return
     setEditingShipment(null)
     reset({ product_id: '', origin: '', destination: '', notes: '' })
     setModalOpen(true)
   }
 
   const openEditModal = (shipment: Shipment) => {
+    if (!ownsRecord(shipment, auth.address)) return
     setEditingShipment(shipment)
     reset({
       product_id: shipment.product_id,
@@ -216,7 +238,12 @@ export default function Shipments() {
 
   const handleSubmitCheckpoint = () => {
     if (!cpLocation.trim() || !selectedShipment) return
-    record(toBytes32(selectedShipment.product_id), cpLocation.trim(), cpStatus, cpNotes.trim())
+    record(
+      toBytes32(selectedShipment.product_id),
+      cpLocation.trim(),
+      cpStatus,
+      cpNotes.trim(),
+    )
   }
 
   const handleTransferCustody = () => {
@@ -225,6 +252,7 @@ export default function Shipments() {
   }
 
   const onSubmit = async (formData: ShipmentFormData) => {
+    if (!auth.isAuthenticated) return
     try {
       if (editingShipment) {
         const { product_id, ...updateData } = formData
@@ -265,11 +293,22 @@ export default function Shipments() {
             Manage and track product shipments across the supply chain.
           </p>
         </div>
-        <Button onClick={openAddModal} className="gap-2">
+        <Button
+          onClick={openAddModal}
+          disabled={!auth.isAuthenticated}
+          className="gap-2"
+        >
           <Plus className="h-4 w-4" />
           Add Shipment
         </Button>
       </div>
+
+      {!auth.isAuthenticated && (
+        <p className="text-sm text-muted">
+          Connect your wallet and sign in to plan shipments for products you
+          own.
+        </p>
+      )}
 
       {/* ─── Filters ─────────────────────────────────────────────── */}
       <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 backdrop-blur-2xl">
@@ -330,7 +369,9 @@ export default function Shipments() {
           <div>
             <p className="font-medium text-red-400">Failed to load shipments</p>
             <p className="text-sm text-red-400/70">
-              {error instanceof Error ? error.message : 'Please try again later.'}
+              {error instanceof Error
+                ? error.message
+                : 'Please try again later.'}
             </p>
           </div>
         </div>
@@ -354,7 +395,11 @@ export default function Shipments() {
                 : 'Create your first shipment to start tracking'}
             </p>
             {statusFilter === 'all' && (
-              <Button onClick={openAddModal} className="mt-4 gap-2">
+              <Button
+                onClick={openAddModal}
+                disabled={!auth.isAuthenticated}
+                className="mt-4 gap-2"
+              >
                 <Plus className="h-4 w-4" />
                 Add Your First Shipment
               </Button>
@@ -365,13 +410,27 @@ export default function Shipments() {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-white/[0.06]">
-                  <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-muted/60">Shipment ID</th>
-                  <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-muted/60">Product ID</th>
-                  <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-muted/60">Origin</th>
-                  <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-muted/60">Destination</th>
-                  <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-muted/60">Status</th>
-                  <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-muted/60">Created</th>
-                  <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-muted/60">Actions</th>
+                  <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-muted/60">
+                    Shipment ID
+                  </th>
+                  <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-muted/60">
+                    Product ID
+                  </th>
+                  <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-muted/60">
+                    Origin
+                  </th>
+                  <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-muted/60">
+                    Destination
+                  </th>
+                  <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-muted/60">
+                    Status
+                  </th>
+                  <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-muted/60">
+                    Created
+                  </th>
+                  <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-muted/60">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.04]">
@@ -387,9 +446,13 @@ export default function Shipments() {
                       {shipment.product_id}
                     </td>
                     <td className="px-6 py-4 text-text">{shipment.origin}</td>
-                    <td className="px-6 py-4 text-text">{shipment.destination}</td>
+                    <td className="px-6 py-4 text-text">
+                      {shipment.destination}
+                    </td>
                     <td className="px-6 py-4">
-                      <Badge variant={statusVariant[shipment.status] || 'default'}>
+                      <Badge
+                        variant={statusVariant[shipment.status] || 'default'}
+                      >
                         {statusLabels[shipment.status] || shipment.status}
                       </Badge>
                     </td>
@@ -409,13 +472,15 @@ export default function Shipments() {
                         >
                           <Activity className="h-4 w-4" />
                         </button>
-                        <button
-                          onClick={() => openEditModal(shipment)}
-                          className="rounded-lg p-2 text-muted/40 transition-colors hover:bg-white/[0.04] hover:text-text"
-                          aria-label={`Edit shipment ${shipment.shipment_id}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
+                        {ownsRecord(shipment, auth.address) && (
+                          <button
+                            onClick={() => openEditModal(shipment)}
+                            className="rounded-lg p-2 text-muted/40 transition-colors hover:bg-white/[0.04] hover:text-text"
+                            aria-label={`Edit shipment ${shipment.shipment_id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -469,7 +534,9 @@ export default function Shipments() {
               <Activity className="h-4 w-4 text-accent" />
               <span className="text-sm font-medium text-text">
                 On-Chain Actions -{' '}
-                <span className="font-mono">{selectedShipment.shipment_id}</span>
+                <span className="font-mono">
+                  {selectedShipment.shipment_id}
+                </span>
               </span>
             </div>
             <button
@@ -482,6 +549,10 @@ export default function Shipments() {
           </div>
 
           {/* Wallet guard */}
+          <p className="text-sm text-muted">
+            Checkpoint and custody actions are available to the current handler.
+            The manufacturer records the first checkpoint.
+          </p>
           {!isConnected ? (
             <div className="flex items-center gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.02] px-5 py-4 text-sm text-muted backdrop-blur-2xl">
               <LinkIcon className="h-4 w-4 shrink-0 text-muted/40" />
@@ -493,11 +564,14 @@ export default function Shipments() {
               <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-2xl">
                 <button
                   onClick={() => setShowCheckpointForm((v) => !v)}
+                  disabled={!permissions.canRecord}
                   className="flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-white/[0.02]"
                 >
                   <div className="flex items-center gap-3">
                     <MapPin className="h-4 w-4 text-accent" />
-                    <span className="text-sm font-medium text-text">Record Checkpoint</span>
+                    <span className="text-sm font-medium text-text">
+                      Record Checkpoint
+                    </span>
                   </div>
                   {showCheckpointForm ? (
                     <ChevronUp className="h-4 w-4 text-muted/60" />
@@ -514,85 +588,98 @@ export default function Shipments() {
                     className="overflow-hidden"
                   >
                     <div className="border-t border-white/[0.06] px-5 pb-5 pt-4 space-y-4">
-                    {/* Location */}
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text">
-                        Location <span className="text-red-400">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={cpLocation}
-                        onChange={(e) => setCpLocation(e.target.value)}
-                        placeholder="e.g., Port of Rotterdam"
-                        disabled={cpPending || cpConfirming}
-                        className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
-                      />
-                    </div>
+                      {/* Location */}
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-text">
+                          Location <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={cpLocation}
+                          onChange={(e) => setCpLocation(e.target.value)}
+                          placeholder="e.g., Port of Rotterdam"
+                          disabled={cpPending || cpConfirming}
+                          className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
+                        />
+                      </div>
 
-                    {/* Status */}
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text">
-                        Status
-                      </label>
-                      <select
-                        value={cpStatus}
-                        onChange={(e) => setCpStatus(Number(e.target.value) as ShipmentStatus)}
-                        disabled={cpPending || cpConfirming}
-                        className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
-                      >
-                        {(Object.entries(StatusLabels) as [string, string][]).map(([val, label]) => (
-                          <option key={val} value={val}>
-                            {label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                      {/* Status */}
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-text">
+                          Status
+                        </label>
+                        <select
+                          value={cpStatus}
+                          onChange={(e) =>
+                            setCpStatus(
+                              Number(e.target.value) as ShipmentStatus,
+                            )
+                          }
+                          disabled={cpPending || cpConfirming}
+                          className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
+                        >
+                          {(
+                            Object.entries(StatusLabels) as [string, string][]
+                          ).map(([val, label]) => (
+                            <option key={val} value={val}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
-                    {/* Notes */}
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text">
-                        Notes <span className="text-muted">(optional)</span>
-                      </label>
-                      <textarea
-                        value={cpNotes}
-                        onChange={(e) => setCpNotes(e.target.value)}
-                        placeholder="Any additional notes..."
-                        rows={2}
-                        disabled={cpPending || cpConfirming}
-                        className="w-full resize-none rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
-                      />
-                    </div>
+                      {/* Notes */}
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-text">
+                          Notes <span className="text-muted">(optional)</span>
+                        </label>
+                        <textarea
+                          value={cpNotes}
+                          onChange={(e) => setCpNotes(e.target.value)}
+                          placeholder="Any additional notes..."
+                          rows={2}
+                          disabled={cpPending || cpConfirming}
+                          className="w-full resize-none rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
+                        />
+                      </div>
 
-                    {/* Error */}
-                    {cpError && (
-                      <p className="text-xs text-red-400">
-                        {cpError instanceof Error ? cpError.message : 'Transaction failed'}
-                      </p>
-                    )}
+                      {/* Error */}
+                      {cpError && (
+                        <p className="text-xs text-red-400">
+                          {cpError instanceof Error
+                            ? cpError.message
+                            : 'Transaction failed'}
+                        </p>
+                      )}
 
-                    <div className="flex justify-end gap-3">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => setShowCheckpointForm(false)}
-                        disabled={cpPending || cpConfirming}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={handleSubmitCheckpoint}
-                        disabled={cpPending || cpConfirming || !cpLocation.trim()}
-                      >
-                        {(cpPending || cpConfirming) && (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        )}
-                        {cpPending
-                          ? 'Submitting...'
-                          : cpConfirming
-                          ? 'Confirming...'
-                          : 'Submit Checkpoint'}
-                      </Button>
-                    </div>
+                      <div className="flex justify-end gap-3">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => setShowCheckpointForm(false)}
+                          disabled={cpPending || cpConfirming}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={handleSubmitCheckpoint}
+                          disabled={
+                            cpPending ||
+                            cpConfirming ||
+                            !cpLocation.trim() ||
+                            !permissions.canRecord
+                          }
+                        >
+                          {(cpPending || cpConfirming) && (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          )}
+                          {cpPending
+                            ? 'Submitting...'
+                            : cpConfirming
+                              ? 'Confirming...'
+                              : 'Submit Checkpoint'}
+                        </Button>
+                      </div>
                     </div>
                   </motion.div>
                 )}
@@ -602,11 +689,14 @@ export default function Shipments() {
               <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.02] backdrop-blur-2xl">
                 <button
                   onClick={() => setShowTransferForm((v) => !v)}
+                  disabled={!permissions.canTransfer}
                   className="flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-white/[0.02]"
                 >
                   <div className="flex items-center gap-3">
                     <ArrowRight className="h-4 w-4 text-accent" />
-                    <span className="text-sm font-medium text-text">Transfer Custody</span>
+                    <span className="text-sm font-medium text-text">
+                      Transfer Custody
+                    </span>
                   </div>
                   {showTransferForm ? (
                     <ChevronUp className="h-4 w-4 text-muted/60" />
@@ -623,56 +713,66 @@ export default function Shipments() {
                     className="overflow-hidden"
                   >
                     <div className="border-t border-white/[0.06] px-5 pb-5 pt-4 space-y-4">
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-text">
-                        New Handler Address <span className="text-red-400">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={txHandler}
-                        onChange={(e) => {
-                          setTxHandler(e.target.value)
-                          setTxHandlerError('')
-                        }}
-                        placeholder="0x..."
-                        disabled={txPending || txConfirming}
-                        className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 font-mono text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
-                      />
-                      {txHandlerError && (
-                        <p className="mt-1 text-xs text-red-400">{txHandlerError}</p>
-                      )}
-                    </div>
-
-                    {/* Error */}
-                    {txError && (
-                      <p className="text-xs text-red-400">
-                        {txError instanceof Error ? txError.message : 'Transaction failed'}
-                      </p>
-                    )}
-
-                    <div className="flex justify-end gap-3">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => setShowTransferForm(false)}
-                        disabled={txPending || txConfirming}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={handleTransferCustody}
-                        disabled={txPending || txConfirming || !txHandler.trim()}
-                      >
-                        {(txPending || txConfirming) && (
-                          <Loader2 className="h-4 w-4 animate-spin" />
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-text">
+                          New Handler Address{' '}
+                          <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={txHandler}
+                          onChange={(e) => {
+                            setTxHandler(e.target.value)
+                            setTxHandlerError('')
+                          }}
+                          placeholder="0x..."
+                          disabled={txPending || txConfirming}
+                          className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 font-mono text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10 disabled:opacity-50"
+                        />
+                        {txHandlerError && (
+                          <p className="mt-1 text-xs text-red-400">
+                            {txHandlerError}
+                          </p>
                         )}
-                        {txPending
-                          ? 'Submitting...'
-                          : txConfirming
-                          ? 'Confirming...'
-                          : 'Transfer'}
-                      </Button>
-                    </div>
+                      </div>
+
+                      {/* Error */}
+                      {txError && (
+                        <p className="text-xs text-red-400">
+                          {txError instanceof Error
+                            ? txError.message
+                            : 'Transaction failed'}
+                        </p>
+                      )}
+
+                      <div className="flex justify-end gap-3">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => setShowTransferForm(false)}
+                          disabled={txPending || txConfirming}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={handleTransferCustody}
+                          disabled={
+                            txPending ||
+                            txConfirming ||
+                            !txHandler.trim() ||
+                            !permissions.canTransfer
+                          }
+                        >
+                          {(txPending || txConfirming) && (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          )}
+                          {txPending
+                            ? 'Submitting...'
+                            : txConfirming
+                              ? 'Confirming...'
+                              : 'Transfer'}
+                        </Button>
+                      </div>
                     </div>
                   </motion.div>
                 )}
@@ -697,7 +797,9 @@ export default function Shipments() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {mutationError && (
             <div className="rounded-xl border border-red-500/20 bg-red-500/[0.06] p-3 text-sm text-red-400">
-              {mutationError instanceof Error ? mutationError.message : 'An error occurred'}
+              {mutationError instanceof Error
+                ? mutationError.message
+                : 'An error occurred'}
             </div>
           )}
 
@@ -710,6 +812,8 @@ export default function Shipments() {
               control={control}
               render={({ field }) => (
                 <ProductCombobox
+                  ownedOnly
+                  ownerAddress={auth.address}
                   value={field.value}
                   onChange={field.onChange}
                   disabled={!!editingShipment}
@@ -730,7 +834,9 @@ export default function Shipments() {
                 className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
               />
               {errors.origin && (
-                <p className="mt-1 text-xs text-red-400">{errors.origin.message}</p>
+                <p className="mt-1 text-xs text-red-400">
+                  {errors.origin.message}
+                </p>
               )}
             </div>
             <div>
@@ -743,7 +849,9 @@ export default function Shipments() {
                 className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
               />
               {errors.destination && (
-                <p className="mt-1 text-xs text-red-400">{errors.destination.message}</p>
+                <p className="mt-1 text-xs text-red-400">
+                  {errors.destination.message}
+                </p>
               )}
             </div>
           </div>
@@ -759,7 +867,9 @@ export default function Shipments() {
               className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
             />
             {errors.notes && (
-              <p className="mt-1 text-xs text-red-400">{errors.notes.message}</p>
+              <p className="mt-1 text-xs text-red-400">
+                {errors.notes.message}
+              </p>
             )}
           </div>
 
@@ -777,7 +887,13 @@ export default function Shipments() {
               Cancel
             </Button>
             <Button type="submit" disabled={isMutating}>
-              {isMutating ? <LoadingSpinner size="sm" /> : editingShipment ? 'Save Changes' : 'Create Shipment'}
+              {isMutating ? (
+                <LoadingSpinner size="sm" />
+              ) : editingShipment ? (
+                'Save Changes'
+              ) : (
+                'Create Shipment'
+              )}
             </Button>
           </div>
         </form>

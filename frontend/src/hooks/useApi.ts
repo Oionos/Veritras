@@ -195,7 +195,7 @@ export function useCreateProduct() {
 export function useUpdateProduct() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ product_id, data }: { product_id: string; data: ProductMutationInput }) => {
+    mutationFn: async ({ product_id, data }: { product_id: string; data: components['schemas']['ProductUpdate'] }) => {
       return fetchApi(`/products/${product_id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -227,7 +227,7 @@ export function useCreateShipment() {
 export function useUpdateShipment() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ shipment_id, data }: { shipment_id: string; data: Omit<ShipmentMutationInput, 'product_id'> }) => {
+    mutationFn: async ({ shipment_id, data }: { shipment_id: string; data: components['schemas']['ShipmentUpdate'] }) => {
       return fetchApi(`/shipments/${shipment_id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },

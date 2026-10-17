@@ -1,3 +1,9 @@
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => ({ token: 'test-token', address: '0x1234567890123456789012345678901234567890', isAuthenticated: true, isLoggingIn: false, loginError: null, login: vi.fn(), logout: vi.fn() }),
+  getAuthToken: () => null,
+  clearAuthToken: vi.fn(),
+}))
+
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen, fireEvent, waitFor } from '@testing-library/react'
 import Products from './Products'
@@ -36,6 +42,7 @@ vi.mock('@/hooks/useRegisterProduct', () => ({
 }))
 
 vi.mock('@/hooks/useShipmentTracker', () => ({
+  useShipmentPermissions: () => ({ canRecord: true, canTransfer: true }),
   useRecordCheckpoint: () => ({
     record: vi.fn(),
     hash: undefined,
@@ -65,7 +72,7 @@ vi.mock('@/hooks/useApi', () => ({
 }))
 
 const mockProducts = [
-  { id: 1, product_id: 'PROD-001', name: 'Widget A', manufacturer_address: '0x1234567890123456789012345678901234567890', registered_at: '2024-01-15T10:00:00Z' },
+  { id: 1, product_id: 'PROD-001', owner_address: '0x1234567890123456789012345678901234567890', ownership_source: 'signed_draft', block_number: 0, tx_hash: '0x', name: 'Widget A', manufacturer_address: '0x1234567890123456789012345678901234567890', registered_at: '2024-01-15T10:00:00Z' },
   { id: 2, product_id: 'PROD-002', name: 'Gadget B', manufacturer_address: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd', registered_at: '2024-02-20T12:00:00Z' },
 ]
 

@@ -5,6 +5,13 @@ export const SHIPMENT_TRACKER_ADDRESS = appEnvironment.shipmentTracker
 
 export const productRegistryAbi = [
   {
+    inputs: [{ internalType: 'bytes32', name: 'productId', type: 'bytes32' }],
+    name: 'getProductManufacturer',
+    outputs: [{ internalType: 'address', name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
     inputs: [
       { internalType: 'bytes32', name: 'productId', type: 'bytes32' },
       { internalType: 'string', name: 'name', type: 'string' },
@@ -68,6 +75,13 @@ export const productRegistryAbi = [
 ] as const
 
 export const shipmentTrackerAbi = [
+  {
+    inputs: [{ internalType: 'bytes32', name: '', type: 'bytes32' }],
+    name: 'currentHandler',
+    outputs: [{ internalType: 'address', name: '', type: 'address' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
   {
     inputs: [
       { internalType: 'bytes32', name: 'productId', type: 'bytes32' },

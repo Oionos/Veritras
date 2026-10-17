@@ -4,6 +4,8 @@ Prepared October 17, 2026. Based on [PROJECT_REVIEW.md](PROJECT_REVIEW.md) and r
 
 Implementation started on `codex/isolated-testing-environment`. The local stack, preview configuration guards, indexer startup/health fixes, receipt checks, and initial ID/status reconciliation are implemented. Hosted Neon/Render provisioning is pending service access and a separate Sepolia test deployment. See [TESTING.md](TESTING.md) for commands, validation, and remaining boundaries; subsequent PRs below remain planned unless explicitly noted there.
 
+Increment 2 is implemented on `codex/wallet-auth-and-permissions`: database-backed SIWE challenges, scoped tokens, explicit draft ownership and write authorization, shared browser sessions, and owner/handler controls. Security regressions, the real local wallet journey, and an isolated Neon migration rehearsal have passed. See [AUTHENTICATION.md](AUTHENTICATION.md) for behavior, migration/configuration requirements, and validation. Hosted release is tracked by the implementation PR; canonical identity and durable indexing are still subsequent increments.
+
 ## Goal and completion criteria
 
 Deliver a reliable supply chain demonstration in which a manufacturer registers an item, creates its shipment, records checkpoints, transfers custody, completes delivery, and shares independently inspectable registration evidence. The contract, API, user interface, and reports must agree about that item.

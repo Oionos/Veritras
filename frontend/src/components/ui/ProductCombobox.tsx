@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Product } from '@/types'
 import { useProductList } from '@/hooks/useProductList'
+import { ownsRecord } from '@/utils/permissions'
 
 // ─── Pure utility ─────────────────────────────────────────────────────────────
 
@@ -9,7 +10,9 @@ export function filterProducts(products: Product[], query: string): Product[] {
   const q = query.toLowerCase()
   return products
     .filter(
-      p => p.product_id.toLowerCase().startsWith(q) || p.name.toLowerCase().startsWith(q)
+      (p) =>
+        p.product_id.toLowerCase().startsWith(q) ||
+        p.name.toLowerCase().startsWith(q),
     )
     .slice(0, 8)
 }
@@ -21,13 +24,24 @@ interface ProductComboboxProps {
   onChange: (val: string) => void
   disabled?: boolean
   error?: string
+  ownedOnly?: boolean
+  ownerAddress?: string | null
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function ProductCombobox({ value, onChange, disabled, error }: ProductComboboxProps) {
+export function ProductCombobox({
+  value,
+  onChange,
+  disabled,
+  error,
+  ownedOnly = false,
+  ownerAddress,
+}: ProductComboboxProps) {
   const { data, isLoading, error: fetchError } = useProductList()
-  const products = data?.items ?? []
+  const products = (data?.items ?? []).filter(
+    (product) => !ownedOnly || ownsRecord(product, ownerAddress || null),
+  )
   const suggestions = filterProducts(products, value)
 
   const [isOpen, setIsOpen] = useState(false)
@@ -41,7 +55,10 @@ export function ProductCombobox({ value, onChange, disabled, error }: ProductCom
   // Close on outside click
   useEffect(() => {
     function handleMouseDown(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
         setIsOpen(false)
       }
     }
@@ -52,7 +69,12 @@ export function ProductCombobox({ value, onChange, disabled, error }: ProductCom
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const newValue = e.target.value
     onChange(newValue)
-    if (!fetchError && !isLoading && products.length > 0 && newValue.length > 0) {
+    if (
+      !fetchError &&
+      !isLoading &&
+      products.length > 0 &&
+      newValue.length > 0
+    ) {
       setIsOpen(true)
     } else {
       setIsOpen(false)
@@ -78,10 +100,10 @@ export function ProductCombobox({ value, onChange, disabled, error }: ProductCom
 
       {isOpen && suggestions.length > 0 && (
         <ul className="absolute z-50 mt-1 w-full rounded-button border border-border bg-surface shadow-card">
-          {suggestions.map(product => (
+          {suggestions.map((product) => (
             <li
               key={product.product_id}
-              onMouseDown={e => e.preventDefault()}
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
                 onChange(product.product_id)
                 setIsOpen(false)
@@ -94,15 +116,19 @@ export function ProductCombobox({ value, onChange, disabled, error }: ProductCom
         </ul>
       )}
 
-      {isOpen && suggestions.length === 0 && value.length > 0 && !isLoading && !fetchError && (
-        <div className="absolute z-50 mt-1 w-full rounded-button border border-border bg-surface px-3 py-2 shadow-card">
-          <p className="text-sm text-muted">No match for &quot;{value}&quot;</p>
-        </div>
-      )}
+      {isOpen &&
+        suggestions.length === 0 &&
+        value.length > 0 &&
+        !isLoading &&
+        !fetchError && (
+          <div className="absolute z-50 mt-1 w-full rounded-button border border-border bg-surface px-3 py-2 shadow-card">
+            <p className="text-sm text-muted">
+              No match for &quot;{value}&quot;
+            </p>
+          </div>
+        )}
 
-      {error && (
-        <p className="mt-1 text-xs text-red-500">{error}</p>
-      )}
+      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
     </div>
   )
 }

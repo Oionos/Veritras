@@ -37,21 +37,13 @@ test('pagination Next button navigates to page 2', async ({ page }) => {
   await expect(page.locator('p').filter({ hasText: /Page 2 of/ })).toBeVisible()
 })
 
-test('Add Product button opens the modal', async ({ page }) => {
-  await page.getByRole('button', { name: 'Add Product' }).click()
-  await expect(page.getByText('Add Product').nth(1)).toBeVisible()
-  // The modal's submit button says "Create Product"
-  await expect(page.getByRole('button', { name: 'Create Product' })).toBeVisible()
+test('guest product creation requires wallet sign-in', async ({ page }) => {
+  await expect(page.getByRole('button', { name: 'Add Product' })).toBeDisabled()
+  await expect(page.getByText('Connect your wallet and sign in to create products or edit your drafts.')).toBeVisible()
 })
 
-test('edit button opens the modal pre-filled with product data', async ({ page }) => {
-  await page.getByRole('button', { name: `Edit PROD-001` }).click()
-  // Modal title switches to "Edit Product"
-  await expect(page.getByText('Edit Product')).toBeVisible()
-  // The name field should be pre-populated with the product's name
-  await expect(page.getByPlaceholder('e.g., Organic Coffee Beans')).toHaveValue('Alpha Widget')
-  // Submit button says "Save Changes" in edit mode
-  await expect(page.getByRole('button', { name: 'Save Changes' })).toBeVisible()
+test('guest cannot edit another wallet’s product', async ({ page }) => {
+  await expect(page.getByRole('button', { name: 'Edit PROD-001' })).toHaveCount(0)
 })
 
 test('lookup by product ID shows the product detail card', async ({ page }) => {
@@ -77,10 +69,7 @@ test('lookup with unknown ID shows Product Not Found error', async ({ page }) =>
   await expect(page.getByText('Product Not Found')).toBeVisible({ timeout: 15000 })
 })
 
-test('Cancel button closes the modal', async ({ page }) => {
-  await page.getByRole('button', { name: 'Add Product' }).click()
-  await expect(page.getByRole('button', { name: 'Create Product' })).toBeVisible()
-
-  await page.getByRole('button', { name: 'Cancel' }).click()
-  await expect(page.getByRole('button', { name: 'Create Product' })).not.toBeVisible()
+test('guest product lookup remains available without a creation dialog', async ({ page }) => {
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Search' })).toBeEnabled()
 })

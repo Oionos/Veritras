@@ -23,22 +23,13 @@ test('search input has the correct placeholder', async ({ page }) => {
   ).toBeVisible()
 })
 
-test('Add Shipment button opens the modal', async ({ page }) => {
-  await page.getByRole('button', { name: 'Add Shipment' }).click()
-  // The modal's submit button "Create Shipment" confirms the modal is open
-  await expect(page.getByRole('button', { name: 'Create Shipment' })).toBeVisible()
-  // ProductCombobox placeholder is visible in add mode
-  await expect(page.getByPlaceholder('e.g., PROD-8842')).toBeVisible()
+test('guest shipment creation requires wallet sign-in', async ({ page }) => {
+  await expect(page.getByRole('button', { name: 'Add Shipment' })).toBeDisabled()
+  await expect(page.getByText('Connect your wallet and sign in to plan shipments for products you own.')).toBeVisible()
 })
 
-test('edit button opens the modal pre-filled with shipment data', async ({ page }) => {
-  await page.getByRole('button', { name: 'Edit shipment SHP-001' }).click()
-  // Modal title switches to "Edit Shipment"
-  await expect(page.getByText('Edit Shipment')).toBeVisible()
-  // Submit button says "Save Changes" in edit mode
-  await expect(page.getByRole('button', { name: 'Save Changes' })).toBeVisible()
-  // Origin field is pre-populated from MOCK_SHIPMENTS[0].origin
-  await expect(page.getByPlaceholder('Origin location')).toHaveValue('Shanghai')
+test('guest cannot edit another wallet’s shipment', async ({ page }) => {
+  await expect(page.getByRole('button', { name: 'Edit shipment SHP-001' })).toHaveCount(0)
 })
 
 test('status filter select shows all status options', async ({ page }) => {
