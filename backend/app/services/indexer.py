@@ -13,12 +13,12 @@ from datetime import datetime, timezone
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.product import Product
-from app.models.shipment import Checkpoint, CustodyTransfer
+from app.models.shipment import Checkpoint, CustodyTransfer, Shipment
 
 logger = logging.getLogger(__name__)
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
-INDEXER_STATE_FILE = BACKEND_DIR / "indexer_state.json"
+INDEXER_STATE_FILE = Path(settings.indexer_state_path) if settings.indexer_state_path else BACKEND_DIR / "indexer_state.json"
 
 # Status mapping from uint8 to string
 STATUS_MAP = {
@@ -39,10 +39,26 @@ def timestamp_to_datetime(ts) -> datetime:
     return datetime.fromtimestamp(ts, tz=timezone.utc)
 
 
+def find_product(db: Session, value):
+    """Resolve a recorded bytes32 ID to an existing public/display ID."""
+    hex_id = bytes32_to_hex(value)
+    candidates = [hex_id]
+    try:
+        text_id = bytes(value).rstrip(b"\x00").decode("utf-8")
+        if text_id:
+            candidates.append(text_id)
+    except UnicodeDecodeError:
+        pass
+    matches = db.query(Product).filter(Product.product_id.in_(candidates)).all()
+    if len(matches) > 1:
+        raise RuntimeError("Conflicting product identities require reconciliation")
+    return matches[0] if matches else None
+
+
 def load_abi(contract_name: str) -> list:
     """Load contract ABI from the bundled abi/ directory inside the backend package."""
     abi_path = BACKEND_DIR / "app" / "abi" / f"{contract_name}.json"
-    with open(abi_path, "r") as f:
+    with open(abi_path, "r", encoding="utf-8-sig") as f:
         return json.load(f)
 
 
@@ -57,8 +73,11 @@ def load_indexer_state() -> Dict:
 
 def save_indexer_state(state: Dict):
     """Save the last processed block to the state file."""
-    with open(INDEXER_STATE_FILE, "w") as f:
+    INDEXER_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    temporary = INDEXER_STATE_FILE.with_suffix(".tmp")
+    with open(temporary, "w", encoding="utf-8") as f:
         json.dump(state, f)
+    temporary.replace(INDEXER_STATE_FILE)
 
 
 class EventIndexer:
@@ -85,6 +104,12 @@ class EventIndexer:
         self.shipment_tracker = None
         self.running = False
         self._thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
+        self.last_error: Optional[str] = None
+        self.last_success_at: Optional[str] = None
+        self._last_success_monotonic: Optional[float] = None
+        self.last_processed_block: Optional[int] = None
+        self.chain_head: Optional[int] = None
 
     def _connect(self):
         """Initialize Web3 connection and contract instances."""
@@ -93,9 +118,11 @@ class EventIndexer:
         if not self.product_registry_address or not self.shipment_tracker_address:
             raise RuntimeError("Contract addresses are not configured")
 
-        self.w3 = Web3(Web3.HTTPProvider(self.rpc_url))
+        self.w3 = Web3(Web3.HTTPProvider(self.rpc_url, request_kwargs={"timeout": settings.indexer_rpc_timeout}))
         if not self.w3.is_connected():
-            raise ConnectionError(f"Failed to connect to RPC: {self.rpc_url}")
+            raise ConnectionError("RPC connection failed")
+        if self.w3.eth.chain_id != settings.chain_id:
+            raise RuntimeError("RPC chain ID does not match configured CHAIN_ID")
 
         product_registry_abi = load_abi("ProductRegistry")
         shipment_tracker_abi = load_abi("ShipmentTracker")
@@ -117,6 +144,7 @@ class EventIndexer:
             return
 
         self.running = True
+        self._stop_event.clear()
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
         logger.info("Indexer background thread started")
@@ -124,68 +152,89 @@ class EventIndexer:
     def stop(self):
         """Gracefully stop the indexer loop."""
         self.running = False
+        self._stop_event.set()
         if self._thread:
-            self._thread.join(timeout=self.poll_interval + 5)
+            self._thread.join(timeout=settings.indexer_rpc_timeout + 2)
             logger.info("Indexer stopped")
 
+    def health(self) -> Dict:
+        age = None if self._last_success_monotonic is None else time.monotonic() - self._last_success_monotonic
+        lag = None if self.chain_head is None or self.last_processed_block is None else max(0, self.chain_head - self.last_processed_block)
+        if not self.running or (self._thread is not None and not self._thread.is_alive()):
+            status = "stopped"
+        elif self.last_error or (age is not None and age > max(settings.indexer_stale_after, self.poll_interval * 3)):
+            status = "degraded"
+        elif age is None:
+            status = "starting"
+        else:
+            status = "catching_up" if lag else "current"
+        return {
+            "status": status, "last_processed_block": self.last_processed_block,
+            "chain_head": self.chain_head, "lag_blocks": lag,
+            "last_success_at": self.last_success_at, "last_error": self.last_error,
+            "poll_interval_seconds": self.poll_interval,
+            "chain_id": settings.chain_id,
+        }
+
     def _run(self):
-        """Main polling loop."""
-        try:
-            self._connect()
-        except Exception as e:
-            logger.error(f"Indexer connection failed: {e}")
-            self.running = False
-            return
-
-        state = load_indexer_state()
-        last_processed = state.get("last_processed_block", 0)
-
-        while self.running:
+        """Retry startup/polls with bounded ranges and interruptible shutdown."""
+        last_processed = None
+        while not self._stop_event.is_set():
             try:
+                if self.product_registry is None or self.shipment_tracker is None:
+                    self._connect()
+                if last_processed is None:
+                    last_processed = int(load_indexer_state().get("last_processed_block", settings.indexer_start_block))
                 latest_block = self.w3.eth.block_number
+                self.chain_head = latest_block
+                if last_processed > latest_block:
+                    raise RuntimeError("Indexer cursor is ahead of chain; reconcile/reset the testing stack")
                 from_block = last_processed + 1
+                to_block = min(latest_block, last_processed + settings.indexer_batch_size)
 
-                if from_block > latest_block:
-                    time.sleep(self.poll_interval)
-                    continue
-
-                logger.info(f"Indexing blocks {from_block} to {latest_block}")
+                if from_block <= to_block:
+                    logger.info("Indexing blocks %s to %s", from_block, to_block)
 
                 # Fetch ProductRegistered events
-                product_events = self.product_registry.events.ProductRegistered().get_logs(
-                    fromBlock=from_block, toBlock=latest_block
-                )
+                product_events = [] if from_block > to_block else self.product_registry.events.ProductRegistered().get_logs(
+                    from_block=from_block, to_block=to_block)
                 for event in product_events:
                     self._process_product_registered(event)
 
                 # Fetch CheckpointRecorded events
-                checkpoint_events = self.shipment_tracker.events.CheckpointRecorded().get_logs(
-                    fromBlock=from_block, toBlock=latest_block
-                )
+                checkpoint_events = [] if from_block > to_block else self.shipment_tracker.events.CheckpointRecorded().get_logs(
+                    from_block=from_block, to_block=to_block)
                 for event in checkpoint_events:
                     self._process_checkpoint_recorded(event)
 
                 # Fetch CustodyTransferred events
-                custody_events = self.shipment_tracker.events.CustodyTransferred().get_logs(
-                    fromBlock=from_block, toBlock=latest_block
-                )
+                custody_events = [] if from_block > to_block else self.shipment_tracker.events.CustodyTransferred().get_logs(
+                    from_block=from_block, to_block=to_block)
                 for event in custody_events:
                     self._process_custody_transferred(event)
 
                 # Fetch DeliveryCompleted events
-                delivery_events = self.shipment_tracker.events.DeliveryCompleted().get_logs(
-                    fromBlock=from_block, toBlock=latest_block
-                )
+                delivery_events = [] if from_block > to_block else self.shipment_tracker.events.DeliveryCompleted().get_logs(
+                    from_block=from_block, to_block=to_block)
                 for event in delivery_events:
                     self._process_delivery_completed(event)
 
-                last_processed = latest_block
-                save_indexer_state({"last_processed_block": last_processed})
-                time.sleep(self.poll_interval)
+                save_indexer_state({"last_processed_block": to_block})
+                last_processed = to_block
+                self.last_processed_block = last_processed
+                self.last_success_at = datetime.now(timezone.utc).isoformat()
+                self._last_success_monotonic = time.monotonic()
+                self.last_error = None
+                if last_processed >= latest_block:
+                    self._stop_event.wait(self.poll_interval)
 
             except Exception as e:
-                logger.error(f"Indexer polling error: {e}")
-                time.sleep(5)
+                self.last_error = type(e).__name__
+                logger.error("Indexer startup/poll failed: %s", self.last_error)
+                self.product_registry = None
+                self.shipment_tracker = None
+                self._stop_event.wait(settings.indexer_retry_interval)
+        self.running = False
 
     def _process_product_registered(self, event: Dict):
         """Persist a ProductRegistered event to the database."""
@@ -195,14 +244,11 @@ class EventIndexer:
         name = args["name"]
         timestamp = timestamp_to_datetime(args["timestamp"])
         block_number = event["blockNumber"]
-        tx_hash = event["transactionHash"].hex()
+        tx_hash = Web3.to_hex(event["transactionHash"])
 
         db = SessionLocal()
         try:
-            existing = db.query(Product).filter(Product.product_id == product_id).first()
-            if existing:
-                logger.debug(f"Product {product_id} already exists, skipping")
-                return
+            existing = find_product(db, args["productId"])
 
             # Try to fetch additional product info from the contract
             description = ""
@@ -214,7 +260,7 @@ class EventIndexer:
             except Exception as e:
                 logger.warning(f"Could not fetch product details for {product_id}: {e}")
 
-            product = Product(
+            values = dict(
                 product_id=product_id,
                 name=name,
                 description=description or None,
@@ -224,12 +270,18 @@ class EventIndexer:
                 block_number=block_number,
                 tx_hash=tx_hash,
             )
-            db.add(product)
+            if existing:
+                values.pop("product_id")
+                for key, value in values.items():
+                    setattr(existing, key, value)
+            else:
+                db.add(Product(**values))
             db.commit()
             logger.info(f"Indexed ProductRegistered: {product_id}")
         except Exception as e:
             db.rollback()
             logger.error(f"Error processing ProductRegistered: {e}")
+            raise
         finally:
             db.close()
 
@@ -243,10 +295,13 @@ class EventIndexer:
         timestamp = timestamp_to_datetime(args["timestamp"])
         notes = args.get("notes", "")
         block_number = event["blockNumber"]
-        tx_hash = event["transactionHash"].hex()
+        tx_hash = Web3.to_hex(event["transactionHash"])
 
         db = SessionLocal()
         try:
+            product = find_product(db, args["productId"])
+            if product:
+                product_id = product.product_id
             checkpoint = Checkpoint(
                 product_id=product_id,
                 location=location,
@@ -258,11 +313,14 @@ class EventIndexer:
                 tx_hash=tx_hash,
             )
             db.add(checkpoint)
+            for shipment in db.query(Shipment).filter(Shipment.product_id == product_id).all():
+                shipment.status = status
             db.commit()
             logger.info(f"Indexed CheckpointRecorded: {product_id} at {location}")
         except Exception as e:
             db.rollback()
             logger.error(f"Error processing CheckpointRecorded: {e}")
+            raise
         finally:
             db.close()
 
@@ -274,10 +332,13 @@ class EventIndexer:
         to_addr = args["to"]
         timestamp = timestamp_to_datetime(args["timestamp"])
         block_number = event["blockNumber"]
-        tx_hash = event["transactionHash"].hex()
+        tx_hash = Web3.to_hex(event["transactionHash"])
 
         db = SessionLocal()
         try:
+            product = find_product(db, args["productId"])
+            if product:
+                product_id = product.product_id
             transfer = CustodyTransfer(
                 product_id=product_id,
                 from_address=from_addr,
@@ -292,38 +353,11 @@ class EventIndexer:
         except Exception as e:
             db.rollback()
             logger.error(f"Error processing CustodyTransferred: {e}")
+            raise
         finally:
             db.close()
 
     def _process_delivery_completed(self, event: Dict):
-        """
-        Process DeliveryCompleted event by recording a final checkpoint
-        with status '3' (Delivered).
-        """
-        args = event["args"]
-        product_id = bytes32_to_hex(args["productId"])
-        handler = args["handler"]
-        timestamp = timestamp_to_datetime(args["timestamp"])
-        block_number = event["blockNumber"]
-        tx_hash = event["transactionHash"].hex()
-
-        db = SessionLocal()
-        try:
-            checkpoint = Checkpoint(
-                product_id=product_id,
-                location="Delivery",
-                status="3",
-                handler_address=handler,
-                notes="Delivery completed",
-                timestamp=timestamp,
-                block_number=block_number,
-                tx_hash=tx_hash,
-            )
-            db.add(checkpoint)
-            db.commit()
-            logger.info(f"Indexed DeliveryCompleted: {product_id}")
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Error processing DeliveryCompleted: {e}")
-        finally:
-            db.close()
+        # A Delivered checkpoint emits both events. CheckpointRecorded already
+        # stores the actual location, notes, and status; never invent a second row.
+        logger.info("DeliveryCompleted observed at block %s", event["blockNumber"])

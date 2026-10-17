@@ -1,0 +1,120 @@
+name: veritras-testing
+
+# Self-contained: never interpolate DATABASE_URL, SEPOLIA_RPC_URL, or contract
+# addresses from a developer's production .env. All published ports are loopback.
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: veritras_test
+      POSTGRES_PASSWORD: local-testing-only
+      POSTGRES_DB: veritras_test
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - testing_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U veritras_test -d veritras_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  blockchain:
+    build:
+      context: ./blockchain
+    ports:
+      - "127.0.0.1:18545:8545"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8545',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_chainId',params:[]})}).then(r=>r.json()).then(x=>process.exit(x.result==='0x7a69'?0:1)).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  deploy-contracts:
+    build:
+      context: ./blockchain
+    command: ["npx", "hardhat", "run", "scripts/deploy.ts", "--network", "localhost"]
+    environment:
+      LOCAL_RPC_URL: http://blockchain:8545
+      TESTING_DEPLOYMENT: "true"
+      DEPLOYMENT_OUTPUT: /testing-config/deployment.json
+      NO_PROXY: localhost,127.0.0.1,blockchain
+    volumes:
+      - testing_config:/testing-config
+    depends_on:
+      blockchain:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: ./backend
+    command: ["python", "start_testing.py"]
+    environment:
+      ENVIRONMENT: testing
+      DATABASE_URL: postgresql://veritras_test:local-testing-only@postgres:5432/veritras_test
+      JWT_SECRET_KEY: local-testing-only-not-for-hosting-7fa8cb32026e4a53a3a48647
+      CORS_ORIGINS: http://localhost:13000,http://127.0.0.1:13000
+      SEPOLIA_RPC_URL: http://blockchain:8545
+      CHAIN_ID: "31337"
+      INDEXER_ENABLED: "true"
+      INDEXER_POLL_INTERVAL: "2"
+      INDEXER_STATE_PATH: /testing-state/indexer_state.json
+      DEPLOYMENT_MANIFEST: /testing-config/deployment.json
+      NO_PROXY: localhost,127.0.0.1,postgres,backend,blockchain,frontend
+      no_proxy: localhost,127.0.0.1,postgres,backend,blockchain,frontend
+    ports:
+      - "127.0.0.1:18000:8000"
+    volumes:
+      - testing_config:/testing-config:ro
+      - testing_state:/testing-state
+    depends_on:
+      postgres:
+        condition: service_healthy
+      deploy-contracts:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+      start_period: 15s
+
+  frontend:
+    build:
+      context: ./frontend
+      target: testing
+    command: ["node", "start-testing.mjs"]
+    environment:
+      VITE_APP_ENV: testing
+      VITE_API_URL: http://localhost:18000
+      VITE_RPC_URL: http://localhost:18545
+      VITE_CHAIN_ID: "31337"
+      DEPLOYMENT_MANIFEST: /testing-config/deployment.json
+    ports:
+      - "127.0.0.1:13000:3000"
+    volumes:
+      - testing_config:/testing-config:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  smoke:
+    profiles: [checks]
+    build:
+      context: ./blockchain
+    command: ["npx", "hardhat", "run", "scripts/smoke.ts", "--network", "localhost"]
+    environment:
+      LOCAL_RPC_URL: http://blockchain:8545
+      TEST_API_URL: http://backend:8000
+      DEPLOYMENT_MANIFEST: /testing-config/deployment.json
+      NO_PROXY: localhost,127.0.0.1,backend,blockchain
+    volumes:
+      - testing_config:/testing-config:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  testing_postgres:
+  testing_config:
+  testing_state:

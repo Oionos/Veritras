@@ -100,9 +100,14 @@ deployed-contracts.json
 #.planning
 .planning/
 scripts/
+!blockchain/scripts/
+!blockchain/scripts/*.ts
 docs/
 AGENTS.md
 
 # Playwright
 **/test-results/
 **/playwright-report/
+
+# Isolated test output / local credentials
+.testing/

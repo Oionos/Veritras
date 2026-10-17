@@ -1,0 +1,36 @@
+# Separate Render Blueprint; never apply this file to the production service.
+services:
+  - type: web
+    name: veritras-api-testing
+    runtime: docker
+    plan: free
+    branch: codex/isolated-testing-environment
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    autoDeploy: false
+    healthCheckPath: /health/live
+    # Migrations run before starting the API. Do not stamp an existing database.
+    dockerCommand: sh -c 'alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000'
+    envVars:
+      - key: ENVIRONMENT
+        value: testing
+      - key: CHAIN_ID
+        value: "11155111"
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: SEPOLIA_RPC_URL
+        sync: false
+      - key: PRODUCT_REGISTRY_CONTRACT
+        sync: false
+      - key: SHIPMENT_TRACKER_CONTRACT
+        sync: false
+      - key: INDEXER_START_BLOCK
+        sync: false
+      - key: INDEXER_ENABLED
+        value: "true"
+      - key: INDEXER_POLL_INTERVAL
+        value: "15"

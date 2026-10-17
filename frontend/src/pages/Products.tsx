@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { toHex, pad } from 'viem'
+import { toProductBytes32 as toBytes32 } from '@/utils/productId'
 import { useAccount } from 'wagmi'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
@@ -66,18 +66,6 @@ const statusVariant: Record<string, 'default' | 'blue' | 'orange' | 'success'> =
 const DEFAULT_LIMIT = 10
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-
-function toBytes32(productId: string): `0x${string}` {
-  const hex = toHex(productId) // UTF-8 → hex
-  // bytes32 can hold at most 32 bytes (64 hex chars + "0x" prefix = 66 chars).
-  if (hex.length > 66) {
-    throw new Error(
-      `product_id "${productId}" exceeds 32 bytes and cannot fit in bytes32`
-    )
-  }
-  // Solidity bytes32 string literals are right-padded with zeroes.
-  return pad(hex, { size: 32, dir: 'right' }) as `0x${string}`
-}
 
 function isValidEthAddress(value: string): boolean {
   return /^0x[0-9a-fA-F]{40}$/.test(value)
@@ -656,9 +644,9 @@ export default function Products() {
                   </div>
                 </div>
               </div>
-              <div className="rounded-xl bg-accent/[0.06] p-4 text-center">
-                <CheckCircle2 className="mx-auto h-8 w-8 text-accent" />
-                <p className="mt-2 text-xs font-medium text-accent">Blockchain Verified</p>
+              <div className="rounded-xl bg-white/[0.03] p-4 text-center">
+                <ShieldCheck className="mx-auto h-8 w-8 text-muted" />
+                <p className="mt-2 text-xs font-medium text-muted">Check registration on the Verify page</p>
               </div>
             </div>
           </Card>

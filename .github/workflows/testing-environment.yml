@@ -1,0 +1,32 @@
+name: Isolated Testing Environment
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: isolated-testing-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-stack:
+    name: API and Contract Integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Start isolated services
+        run: make testing-up
+      - name: Register, track, transfer, deliver, and verify
+        run: make testing-check
+      - name: Show API diagnostics on failure
+        if: failure()
+        run: docker compose -f compose.testing.yml logs --tail 80 backend deploy-contracts frontend
+      - name: Stop testing services
+        if: always()
+        run: make testing-down

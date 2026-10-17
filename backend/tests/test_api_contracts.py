@@ -136,7 +136,7 @@ class TestProductEndpointContracts:
         data = response.json()
         assert set(data.keys()) == {"product_id", "is_registered", "is_delivered", "checkpoint_count"}
         assert data["product_id"] == seeded_product.product_id
-        assert data["is_registered"] is True
+        assert data["is_registered"] is False  # A seeded row is not receipt evidence.
         assert isinstance(data["is_delivered"], bool)
         assert isinstance(data["checkpoint_count"], int)
 

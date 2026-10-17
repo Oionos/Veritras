@@ -19,7 +19,7 @@ from app.core.limiter import limiter
 from app.core.logging import LOGGING_CONFIG
 from app.core.security import SecurityHeadersMiddleware
 from app.api.routes import auth, products, shipments, analytics
-from app.services.indexer import EventIndexer, load_indexer_state
+from app.services.indexer import EventIndexer
 
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger("veritras.api")
@@ -32,10 +32,11 @@ if settings.sepolia_rpc_url:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    if not settings.is_hosted:
+        Base.metadata.create_all(bind=engine)
 
     global indexer
-    if settings.sepolia_rpc_url and settings.product_registry_contract and settings.shipment_tracker_contract:
+    if settings.indexer_enabled and settings.sepolia_rpc_url and settings.product_registry_contract and settings.shipment_tracker_contract:
         try:
             indexer = EventIndexer()
             indexer.start()
@@ -72,7 +73,7 @@ logger.info("CORS config — raw value: %r", cors_raw)
 origins = parse_cors_origins(cors_raw)
 has_wildcard = "*" in origins
 
-if settings.is_production and (not origins or has_wildcard):
+if settings.is_hosted and (not origins or has_wildcard):
     raise RuntimeError(
         "CORS_ORIGINS must be set to explicit origins in production. "
         "Wildcard '*' is not allowed with credentials enabled."
@@ -131,14 +132,29 @@ def health_indexer():
             },
         )
 
-    state = load_indexer_state()
-    return {
-        "status": "running" if indexer.running else "stopped",
-        "last_processed_block": state.get("last_processed_block"),
-        "poll_interval_seconds": indexer.poll_interval,
-        "product_registry": indexer.product_registry_address,
-        "shipment_tracker": indexer.shipment_tracker_address,
-    }
+    health = indexer.health()
+    return JSONResponse(status_code=200 if health["status"] in {"current", "catching_up"} else 503, content=health)
+
+
+@app.get("/health/live")
+def health_live():
+    return {"status": "alive", "environment": settings.environment, "chain_id": settings.chain_id}
+
+
+@app.get("/health/ready")
+def health_ready():
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        database = "connected"
+    except Exception:
+        database = "disconnected"
+    state = indexer.health() if indexer else {"status": "not_started" if settings.indexer_enabled else "disabled"}
+    ready = database == "connected" and (not settings.indexer_enabled or state["status"] == "current")
+    return JSONResponse(status_code=200 if ready else 503, content={
+        "status": "ready" if ready else "not_ready", "database": database,
+        "environment": settings.environment, "chain_id": settings.chain_id, "indexer": state,
+    })
 
 
 @app.get("/health")
@@ -159,7 +175,9 @@ def health_check():
         except Exception:
             web3_status = "disconnected"
 
-    status = "ok" if db_status == "connected" and web3_status == "connected" else "degraded"
+    indexer_required = settings.indexer_enabled and bool(settings.sepolia_rpc_url)
+    indexer_ok = not indexer_required or (indexer is not None and indexer.health()["status"] == "current")
+    status = "ok" if db_status == "connected" and web3_status == "connected" and indexer_ok else "degraded"
     status_code = 200 if status == "ok" else 503
     return JSONResponse(
         status_code=status_code,

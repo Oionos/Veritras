@@ -33,7 +33,8 @@ describe('Content-Security-Policy', () => {
 
     // Assert — connect-src
     expect(directives['connect-src']).toContain("'self'")
-    expect(directives['connect-src']).toContain('https://chainlens-4qvy.onrender.com')
+    expect(directives['connect-src']).toContain('__VERITRAS_CONNECT_SOURCES__')
+    expect(directives['connect-src']).not.toContain('chainlens-4qvy.onrender.com')
     expect(directives['connect-src']).toContain('https://*.walletconnect.com')
     expect(directives['connect-src']).toContain('https://*.walletconnect.org')
     expect(directives['connect-src']).toContain('wss://*.walletconnect.com')

@@ -1,3 +1,4 @@
+import { appEnvironment } from '@/config/runtime'
 import { useCallback } from 'react'
 import {
   useWriteContract,
@@ -31,6 +32,7 @@ export function useRegisterProduct() {
       writeContract(
         {
           abi: productRegistryAbi,
+          chainId: appEnvironment.chainId,
           address: PRODUCT_REGISTRY_ADDRESS as `0x${string}`,
           functionName: 'registerProduct',
           args: [productId, name, description, metadataURI],

@@ -1,6 +1,7 @@
+import { appEnvironment } from '@/config/runtime'
 import { useEffect, useRef } from 'react'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API_URL = appEnvironment.apiUrl
 
 export function useAnalyticsEvents(onEvent: (type: string, data: unknown) => void) {
   const onEventRef = useRef(onEvent)

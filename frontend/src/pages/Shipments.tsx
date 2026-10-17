@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { toHex, pad } from 'viem'
+import { toProductBytes32 as toBytes32 } from '@/utils/productId'
 import { useAccount } from 'wagmi'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -63,14 +63,6 @@ const statusOptions = [
 const DEFAULT_LIMIT = 10
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-
-function toBytes32(productId: string): `0x${string}` {
-  const hex = toHex(productId)
-  if (hex.length > 66) {
-    throw new Error(`product_id "${productId}" exceeds 32 bytes and cannot fit in bytes32`)
-  }
-  return pad(hex, { size: 32, dir: 'right' }) as `0x${string}`
-}
 
 function isValidEthAddress(value: string): boolean {
   return /^0x[0-9a-fA-F]{40}$/.test(value)

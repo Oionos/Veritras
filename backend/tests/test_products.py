@@ -133,7 +133,7 @@ def test_get_product_verify(client_fixture, seeded_products):
     assert response.status_code == 200
     data = response.json()
     assert data["product_id"] == "0x" + "a" * 64
-    assert data["is_registered"] is True
+    assert data["is_registered"] is False
     assert data["checkpoint_count"] == 0
     assert data["is_delivered"] is False
 

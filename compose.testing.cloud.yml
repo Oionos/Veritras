@@ -1,0 +1,36 @@
+# Build-only CA mount for the managed workspace's network proxy.
+# Run together with compose.testing.yml; no certificate is baked into an image.
+services:
+  blockchain:
+    build:
+      secrets: [proxy_ca]
+    volumes:
+      - ./blockchain/scripts:/app/scripts:ro
+  deploy-contracts:
+    build:
+      secrets: [proxy_ca]
+    volumes:
+      - ./blockchain/scripts:/app/scripts:ro
+  backend:
+    build:
+      secrets: [proxy_ca]
+    volumes:
+      - ./backend/app:/app/app:ro
+      - ./backend/start_testing.py:/app/start_testing.py:ro
+      - ./backend/alembic:/app/alembic:ro
+  frontend:
+    build:
+      secrets: [proxy_ca]
+    volumes:
+      - ./frontend/src:/app/src:ro
+      - ./frontend/vite.config.ts:/app/vite.config.ts:ro
+      - ./frontend/index.html:/app/index.html:ro
+      - ./frontend/start-testing.mjs:/app/start-testing.mjs:ro
+  smoke:
+    build:
+      secrets: [proxy_ca]
+    volumes:
+      - ./blockchain/scripts:/app/scripts:ro
+secrets:
+  proxy_ca:
+    file: ${CODEX_PROXY_CERT:?The managed workspace proxy CA must be configured}
