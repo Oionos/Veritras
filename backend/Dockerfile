@@ -3,6 +3,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Hosted deployments must opt in after durable cursor/replay support is ready.
+# The isolated Compose stack explicitly enables its disposable local indexer.
+ENV INDEXER_ENABLED=false
+
 # Install system dependencies for packages that require compilation (e.g., psycopg2, cryptography)
 COPY requirements.txt requirements.lock ./
 RUN --mount=type=secret,id=proxy_ca \

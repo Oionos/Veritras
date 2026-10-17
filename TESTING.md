@@ -63,7 +63,15 @@ The complete implementation plan remains in `IMPLEMENTATION_PLAN.md`. Object-lev
 
 Hosted Neon/Render resources and a usable Vercel preview must be recorded here after successful provisioning. A template alone does not establish a hosted testing environment.
 
-Current hosted access blockers: the managed environment has no Neon/Render credentials. The Vercel connector can inspect `veritras`, but updating its branch-specific Preview variables returned HTTP 403 for team `hoppaysamas-projects`; no variable was changed. Completing hosted setup requires write access to that team or configuring the Preview values manually in the Vercel dashboard. Production settings were not modified.
+Current hosted access blockers: the managed environment has no Neon/Render credentials. The Vercel connector returns HTTP 403 for team `hoppaysamas-projects`, including project inspection; no hosted variable was changed. Completing hosted setup requires access to that team or configuring the Preview values manually in the Vercel dashboard.
+
+## Shipping this increment on main
+
+Vercel uses `frontend/build-vercel.mjs`. Only a Vercel **Production** build receives the public defaults recorded in `frontend/deployment.production.json`; explicitly configured variables take precedence. WalletConnect's project ID remains in the existing Vercel configuration. Preview builds still require isolated settings and fail closed until hosted testing is configured.
+
+The backend Docker image defaults `INDEXER_ENABLED=false`, and the production Render Blueprint records the same setting. This keeps the repaired file-based indexer from automatically replaying history into the live database on an ephemeral filesystem. The local and hosted testing configurations explicitly enable indexing. Registration verification continues to check receipts directly when indexing is disabled; newly submitted chain events will not appear automatically in the API until durable indexing is released and enabled. `/health/ready` reports indexing as disabled. Render's Blueprint uses `/health/live` for platform liveness.
+
+The observed live Render service still reports `ENVIRONMENT=development`; synchronize its production settings and strong JWT secret in Render separately. No schema migration or database backfill is part of this increment's production deployment. The current schema must be reconciled with Alembic before future migrations.
 
 ## Validation recorded on October 17, 2026
 

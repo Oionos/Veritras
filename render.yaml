@@ -19,6 +19,10 @@ services:
         value: 8000
       - key: INDEXER_POLL_INTERVAL
         value: 60
+      - key: INDEXER_ENABLED
+        value: "false"
+      - key: CHAIN_ID
+        value: "11155111"
       - key: INDEXER_START_BLOCK
         value: 10779035
       - key: PRODUCT_REGISTRY_CONTRACT
@@ -30,6 +34,6 @@ services:
       # Secrets to set in Render Dashboard (can also override CORS_ORIGINS there):
       # - DATABASE_URL
       # - SEPOLIA_RPC_URL
-      # - JWT_SECRET_KEY  (required in production; defaults to unsafe dev key)
-    healthCheckPath: /health
+      # - JWT_SECRET_KEY  (explicit strong secret required in production)
+    healthCheckPath: /health/live
     autoDeploy: true
