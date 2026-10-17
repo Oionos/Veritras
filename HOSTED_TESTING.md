@@ -11,13 +11,15 @@ This is a shared testing environment on Sepolia. Production stays on `main`.
 | API | `https://veritras-api-testing.onrender.com` |
 | Render service | `srv-db9sd1vbtjjs73ct4240`, My Workspace, Singapore, free compute |
 | Neon project | `Veritras Testing` / `blue-sun-65931382`, Singapore |
-| Neon branch/database | `testing` / `veritras_testing` |
+| Neon branch/database | `testing` / `veritras_preview` |
 | Chain | Sepolia, `11155111` |
 | Product registry | `0xCf9C169752E1B7AF9A0A54C3086dBa11A2DeE285` |
 | Shipment tracker | `0xF5A251812Ec9A7645c29c63656EfB6b307360fDE` |
 | First indexed block | `11936014` (`INDEXER_START_BLOCK=11936013`) |
 
 Creation blocks and successful contract deployment transactions are recorded in `blockchain/deployment.testing.json`. No production rows were copied into the testing database.
+
+The first setup journey exposed duplicate checkpoint inserts after a restart. Its database, `veritras_testing`, is retained for diagnosis and is not the application's configured database. `veritras_preview` starts empty and projects only the dedicated testing contracts' history.
 
 Render's existing testing service is managed through its Dashboard/MCP configuration. `render.testing.yaml` is a reproducible template; it is not an attached Blueprint and must not be applied to the live production service. The current MCP creation surface uses Render's default TCP health check. The template also defines `/health/live` for a future Blueprint-managed service; use `/health/ready` to inspect database/indexer readiness separately.
 
@@ -58,6 +60,8 @@ Vercel Deployment Protection remains enabled. Team members can open previews thr
 - Check the browser's API requests use `veritras-api-testing.onrender.com` and contract actions use the testing addresses above.
 - Confirm the production API remains healthy after testing. Do not seed testing data through the production endpoint.
 
-The current file-based indexer cursor is ephemeral on Render's free filesystem. A restart replays from the testing contracts' deployment blocks; durable cursor/event-journal work remains planned. Keep the testing contract history small. Production indexing stays disabled until that work is released.
+The current file-based indexer cursor is ephemeral on Render's free filesystem. A restart replays from the testing contracts' deployment blocks. Migration `c72b53d91e04` adds nullable unique source-event identities to checkpoints and custody transfers, so newly indexed logs are inserted once across replays and overlapping deploys. Identity includes chain, emitter, transaction, and log index; distinct logs from one transaction remain distinct. Legacy rows are preserved without inferring their event identity or deleting duplicates.
+
+Durable cursor/event-journal work and reorganization recovery remain planned. Keep the testing contract history small. Production indexing stays disabled until that work is released.
 
 Do not reset `testing` to `main` with a force push as a routine workflow. Merge current `main` into `testing` to keep it updated, then resolve conflicts explicitly.

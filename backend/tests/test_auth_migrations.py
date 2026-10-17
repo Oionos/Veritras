@@ -49,3 +49,26 @@ def test_legacy_schema_mismatch_blocks_adoption(tmp_path, monkeypatch):
         manage_schema.migrate(apply=True, adopt_legacy=True)
     assert "auth_challenges" not in sa.inspect(engine).get_table_names()
     engine.dispose()
+
+
+def test_history_identity_migration_preserves_legacy_rows_and_enforces_uniqueness(tmp_path, monkeypatch):
+    engine = sa.create_engine(f"sqlite:///{tmp_path / 'history.db'}")
+    monkeypatch.setattr(manage_schema, 'engine', engine)
+    config = Config('alembic.ini')
+    config.attributes['configure_logger'] = False
+    with engine.begin() as conn:
+        config.attributes['connection'] = conn
+        command.upgrade(config, 'b19e8a6c4f20')
+        conn.execute(sa.text("INSERT INTO products (id,product_id,name,manufacturer_address,registered_at,block_number,tx_hash) VALUES (1,'LEGACY','Existing','untrusted','2026-01-01',1,'0xabc')"))
+        for row_id in (1, 2):
+            conn.execute(sa.text("INSERT INTO checkpoints (id,product_id,location,status,handler_address,timestamp,block_number,tx_hash) VALUES (:id,'LEGACY','Factory','0','untrusted','2026-01-01',1,'0xabc')"), {'id': row_id})
+    manage_schema.migrate(apply=True)
+    with engine.connect() as conn:
+        assert conn.execute(sa.text('SELECT count(*) FROM checkpoints')).scalar_one() == 2
+        assert conn.execute(sa.text('SELECT count(*) FROM checkpoints WHERE source_event_id IS NULL')).scalar_one() == 2
+    with engine.begin() as conn:
+        conn.execute(sa.text("UPDATE checkpoints SET source_event_id='specific-log' WHERE id=1"))
+    with pytest.raises(sa.exc.IntegrityError):
+        with engine.begin() as conn:
+            conn.execute(sa.text("UPDATE checkpoints SET source_event_id='specific-log' WHERE id=2"))
+    engine.dispose()

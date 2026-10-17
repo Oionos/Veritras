@@ -16,6 +16,7 @@ class Checkpoint(Base):
     timestamp = Column(DateTime, nullable=False)
     block_number = Column(BigInteger, nullable=False)
     tx_hash = Column(String, nullable=False)
+    source_event_id = Column(String(255), nullable=True, unique=True, index=True)
 
     product = relationship("Product", backref="checkpoints")
 
@@ -30,6 +31,7 @@ class CustodyTransfer(Base):
     timestamp = Column(DateTime, nullable=False)
     block_number = Column(BigInteger, nullable=False)
     tx_hash = Column(String, nullable=False)
+    source_event_id = Column(String(255), nullable=True, unique=True, index=True)
 
     product = relationship("Product", backref="custody_transfers")
 
