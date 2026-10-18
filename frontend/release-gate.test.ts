@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   assess,
   policy,
@@ -8,7 +8,12 @@ import {
   waitForRelease,
   waitForApi,
   backendCommit,
+  github,
 } from './release-gate.mjs'
+afterEach(() => {
+  vi.unstubAllEnvs()
+  vi.unstubAllGlobals()
+})
 const sha = 'a'.repeat(40)
 function fixture() {
   const runs = policy.workflows.map((w, i) => ({
@@ -39,6 +44,36 @@ function fixture() {
   return { runs, jobs, get }
 }
 describe('production release admission', () => {
+  it.each([undefined, 'synthetic-read-only-token'])(
+    'uses optional server-only credential %s',
+    async (token) => {
+      vi.stubEnv('GITHUB_RELEASE_TOKEN', token)
+      const get = vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ workflow_runs: [] }),
+      }))
+      vi.stubGlobal('fetch', get)
+      await github('/actions/runs')
+      expect(get.mock.calls[0][0]).toBe(
+        'https://api.github.com/repos/Oionos/Veritras/actions/runs',
+      )
+      expect(get.mock.calls[0][1].headers.Authorization).toBe(
+        token ? `Bearer ${token}` : undefined,
+      )
+    },
+  )
+  it('does not expose a credential when the provider request fails', async () => {
+    vi.stubEnv('GITHUB_RELEASE_TOKEN', 'synthetic-private-token')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('synthetic-private-token')
+      }),
+    )
+    await expect(github('/actions/runs')).rejects.toThrow(
+      'GitHub release checks unavailable',
+    )
+  })
   it('requires exact main push and all real jobs', async () => {
     const { get } = fixture()
     expect((await assess(sha, get)).commit).toBe(sha)

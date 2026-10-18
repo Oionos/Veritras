@@ -5,6 +5,7 @@ The policy is mirrored in frontend because hosts build separate repository roots
 """
 
 import json
+import os
 import re
 import time
 from pathlib import Path
@@ -24,20 +25,26 @@ class ReleasePending(RuntimeError):
 
 
 def github(path):
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "Veritras-release-gate",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    if token := os.environ.get("GITHUB_RELEASE_TOKEN"):
+        headers["Authorization"] = "Bearer " + token
     request = Request(
         "https://api.github.com/repos/" + POLICY["repository"] + path,
-        headers={
-            "Accept": "application/vnd.github+json",
-            "User-Agent": "Veritras-release-gate",
-            "X-GitHub-Api-Version": "2022-11-28",
-        },
+        headers=headers,
     )
     try:
         with urlopen(request, timeout=10) as response:
             return json.load(response)
     except (HTTPError, URLError, TimeoutError, OSError, ValueError) as error:
         # Provider errors may contain URLs/headers. Never print response bodies.
-        raise ReleasePending("GitHub unavailable: " + type(error).__name__) from None
+        code = f" (HTTP {error.code})" if isinstance(error, HTTPError) else ""
+        raise ReleasePending(
+            "GitHub unavailable: " + type(error).__name__ + code
+        ) from None
 
 
 def assess(commit, fetch=github):

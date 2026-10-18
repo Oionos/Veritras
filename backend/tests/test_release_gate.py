@@ -1,11 +1,44 @@
 import copy
+import io
 import json
 from pathlib import Path
 
 import pytest
 import release_gate as gate
+from urllib.error import HTTPError
 
 SHA = "a" * 40
+
+
+@pytest.mark.parametrize("token", [None, "synthetic-read-only-token"])
+def test_github_uses_optional_server_only_credential(monkeypatch, token):
+    if token is None:
+        monkeypatch.delenv("GITHUB_RELEASE_TOKEN", raising=False)
+    else:
+        monkeypatch.setenv("GITHUB_RELEASE_TOKEN", token)
+
+    def request(req, timeout):
+        assert req.full_url.startswith("https://api.github.com/repos/Oionos/Veritras/")
+        assert req.get_header("Authorization") == ("Bearer " + token if token else None)
+        assert timeout == 10
+        return io.BytesIO(b'{"workflow_runs": []}')
+
+    monkeypatch.setattr(gate, "urlopen", request)
+    assert gate.github("/actions/runs") == {"workflow_runs": []}
+
+
+def test_github_http_error_reports_status_without_credentials(monkeypatch):
+    monkeypatch.setenv("GITHUB_RELEASE_TOKEN", "synthetic-private-token")
+
+    def unavailable(*args, **kwargs):
+        raise HTTPError(
+            "https://api.github.com", 403, "synthetic-private-token", {}, None
+        )
+
+    monkeypatch.setattr(gate, "urlopen", unavailable)
+    with pytest.raises(gate.ReleasePending) as error:
+        gate.github("/actions/runs")
+    assert str(error.value) == "GitHub unavailable: HTTPError (HTTP 403)"
 
 
 def fixture_data():
