@@ -9,11 +9,27 @@ from app.services.indexer import load_abi
 
 
 def verify_registration(product) -> bool:
+    if getattr(product, "registration_status", None) != "indexed" or not getattr(
+        product, "on_chain_product_id", None
+    ):
+        return False
+    if (
+        product.chain_id != settings.chain_id
+        or product.registry_address != settings.product_registry_contract.lower()
+    ):
+        raise ConnectionError(
+            "Product identity belongs to a different chain configuration"
+        )
     if product.block_number <= 0 or not product.tx_hash or len(product.tx_hash) != 66:
         return False
     if not settings.sepolia_rpc_url or not settings.product_registry_contract:
         raise ConnectionError("Registration evidence is unavailable")
-    w3 = Web3(Web3.HTTPProvider(settings.sepolia_rpc_url, request_kwargs={"timeout": settings.indexer_rpc_timeout}))
+    w3 = Web3(
+        Web3.HTTPProvider(
+            settings.sepolia_rpc_url,
+            request_kwargs={"timeout": settings.indexer_rpc_timeout},
+        )
+    )
     if w3.eth.chain_id != settings.chain_id:
         raise ConnectionError("Configured chain is unavailable")
     registry = w3.to_checksum_address(settings.product_registry_contract)
@@ -24,10 +40,12 @@ def verify_registration(product) -> bool:
         return False
     if w3.eth.block_number - receipt["blockNumber"] < settings.indexer_confirmations:
         return False
-    if bytes(w3.eth.get_block(receipt["blockNumber"])["hash"]) != bytes(receipt["blockHash"]):
+    if bytes(w3.eth.get_block(receipt["blockNumber"])["hash"]) != bytes(
+        receipt["blockHash"]
+    ):
         return False
     try:
-        canonical_id = canonical_product_id(product.product_id)
+        canonical_id = canonical_product_id(product.on_chain_product_id)
     except ValueError:
         return False
     contract = w3.eth.contract(address=registry, abi=load_abi("ProductRegistry"))
@@ -36,5 +54,7 @@ def verify_registration(product) -> bool:
         and bytes(log["args"]["productId"]) == canonical_id
         and log["args"]["manufacturer"].lower() == product.manufacturer_address.lower()
         and log["args"]["name"] == product.name
-        for log in contract.events.ProductRegistered().process_receipt(receipt, errors=DISCARD)
+        for log in contract.events.ProductRegistered().process_receipt(
+            receipt, errors=DISCARD
+        )
     )

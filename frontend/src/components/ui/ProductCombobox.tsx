@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Product } from '@/types'
 import { useProductList } from '@/hooks/useProductList'
-import { ownsRecord } from '@/utils/permissions'
+import { ownsRecord, hasCurrentIdentity } from '@/utils/permissions'
 
 // ─── Pure utility ─────────────────────────────────────────────────────────────
 
@@ -40,7 +40,11 @@ export function ProductCombobox({
 }: ProductComboboxProps) {
   const { data, isLoading, error: fetchError } = useProductList()
   const products = (data?.items ?? []).filter(
-    (product) => !ownedOnly || ownsRecord(product, ownerAddress || null),
+    (product) =>
+      !ownedOnly ||
+      (ownsRecord(product, ownerAddress || null) &&
+        hasCurrentIdentity(product) &&
+        !product.has_shipment),
   )
   const suggestions = filterProducts(products, value)
 

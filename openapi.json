@@ -1551,9 +1551,89 @@
             ],
             "title": "Ownership Source"
           },
-          "registered_at": {
+          "on_chain_product_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On Chain Product Id"
+          },
+          "chain_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chain Id"
+          },
+          "registry_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registry Address"
+          },
+          "tracker_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tracker Address"
+          },
+          "registration_status": {
             "type": "string",
-            "format": "date-time",
+            "enum": [
+              "draft",
+              "indexed",
+              "unregistered",
+              "legacy_unreconciled",
+              "superseded"
+            ],
+            "title": "Registration Status",
+            "default": "legacy_unreconciled"
+          },
+          "has_shipment": {
+            "type": "boolean",
+            "title": "Has Shipment",
+            "default": false
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "registered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Registered At"
           },
           "block_number": {
@@ -1573,7 +1653,6 @@
           "id",
           "product_id",
           "manufacturer_address",
-          "registered_at",
           "block_number",
           "tx_hash"
         ],
@@ -1722,6 +1801,50 @@
               }
             ],
             "title": "Notes"
+          },
+          "on_chain_product_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On Chain Product Id"
+          },
+          "registry_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registry Address"
+          },
+          "chain_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chain Id"
+          },
+          "tracker_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tracker Address"
           },
           "current_handler": {
             "anyOf": [

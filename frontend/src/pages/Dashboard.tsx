@@ -411,7 +411,7 @@ export default function Dashboard() {
                           </div>
                           <p className="text-xs text-muted truncate">{item.name}</p>
                           <p className="text-xs text-muted/40">
-                            {formatDate(item.registered_at)}
+                            {item.registered_at ? formatDate(item.registered_at) : 'Not registered'}
                           </p>
                         </div>
                       </motion.div>

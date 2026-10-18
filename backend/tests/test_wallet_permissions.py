@@ -109,7 +109,6 @@ def test_unindexed_registration_is_checked_before_draft_edits(client_fixture, mo
     wallet = Account.create()
     draft = client_fixture.post("/products/", headers=headers(wallet), json={"name": "Draft"}).json()
     monkeypatch.setattr(settings, "sepolia_rpc_url", "https://rpc.example/private-placeholder")
-    monkeypatch.setattr(settings, "product_registry_contract", wallet.address)
     web3 = MagicMock()
     web3.return_value.eth.chain_id = settings.chain_id
     registration = web3.return_value.eth.contract.return_value.functions.isProductRegistered.return_value.call

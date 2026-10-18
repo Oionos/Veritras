@@ -36,12 +36,21 @@ async function main() {
   const draft = await api('/products/', json({ name: 'Isolated testing item', manufacturer_address: manufacturer.address }));
   assert.equal(draft.owner_address, manufacturer.address.toLowerCase());
   assert.equal(draft.ownership_source, 'signed_draft');
+  assert.equal(draft.registration_status, 'draft');
+  assert.ok(draft.created_at);
+  assert.equal(draft.registered_at, null);
+  assert.equal(draft.on_chain_product_id, ethers.encodeBytes32String(draft.product_id));
+  assert.equal(draft.chain_id, 31337);
+  assert.equal(draft.registry_address, manifest.contracts.ProductRegistry.toLowerCase());
   assert.equal((await fetch(`${base}/products/`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Anonymous write' }),
   })).status, 401);
   assert.equal((await api(`/products/${draft.product_id}/verify`)).is_registered, false);
   const shipment = await api('/shipments/', json({ product_id: draft.product_id, origin: 'Test factory', destination: 'Test depot' }));
-  const id = ethers.encodeBytes32String(draft.product_id);
+  assert.equal((await fetch(`${base}/shipments/`, json({ product_id: draft.product_id, origin: 'Other', destination: 'Other' }))).status, 409);
+  assert.equal(shipment.on_chain_product_id, draft.on_chain_product_id);
+  assert.equal(shipment.tracker_address, manifest.contracts.ShipmentTracker.toLowerCase());
+  const id = draft.on_chain_product_id;
   const registry = await ethers.getContractAt('ProductRegistry', manifest.contracts.ProductRegistry);
   const tracker = await ethers.getContractAt('ShipmentTracker', manifest.contracts.ShipmentTracker);
   await (await registry.registerProduct(id, draft.name, '', '')).wait();
@@ -57,6 +66,9 @@ async function main() {
     await new Promise(resolve => setTimeout(resolve, 500));
   }
   const detail = await api(`/products/${draft.product_id}`);
+  assert.equal(detail.product.registration_status, 'indexed');
+  assert.ok(detail.product.registered_at);
+  assert.equal(detail.product.on_chain_product_id, id);
   assert.equal(detail.history.length, 3, 'Delivery must not duplicate the checkpoint');
   assert.equal(detail.transfers.length, 1);
   const verification = await api(`/products/${draft.product_id}/verify`);

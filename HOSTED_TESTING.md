@@ -65,3 +65,7 @@ The durable indexer uses a database cursor, event journal and canonical block an
 See [DURABLE_INDEXING.md](DURABLE_INDEXING.md) for the confirmation policy, legacy attribution, rollout and recovery procedure. Production indexing remains explicitly disabled until its identity/history reconciliation and enablement checks are complete. Free testing compute can still sleep; durable state does not imply continuous indexing.
 
 Do not reset `testing` to `main` with a force push as a routine workflow. Merge current `main` into `testing` to keep it updated, then resolve conflicts explicitly.
+
+## Canonical identity schema release
+
+API startup now checks the Alembic head without migrating. Apply revision `a38f917bd260` in a separate release transaction before deploying matching API code. Pause/drain the testing writer, rehearse on a copy, preserve all legacy records, then deploy and verify the API/frontend before resuming testing indexing. See [CANONICAL_PRODUCT_IDENTITY.md](CANONICAL_PRODUCT_IDENTITY.md) for source guards, alias reconciliation and the free Render release path. Production indexing remains disabled.

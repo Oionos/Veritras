@@ -1,3 +1,5 @@
+import { appEnvironment } from '@/config/runtime'
+import { toProductBytes32 } from '@/utils/productId'
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ token: 'test-token', address: '0x1234567890123456789012345678901234567890', isAuthenticated: true, isLoggingIn: false, loginError: null, login: vi.fn(), logout: vi.fn() }),
   getAuthToken: () => null,
@@ -56,7 +58,7 @@ vi.mock('@/hooks/useApi', () => ({
 const PRODUCTS: Product[] = [
   {
     id: 1,
-    product_id: 'PROD-001', owner_address: '0x1234567890123456789012345678901234567890', ownership_source: 'signed_draft', block_number: 0, tx_hash: '0x',
+    product_id: 'PROD-001', on_chain_product_id: toProductBytes32('PROD-001'), chain_id: appEnvironment.chainId, registry_address: appEnvironment.productRegistry, tracker_address: appEnvironment.shipmentTracker, owner_address: '0x1234567890123456789012345678901234567890', ownership_source: 'signed_draft', block_number: 0, tx_hash: '0x',
     name: 'Alpha Widget',
     manufacturer_address: '0xabc',
     registered_at: '',
@@ -66,7 +68,7 @@ const PRODUCTS: Product[] = [
 const MOCK_SHIPMENT = {
   id: 1,
   shipment_id: 'SHIP-001',
-  product_id: 'PROD-001', owner_address: '0x1234567890123456789012345678901234567890', ownership_source: 'signed_draft', block_number: 0, tx_hash: '0x',
+  product_id: 'PROD-001', on_chain_product_id: toProductBytes32('PROD-001'), chain_id: appEnvironment.chainId, registry_address: appEnvironment.productRegistry, tracker_address: appEnvironment.shipmentTracker, owner_address: '0x1234567890123456789012345678901234567890', ownership_source: 'signed_draft', block_number: 0, tx_hash: '0x',
   origin: 'Rotterdam',
   destination: 'Shanghai',
   status: '1',

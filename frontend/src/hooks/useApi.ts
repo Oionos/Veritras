@@ -1,6 +1,6 @@
 import { appEnvironment } from '@/config/runtime'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { Product, Shipment } from '@/types'
+import type { Product, ProductDetail, Shipment } from '@/types'
 import type { components } from '@/types/api'
 import { getAuthToken, clearAuthToken } from './useAuth'
 
@@ -49,7 +49,7 @@ export function useProducts() {
 }
 
 export function useProduct(id: string) {
-  return useQuery({
+  return useQuery<ProductDetail>({
     queryKey: ['product', id],
     queryFn: () => fetchApi(`/products/${id}`),
     enabled: !!id,

@@ -87,7 +87,9 @@ def detect_anomalies(db: Session, z_threshold: float = 2.0) -> List[AnomalyRespo
     return anomalies
 
 
-def calculate_on_time_rate(db: Session, expected_hours: float = 72.0) -> Optional[float]:
+def calculate_on_time_rate(
+    db: Session, expected_hours: float = 72.0
+) -> Optional[float]:
     """
     Calculate the percentage of shipments delivered within the expected duration.
     """
@@ -155,17 +157,24 @@ def get_kpi_summary(db: Session) -> Dict:
             .subquery()
         )
         delivered_shipments = (
-            db.query(Product).filter(Product.product_id.in_(delivered_ids.select())).count()
+            db.query(Product)
+            .filter(Product.registration_status != "superseded")
+            .filter(Product.product_id.in_(delivered_ids.select()))
+            .count()
         )
 
-        products_with_checkpoints = db.query(Checkpoint.product_id).distinct().subquery()
+        products_with_checkpoints = (
+            db.query(Checkpoint.product_id).distinct().subquery()
+        )
         total_shipments = (
             db.query(Product)
+            .filter(Product.registration_status != "superseded")
             .filter(Product.product_id.in_(products_with_checkpoints.select()))
             .count()
         )
         active_shipments = (
             db.query(Product)
+            .filter(Product.registration_status != "superseded")
             .filter(Product.product_id.in_(products_with_checkpoints.select()))
             .filter(Product.product_id.notin_(delivered_ids.select()))
             .count()
@@ -175,7 +184,9 @@ def get_kpi_summary(db: Session) -> Dict:
     on_time = calculate_on_time_rate(db)
 
     checkpoint_counts = db.query(Checkpoint).count()
-    avg_checkpoints = checkpoint_counts / total_shipments if total_shipments > 0 else 0.0
+    avg_checkpoints = (
+        checkpoint_counts / total_shipments if total_shipments > 0 else 0.0
+    )
 
     bottlenecks = get_bottleneck_locations(db)
 
@@ -200,9 +211,11 @@ def get_daily_volume_data(db: Session) -> List[DailyVolumeItem]:
     shipment_counts: dict[str, int] = {d.isoformat(): 0 for d in dates}
 
     product_rows = (
-        db.query(func.date(Product.registered_at), func.count(Product.id))
-        .filter(Product.registered_at >= start_dt)
-        .group_by(func.date(Product.registered_at))
+        db.query(func.date(Product.created_at), func.count(Product.id))
+        .filter(
+            Product.created_at >= start_dt, Product.registration_status != "superseded"
+        )
+        .group_by(func.date(Product.created_at))
         .all()
     )
     shipment_rows = (
@@ -213,10 +226,14 @@ def get_daily_volume_data(db: Session) -> List[DailyVolumeItem]:
     )
 
     for day, count in product_rows:
-        product_counts[day.isoformat() if hasattr(day, "isoformat") else str(day)] = count
+        product_counts[day.isoformat() if hasattr(day, "isoformat") else str(day)] = (
+            count
+        )
 
     for day, count in shipment_rows:
-        shipment_counts[day.isoformat() if hasattr(day, "isoformat") else str(day)] = count
+        shipment_counts[day.isoformat() if hasattr(day, "isoformat") else str(day)] = (
+            count
+        )
 
     items: List[DailyVolumeItem] = []
     for d in dates:
