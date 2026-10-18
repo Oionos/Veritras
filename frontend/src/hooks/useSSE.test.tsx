@@ -27,7 +27,7 @@ describe('committed chain events', () => {
     const first = Stream.instances[0]
     expect(first.url).toContain('/analytics/events')
     act(() => first.send('chain_updated'))
-    for (const key of ['products', 'product-history', 'product-transfers', 'shipments', 'verify', 'kpis']) {
+    for (const key of ['products', 'product-history', 'product-transfers', 'shipments', 'verify', 'registration', 'metadata-history', 'kpis']) {
       expect(invalidate).toHaveBeenCalledWith({ queryKey: [key] })
     }
     act(() => first.onerror?.())
