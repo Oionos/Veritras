@@ -20,6 +20,7 @@ from app.schemas.shipment import (
     ShipmentUpdate,
 )
 from app.services.events import broadcaster
+from app.services.identity import resolve_product, require_current_scope
 
 router = APIRouter()
 
@@ -69,14 +70,17 @@ async def create_shipment(
     current_user: str = Depends(get_current_user),
 ):
     """Create a new shipment."""
-    product = db.query(Product).filter(Product.product_id == shipment_in.product_id).with_for_update().first()
+    product = resolve_product(db, shipment_in.product_id, lock=True)
     if not product:
         raise HTTPException(status_code=422, detail="Product not found")
     require_product_owner(product, current_user)
+    require_current_scope(product)
+    if db.query(Shipment).filter_by(product_id=product.product_id).first():
+        raise HTTPException(409, "This item already has a shipment lifecycle")
 
     shipment = Shipment(
         shipment_id=f"SHIP-{uuid.uuid4().hex[:8].upper()}",
-        product_id=shipment_in.product_id,
+        product_id=product.product_id,
         origin=shipment_in.origin,
         destination=shipment_in.destination,
         status=product.indexed_state.status if product.indexed_state else "0",
@@ -87,7 +91,11 @@ async def create_shipment(
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Shipment ID conflict, please retry")
+        if db.query(Shipment).filter_by(product_id=product.product_id).first():
+            raise HTTPException(409, "This item already has a shipment lifecycle")
+        raise HTTPException(
+            status_code=409, detail="Shipment ID conflict, please retry"
+        )
     db.refresh(shipment)
     await broadcaster.broadcast(
         "shipment_created",
@@ -109,11 +117,19 @@ def update_shipment(
     shipment = db.query(Shipment).filter(Shipment.shipment_id == shipment_id).first()
     if not shipment:
         raise HTTPException(status_code=404, detail="Shipment not found")
-    product = db.query(Product).filter(Product.product_id == shipment.product_id).with_for_update().first()
+    product = (
+        db.query(Product)
+        .filter(Product.product_id == shipment.product_id)
+        .with_for_update()
+        .first()
+    )
     if not product:
-        raise HTTPException(status_code=409, detail="Shipment product needs reconciliation")
+        raise HTTPException(
+            status_code=409, detail="Shipment product needs reconciliation"
+        )
     require_product_owner(product, current_user)
 
+    require_current_scope(product)
     update_data = shipment_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(shipment, field, value)
@@ -126,6 +142,8 @@ def update_shipment(
 @router.get("/{product_id}/history", response_model=List[CheckpointResponse])
 def get_checkpoint_history(product_id: str, db: Session = Depends(get_db)):
     """Get checkpoint history for a given product."""
+    product = resolve_product(db, product_id)
+    product_id = product.product_id if product else product_id
     return (
         db.query(Checkpoint)
         .filter(Checkpoint.product_id == product_id)
@@ -137,6 +155,8 @@ def get_checkpoint_history(product_id: str, db: Session = Depends(get_db)):
 @router.get("/{product_id}/transfers", response_model=List[CustodyTransferResponse])
 def get_custody_transfers(product_id: str, db: Session = Depends(get_db)):
     """Get custody transfer history for a given product."""
+    product = resolve_product(db, product_id)
+    product_id = product.product_id if product else product_id
     return (
         db.query(CustodyTransfer)
         .filter(CustodyTransfer.product_id == product_id)

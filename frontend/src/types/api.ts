@@ -610,11 +610,29 @@ export interface components {
             owner_address?: string | null;
             /** Ownership Source */
             ownership_source?: string | null;
+            /** On Chain Product Id */
+            on_chain_product_id?: string | null;
+            /** Chain Id */
+            chain_id?: number | null;
+            /** Registry Address */
+            registry_address?: string | null;
+            /** Tracker Address */
+            tracker_address?: string | null;
             /**
-             * Registered At
-             * Format: date-time
+             * Registration Status
+             * @default legacy_unreconciled
+             * @enum {string}
              */
-            registered_at: string;
+            registration_status: "draft" | "indexed" | "unregistered" | "legacy_unreconciled" | "superseded";
+            /**
+             * Has Shipment
+             * @default false
+             */
+            has_shipment: boolean;
+            /** Created At */
+            created_at?: string | null;
+            /** Registered At */
+            registered_at?: string | null;
             /** Block Number */
             block_number: number;
             /** Tx Hash */
@@ -668,6 +686,14 @@ export interface components {
             status: string;
             /** Notes */
             notes?: string | null;
+            /** On Chain Product Id */
+            on_chain_product_id?: string | null;
+            /** Registry Address */
+            registry_address?: string | null;
+            /** Chain Id */
+            chain_id?: number | null;
+            /** Tracker Address */
+            tracker_address?: string | null;
             /** Current Handler */
             current_handler?: string | null;
             /** Id */

@@ -1,4 +1,4 @@
-from .product import Product
+from .product import Product, ProductAlias
 from .auth import AuthChallenge
 from .shipment import Checkpoint, CustodyTransfer, Shipment
 

@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion } from 'framer-motion'
-import { toProductBytes32 as toBytes32 } from '@/utils/productId'
 import { useAccount } from 'wagmi'
 import { useAuth } from '@/hooks/useAuth'
-import { ownsRecord } from '@/utils/permissions'
+import { ownsRecord, hasCurrentIdentity } from '@/utils/permissions'
 import Card from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
@@ -203,7 +202,9 @@ export default function Products() {
     useProductTransfers(submittedId)
 
   const product = productDetail?.product
-  const permissions = useShipmentPermissions(product?.product_id)
+  const permissions = useShipmentPermissions(
+    hasCurrentIdentity(product) ? product.on_chain_product_id : undefined,
+  )
   const history: Checkpoint[] = historyData ?? []
   const transfers: CustodyTransfer[] = transfersData ?? []
   const isDelivered = history.some((c) => c.status === '3')
@@ -317,6 +318,7 @@ export default function Products() {
   const openEditModal = (productItem: Product) => {
     if (
       !ownsRecord(productItem, auth.address) ||
+      !hasCurrentIdentity(productItem) ||
       productItem.block_number !== 0 ||
       productItem.tx_hash !== '0x' ||
       productItem.ownership_source !== 'signed_draft'
@@ -377,8 +379,13 @@ export default function Products() {
   }
 
   const handleRegisterOnChain = () => {
-    if (!createdProduct || !ownsRecord(createdProduct, auth.address)) return
-    const productIdBytes32 = toBytes32(createdProduct.product_id)
+    if (
+      !hasCurrentIdentity(createdProduct) ||
+      !createdProduct ||
+      !ownsRecord(createdProduct, auth.address)
+    )
+      return
+    const productIdBytes32 = createdProduct.on_chain_product_id
     registerOnChain(
       productIdBytes32,
       createdProduct.name,
@@ -388,19 +395,24 @@ export default function Products() {
   }
 
   const handleSubmitCheckpoint = () => {
-    if (!product || !cpLocation.trim()) return
-    const productIdBytes32 = toBytes32(product.product_id)
+    if (
+      !hasCurrentIdentity(product) ||
+      !cpLocation.trim() ||
+      !permissions.canRecord
+    )
+      return
+    const productIdBytes32 = product.on_chain_product_id
     record(productIdBytes32, cpLocation.trim(), cpStatus, cpNotes.trim())
   }
 
   const handleTransferCustody = () => {
-    if (!product) return
+    if (!hasCurrentIdentity(product) || !permissions.canTransfer) return
     if (!isValidEthAddress(txHandler)) {
       setTxHandlerError('Must be a valid Ethereum address (0x…40 hex chars)')
       return
     }
     setTxHandlerError('')
-    const productIdBytes32 = toBytes32(product.product_id)
+    const productIdBytes32 = product.on_chain_product_id
     transfer(productIdBytes32, txHandler as `0x${string}`)
   }
 
@@ -572,7 +584,11 @@ export default function Products() {
                       {formatAddress(item.manufacturer_address)}
                     </td>
                     <td className="px-6 py-4 text-muted">
-                      {formatDate(item.registered_at)}
+                      {item.registered_at
+                        ? formatDate(item.registered_at)
+                        : item.registration_status === 'draft'
+                          ? 'Draft'
+                          : 'Not registered'}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-1">
@@ -584,6 +600,7 @@ export default function Products() {
                           <Eye className="h-4 w-4" />
                         </button>
                         {ownsRecord(item, auth.address) &&
+                          hasCurrentIdentity(item) &&
                           item.ownership_source === 'signed_draft' &&
                           item.block_number === 0 &&
                           item.tx_hash === '0x' && (
@@ -728,7 +745,16 @@ export default function Products() {
                   </div>
                   <div className="flex items-center gap-2">
                     <ShieldCheck className="h-4 w-4 text-accent" />
-                    Registered {formatDate(product.registered_at)}
+                    {product.registered_at
+                      ? `Registered ${formatDate(product.registered_at)}`
+                      : product.registration_status === 'draft'
+                        ? 'Draft · Not registered'
+                        : 'Not registered'}
+                    {product.created_at && (
+                      <span className="ml-2">
+                        Created {formatDate(product.created_at)}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1229,7 +1255,11 @@ export default function Products() {
                   <Button
                     type="button"
                     onClick={handleRegisterOnChain}
-                    disabled={registerBusy || registerSuccess}
+                    disabled={
+                      registerBusy ||
+                      registerSuccess ||
+                      !hasCurrentIdentity(createdProduct)
+                    }
                   >
                     {registerBusy && (
                       <Loader2 className="h-4 w-4 animate-spin" />

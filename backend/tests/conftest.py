@@ -12,6 +12,8 @@ os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["SEPOLIA_RPC_URL"] = ""
 os.environ["ENVIRONMENT"] = "development"
 os.environ["CHAIN_ID"] = "11155111"
+os.environ["PRODUCT_REGISTRY_CONTRACT"] = "0x" + "1" * 40
+os.environ["SHIPMENT_TRACKER_CONTRACT"] = "0x" + "2" * 40
 os.environ["SIWE_ORIGINS"] = "http://localhost:5173"
 os.environ.pop("CORS_ORIGINS", None)
 os.environ.pop("CORS_ORIGIN", None)
@@ -60,6 +62,8 @@ def db_session():
 def client_fixture(db_session):
     limiter._storage.reset()
     with TestClient(app) as c:
-        c.headers["Authorization"] = "Bearer " + create_access_token("0x1234567890123456789012345678901234567890")
+        c.headers["Authorization"] = "Bearer " + create_access_token(
+            "0x1234567890123456789012345678901234567890"
+        )
         yield c
     limiter._storage.reset()

@@ -13,14 +13,18 @@ from app.models.product import Product
 from app.models.shipment import Checkpoint, CustodyTransfer
 
 
-def export_to_csv(db: Session, start_date: Optional[str], end_date: Optional[str]) -> str:
+def export_to_csv(
+    db: Session, start_date: Optional[str], end_date: Optional[str]
+) -> str:
     """
     Query products and checkpoints within date range and export to CSV.
     Returns CSV content as a string.
     """
-    query = db.query(Product)
+    query = db.query(Product).filter(Product.registration_status != "superseded")
     if start_date:
-        query = query.filter(Product.registered_at >= datetime.fromisoformat(start_date))
+        query = query.filter(
+            Product.registered_at >= datetime.fromisoformat(start_date)
+        )
     if end_date:
         query = query.filter(Product.registered_at <= datetime.fromisoformat(end_date))
     products = query.all()
@@ -60,14 +64,18 @@ def export_to_csv(db: Session, start_date: Optional[str], end_date: Optional[str
     return buffer.getvalue()
 
 
-def export_to_pdf(db: Session, start_date: Optional[str], end_date: Optional[str]) -> bytes:
+def export_to_pdf(
+    db: Session, start_date: Optional[str], end_date: Optional[str]
+) -> bytes:
     """
     Generate a simple PDF report with summary stats and a table of shipments.
     Returns PDF content as bytes.
     """
-    query = db.query(Product)
+    query = db.query(Product).filter(Product.registration_status != "superseded")
     if start_date:
-        query = query.filter(Product.registered_at >= datetime.fromisoformat(start_date))
+        query = query.filter(
+            Product.registered_at >= datetime.fromisoformat(start_date)
+        )
     if end_date:
         query = query.filter(Product.registered_at <= datetime.fromisoformat(end_date))
     products = query.all()
@@ -93,7 +101,9 @@ def export_to_pdf(db: Session, start_date: Optional[str], end_date: Optional[str
         db.query(Checkpoint).filter(Checkpoint.product_id.in_(product_ids)).count()
     )
     transfer_count = (
-        db.query(CustodyTransfer).filter(CustodyTransfer.product_id.in_(product_ids)).count()
+        db.query(CustodyTransfer)
+        .filter(CustodyTransfer.product_id.in_(product_ids))
+        .count()
     )
 
     summary_data = [

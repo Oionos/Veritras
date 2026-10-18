@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
-import { toProductBytes32 as toBytes32 } from '@/utils/productId'
 import { useAccount } from 'wagmi'
 import { useAuth } from '@/hooks/useAuth'
-import { ownsRecord } from '@/utils/permissions'
+import { ownsRecord, hasCurrentIdentity } from '@/utils/permissions'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
@@ -97,7 +96,11 @@ export default function Shipments() {
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(
     null,
   )
-  const permissions = useShipmentPermissions(selectedShipment?.product_id)
+  const permissions = useShipmentPermissions(
+    hasCurrentIdentity(selectedShipment)
+      ? selectedShipment.on_chain_product_id
+      : undefined,
+  )
 
   // ── Blockchain action panel state ─────────────────────────────────────────
   const [showCheckpointForm, setShowCheckpointForm] = useState(false)
@@ -203,7 +206,8 @@ export default function Shipments() {
   }
 
   const openEditModal = (shipment: Shipment) => {
-    if (!ownsRecord(shipment, auth.address)) return
+    if (!ownsRecord(shipment, auth.address) || !hasCurrentIdentity(shipment))
+      return
     setEditingShipment(shipment)
     reset({
       product_id: shipment.product_id,
@@ -237,9 +241,14 @@ export default function Shipments() {
   }, [])
 
   const handleSubmitCheckpoint = () => {
-    if (!cpLocation.trim() || !selectedShipment) return
+    if (
+      !cpLocation.trim() ||
+      !hasCurrentIdentity(selectedShipment) ||
+      !permissions.canRecord
+    )
+      return
     record(
-      toBytes32(selectedShipment.product_id),
+      selectedShipment.on_chain_product_id,
       cpLocation.trim(),
       cpStatus,
       cpNotes.trim(),
@@ -247,8 +256,13 @@ export default function Shipments() {
   }
 
   const handleTransferCustody = () => {
-    if (!isValidEthAddress(txHandler) || !selectedShipment) return
-    transfer(toBytes32(selectedShipment.product_id), txHandler as `0x${string}`)
+    if (
+      !isValidEthAddress(txHandler) ||
+      !hasCurrentIdentity(selectedShipment) ||
+      !permissions.canTransfer
+    )
+      return
+    transfer(selectedShipment.on_chain_product_id, txHandler as `0x${string}`)
   }
 
   const onSubmit = async (formData: ShipmentFormData) => {
@@ -472,15 +486,16 @@ export default function Shipments() {
                         >
                           <Activity className="h-4 w-4" />
                         </button>
-                        {ownsRecord(shipment, auth.address) && (
-                          <button
-                            onClick={() => openEditModal(shipment)}
-                            className="rounded-lg p-2 text-muted/40 transition-colors hover:bg-white/[0.04] hover:text-text"
-                            aria-label={`Edit shipment ${shipment.shipment_id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                        )}
+                        {ownsRecord(shipment, auth.address) &&
+                          hasCurrentIdentity(shipment) && (
+                            <button
+                              onClick={() => openEditModal(shipment)}
+                              className="rounded-lg p-2 text-muted/40 transition-colors hover:bg-white/[0.04] hover:text-text"
+                              aria-label={`Edit shipment ${shipment.shipment_id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                          )}
                       </div>
                     </td>
                   </tr>

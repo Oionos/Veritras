@@ -1,0 +1,72 @@
+[
+  {
+    "input": "PROD-ABC123",
+    "expected": "0x50524f442d414243313233000000000000000000000000000000000000000000"
+  },
+  {
+    "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "expected": "0x6161616161616161616161616161616161616161616161616161616161616161"
+  },
+  {
+    "input": "\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9",
+    "expected": "0xc3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9"
+  },
+  {
+    "input": "\ud83c\udf4a\ud83c\udf4a\ud83c\udf4a\ud83c\udf4a\ud83c\udf4a\ud83c\udf4a\ud83c\udf4a\ud83c\udf4a",
+    "expected": "0xf09f8d8af09f8d8af09f8d8af09f8d8af09f8d8af09f8d8af09f8d8af09f8d8a"
+  },
+  {
+    "input": "0XABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB",
+    "expected": "0xabababababababababababababababababababababababababababababababab"
+  },
+  {
+    "input": "0x0101010101010101010101010101010101010101010101010101010101010101",
+    "expected": "0x0101010101010101010101010101010101010101010101010101010101010101"
+  },
+  {
+    "input": "0x50524f442d414243313233000000000000000000000000000000000000000000",
+    "expected": "0x50524f442d414243313233000000000000000000000000000000000000000000"
+  },
+  {
+    "input": "",
+    "error": true
+  },
+  {
+    "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "error": true
+  },
+  {
+    "input": "\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9\u00e9",
+    "error": true
+  },
+  {
+    "input": "\ud83c\udf4a\ud83c\udf4a\ud83c\udf4a\ud83c\udf4a\ud83c\udf4a\ud83c\udf4a\ud83c\udf4a\ud83c\udf4a\ud83c\udf4a",
+    "error": true
+  },
+  {
+    "input": "ab\u0000c",
+    "error": true
+  },
+  {
+    "input": "\u0000",
+    "error": true
+  },
+  {
+    "error": true,
+    "codepoints": [
+      55296
+    ]
+  },
+  {
+    "input": "0x12",
+    "error": true
+  },
+  {
+    "input": "0xgggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
+    "error": true
+  },
+  {
+    "input": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "error": true
+  }
+]

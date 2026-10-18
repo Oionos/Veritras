@@ -11,8 +11,10 @@ class ProductBase(BaseModel):
 
 class ProductCreate(ProductBase):
     # Accepted for older clients only; the signed-in wallet is authoritative.
-    manufacturer_address: Optional[str] = Field(default=None, pattern=r"^0x[a-fA-F0-9]{40}$")
-    model_config = ConfigDict(extra='forbid')
+    manufacturer_address: Optional[str] = Field(
+        default=None, pattern=r"^0x[a-fA-F0-9]{40}$"
+    )
+    model_config = ConfigDict(extra="forbid")
 
 
 class ProductUpdate(BaseModel):
@@ -20,7 +22,7 @@ class ProductUpdate(BaseModel):
     description: Optional[str] = Field(default=None, max_length=1000)
     metadata_uri: Optional[str] = Field(default=None, max_length=500)
 
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra="forbid")
 
     @field_validator("name")
     @classmethod
@@ -36,11 +38,24 @@ class ProductResponse(ProductBase):
     manufacturer_address: str = Field(..., max_length=42)
     owner_address: Optional[str] = None
     ownership_source: Optional[str] = None
-    registered_at: datetime
+    on_chain_product_id: Optional[str] = None
+    chain_id: Optional[int] = None
+    registry_address: Optional[str] = None
+    tracker_address: Optional[str] = None
+    registration_status: Literal[
+        "draft", "indexed", "unregistered", "legacy_unreconciled", "superseded"
+    ] = "legacy_unreconciled"
+    has_shipment: bool = False
+    created_at: Optional[datetime] = None
+    registered_at: Optional[datetime] = Field(
+        default=None, validation_alias="chain_registered_at"
+    )
     block_number: int
     tx_hash: str = Field(..., max_length=100)
 
-    model_config = ConfigDict(from_attributes=True, extra='forbid')
+    model_config = ConfigDict(
+        from_attributes=True, populate_by_name=True, extra="forbid"
+    )
 
 
 class ProductListResponse(BaseModel):
@@ -49,9 +64,9 @@ class ProductListResponse(BaseModel):
 
 
 class SynchronizationResponse(BaseModel):
-    confirmation_policy: Literal['depth'] = 'depth'
+    confirmation_policy: Literal["depth"] = "depth"
     confirmations: int
-    cursor_storage: Literal['database'] = 'database'
+    cursor_storage: Literal["database"] = "database"
     indexer_enabled: bool
     indexed_block: Optional[int] = None
     last_successful_sync: Optional[datetime] = None

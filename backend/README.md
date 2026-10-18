@@ -72,7 +72,7 @@ alembic current
 
 ### Development Notes
 
-- `Base.metadata.create_all()` in `app.main` is still active for local development, so the database will auto-create tables on startup. In production, rely on `alembic upgrade head`.
+- `Base.metadata.create_all()` in `app.main` is still active for local development, so the database will auto-create tables on startup. In hosted environments, run `python manage_schema.py --apply` as an explicit schema release before starting the API. `start_api.py` checks the schema head without applying DDL. See [canonical identity release](../CANONICAL_PRODUCT_IDENTITY.md).
 - The `alembic/env.py` script imports all models from `app.models` so that `Base.metadata` is fully populated for autogenerate.
 - Both SQLite and PostgreSQL are supported. The database URL is read dynamically from `app.core.config.settings.database_url`.
 

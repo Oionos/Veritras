@@ -45,7 +45,7 @@ class ShipmentBase(BaseModel):
 
 class ShipmentCreate(ShipmentBase):
     status: Literal["0"] = "0"
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra="forbid")
 
 
 class ShipmentUpdate(BaseModel):
@@ -53,7 +53,7 @@ class ShipmentUpdate(BaseModel):
     destination: Optional[str] = Field(default=None, max_length=200)
     notes: Optional[str] = Field(default=None, max_length=1000)
 
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra="forbid")
 
     @field_validator("origin", "destination")
     @classmethod
@@ -64,6 +64,10 @@ class ShipmentUpdate(BaseModel):
 
 
 class ShipmentResponse(ShipmentBase):
+    on_chain_product_id: Optional[str] = None
+    registry_address: Optional[str] = None
+    chain_id: Optional[int] = None
+    tracker_address: Optional[str] = None
     current_handler: Optional[str] = None
     id: int
     shipment_id: str = Field(..., max_length=100)
@@ -74,7 +78,7 @@ class ShipmentResponse(ShipmentBase):
     block_number: int
     tx_hash: str = Field(..., max_length=100)
 
-    model_config = ConfigDict(from_attributes=True, extra='forbid')
+    model_config = ConfigDict(from_attributes=True, extra="forbid")
 
 
 class ShipmentListResponse(BaseModel):
