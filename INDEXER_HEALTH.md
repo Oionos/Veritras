@@ -85,17 +85,18 @@ Use **`/health/live`** as the platform HTTP health-check path for both existing
 services. This keeps expected backfill and transient RPC/database outages from
 creating restart loops. Use `/health/ready` for release/operational monitoring.
 
-Templates already specify `/health/live`; the existing services are managed
-through MCP/Dashboard, so editing YAML does not change their settings. The current
-connector can inspect service settings but cannot update health-check paths.
-An authenticated Render Dashboard change or API credential is required:
+Both existing services were configured through the Dashboard and independently
+verified through the Render service API on **October 18, 2026**. Each reports
+`serviceDetails.healthCheckPath=/health/live`. The settings pages are:
 
 - [Production settings](https://dashboard.render.com/web/srv-d7rc4opj2pic73f7uudg/settings)
 - [Testing settings](https://dashboard.render.com/web/srv-db9sd1vbtjjs73ct4240/settings)
 
-In **Health Checks**, set `/health/live`, save, and verify `healthCheckPath` through
-the service API after rollout. No paid instance upgrade, new service or pre-deploy
-migration is needed. Startup still checks the separately released schema head.
+For future changes, use **Health Checks**, save `/health/live`, and read back
+`healthCheckPath` through the service API after rollout. Editing the YAML templates
+alone does not change these existing services. No paid instance upgrade, new
+service or pre-deploy migration is needed. Startup still checks the separately
+released schema head.
 
 ## Readiness probes and notifications
 
@@ -160,8 +161,11 @@ weaken confirmation depth or enable production indexing to silence the signal.
   12, returned no-store health responses, verified the existing delivered product,
   and displayed injected catching-up/degraded/disabled UI states with no browser
   errors or production requests. Structured current-state logs were verified.
-- Actual Render HTTP health paths remain a separate pending configuration item
-  until the authenticated Dashboard/API setting is applied and read back. The
-  readiness workflow's HTTP checks do not silently change the platform setting.
+- Render HTTP setup completed October 18, 2026: both service settings read back
+  `/health/live`. Production and testing each returned HTTP 200 and
+  `Cache-Control: no-store` from `/health/live` and `/health/ready`. Production
+  served release `664e929` with indexing intentionally disabled; testing served
+  `e5d2943` with its indexer current, zero confirmed-target lag and depth 12.
+  This independently verifies the platform settings and endpoint responses.
 - Final tested source, complete CI results and production deployment references
   are recorded in PR #20. No schema migration or production backfill is included.

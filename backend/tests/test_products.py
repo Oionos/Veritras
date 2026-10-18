@@ -193,7 +193,7 @@ def test_get_product_verify_contract(client_fixture, seeded_products):
     response = client_fixture.get("/products/0x" + "a" * 64 + "/verify")
     assert response.status_code == 200
     data = response.json()
-    assert set(data.keys()) == {"product_id", "is_registered", "is_delivered", "checkpoint_count", "synchronization"}
+    assert set(data.keys()) == {"product_id", "is_registered", "is_delivered", "checkpoint_count", "synchronization", "evidence"}
     assert data["product_id"] == "0x" + "a" * 64
     assert isinstance(data["is_registered"], bool)
     assert isinstance(data["is_delivered"], bool)

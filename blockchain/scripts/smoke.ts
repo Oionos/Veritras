@@ -53,7 +53,10 @@ async function main() {
   const id = draft.on_chain_product_id;
   const registry = await ethers.getContractAt('ProductRegistry', manifest.contracts.ProductRegistry);
   const tracker = await ethers.getContractAt('ShipmentTracker', manifest.contracts.ShipmentTracker);
-  await (await registry.registerProduct(id, draft.name, '', '')).wait();
+  const registration = await registry.registerProduct(id, draft.name, '', '');
+  const submission = await api(`/products/${draft.product_id}/registration`, json({ tx_hash: registration.hash }));
+  assert.equal(submission.status, 'submitted');
+  await registration.wait();
   const edit = { ...json({ name: 'Cannot change a registered name' }), method: 'PUT' };
   assert.equal((await fetch(`${base}/products/${draft.product_id}`, edit)).status, 409);
   await (await tracker.recordCheckpoint(id, 'Test factory', 0, 'Created')).wait();
@@ -73,6 +76,24 @@ async function main() {
   assert.equal(detail.transfers.length, 1);
   const verification = await api(`/products/${draft.product_id}/verify`);
   assert.equal(verification.is_registered, true);
+  assert.equal(verification.evidence.status, 'verified');
+  assert.equal(verification.evidence.transaction_hash, registration.hash.toLowerCase());
+  assert.equal(verification.evidence.physical_authenticity_verified, false);
+  const reconciled = await api(`/products/${draft.product_id}/registration/reconcile?tx_hash=${registration.hash}`, { ...json({}), body: undefined });
+  assert.equal(reconciled.status, 'indexed');
+  const update = await registry.updateProductMetadata(id, 'ipfs://confirmed-version-two');
+  await api(`/products/${draft.product_id}/registration`, json({ tx_hash: update.hash, operation: 'metadata', metadata_uri: 'ipfs://confirmed-version-two' }));
+  await update.wait();
+  for (let attempt = 0; attempt < 120; attempt++) {
+    if ((await api(`/products/${draft.product_id}`)).product.metadata_uri === 'ipfs://confirmed-version-two') break;
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  const metadata = await api(`/products/${draft.product_id}/metadata-history`);
+  assert.equal(metadata.items.filter((version: { canonical: boolean }) => version.canonical).length, 2);
+  assert.equal(metadata.items[0].metadata_uri, 'ipfs://confirmed-version-two');
+  const metadataState = await api(`/products/${draft.product_id}/registration/reconcile?tx_hash=${update.hash}`, { ...json({}), body: undefined });
+  assert.equal(metadataState.status, 'indexed');
+  assert.equal((await api(`/products/${draft.product_id}/verify`)).evidence.status, 'verified');
   assert.equal(verification.is_delivered, true);
   const rows = await api('/products/?limit=1000');
   assert.equal(rows.items.filter((p: { product_id: string }) => [draft.product_id, id].includes(p.product_id)).length, 1, 'Registration must reconcile the same draft');
