@@ -1,0 +1,49 @@
+name: Hosted API Readiness
+on:
+  push:
+    branches: [main, testing]
+    paths: ['backend/**', '.github/workflows/hosted-health.yml']
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: API environment to inspect
+        type: choice
+        options: [production, testing]
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: hosted-health-${{ github.event.inputs.environment || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  readiness:
+    name: Observe deployed API readiness
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Wait for the matching API release and indexing policy
+        env:
+          EVENT: ${{ github.event_name }}
+          SOURCE_BRANCH: ${{ github.ref_name }}
+          RELEASE_SHA: ${{ github.sha }}
+          SELECTED_ENVIRONMENT: ${{ inputs.environment }}
+        shell: bash
+        run: |
+          environment="$SELECTED_ENVIRONMENT"
+          if [ "$EVENT" = push ]; then
+            if [ "$SOURCE_BRANCH" = main ]; then environment=production; else environment=testing; fi
+          fi
+          if [ "$environment" = production ]; then
+            api=https://chainlens-4qvy.onrender.com
+            indexing=disabled
+          else
+            api=https://veritras-api-testing.onrender.com
+            indexing=enabled
+          fi
+          args=(--url "$api" --environment "$environment" --expect-indexer "$indexing" --deadline 600 --interval 15 --timeout 4)
+          if [ "$EVENT" = push ]; then args+=(--expected-commit "$RELEASE_SHA"); fi
+          python backend/check_health.py "${args[@]}"

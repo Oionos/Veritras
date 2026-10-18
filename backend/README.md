@@ -143,3 +143,7 @@ In production, set `DATABASE_URL` to a PostgreSQL instance. The application auto
 ## License
 
 MIT
+
+## Indexer startup and health
+
+Use `/health/live` for hosting HTTP checks and `/health/ready` for dependency/indexer readiness. Initialization, confirmed-target lag, cursor progress and head freshness are reported separately. See [INDEXER_HEALTH.md](../INDEXER_HEALTH.md) for configuration, capped retries, safe diagnostics and bounded release probes. Production indexing remains disabled pending its separate enablement gate.

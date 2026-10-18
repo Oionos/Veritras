@@ -10,7 +10,7 @@ services:
     dockerContext: ./backend
     autoDeployTrigger: commit
     healthCheckPath: /health/live
-    # Docker CMD migrates a fresh/versioned database and respects Render's PORT.
+    # Apply the explicit schema release first; Docker CMD checks it and respects PORT.
     # The existing service is configured through MCP/Dashboard, not Blueprint sync.
     envVars:
       - key: ENVIRONMENT
