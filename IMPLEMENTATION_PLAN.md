@@ -83,7 +83,7 @@ The numbers below are **plan increment IDs**, not actual GitHub pull request num
 | 3 | **Done / P1 addressed** | `codex/canonical-product-identity` | Maintain identity/reconciliation guarantees; release tracked in PR #19 | 2 |
 | 4 | **Done / P0 addressed** | `codex/durable-chain-indexing` | Maintain recovery guarantees; production enablement remains a separate gate | Scoped identity binding included; broader increment 3 remains |
 | 5 | **Done / P1 addressed** | `codex/registration-lifecycle-evidence` | Maintain durable transaction recovery, checked evidence and metadata history; release tracked in PR #21 | 2–4 |
-| 6 | Pending / P1 | `fix/live-analytics-and-reports` | Accurate metrics, SLA semantics and consistent safe exports | 4 for complete aggregates; mock removal can ship now |
+| 6 | **Done / P1 addressed** | `codex/truthful-analytics-and-exports` | Maintain canonical cohorts, SLA exclusions and safe matching exports; release tracked in PR #22 | 3–5 delivered |
 | 7 | Partial / P1 | `test/complete-provenance-flow` | Failure/reorg coverage, enforced gates and recovery runbook | 2–6 for final acceptance |
 | 8 | Pending / P2 | `feat/qr-verification-and-demo` | QR links, unified shipment detail, mobile and guided demo | 5 and 7 |
 | 9 | Pending / P2 | `feat/shipment-exceptions` | Expected arrival, overdue and dwell exception list | 6–8 |
@@ -221,11 +221,11 @@ Implemented in this increment: persistent transaction attempts and payload snaps
 
 ## PR 6 — Replace placeholder analytics and repair exports
 
-**Status: complete implementation and local validation; hosted release checks run before merge. Priority: P1 addressed.**
+**Status: complete implementation, local validation and hosted testing acceptance. Priority: P1 addressed.**
 
 Delivered: canonical shipment lifecycle from the durable event journal; nullable timezone-aware expected arrival with owner-only pre-departure edits; completed transit/SLA/active elapsed and explicit exclusions; real normalized route aggregates and same-route anomaly sample thresholds; shared validated UTC creation/date/route filters; safe shipment/event CSV and shipment PDF with matching evidence/counts; recent-product pagination and removal of illustrative totals/trends/charts. Migration `c62a904df318` preserves historical unknown SLA. Definitions and compatibility changes: [ANALYTICS.md](ANALYTICS.md).
 
-Local release validation: **400 backend tests passed** (three intentional dialect skips), **240 frontend tests passed** with coverage thresholds satisfied, **29 Playwright regressions** and **40 contract tests passed**. The real isolated API/PostgreSQL/Hardhat journey, SLA/analytics/export assertions, canonical fork recovery and browser downloads are exercised by the integration workflow. The final additive migration was rehearsed on the isolated production copy without changing its one shipment or inventing SLA values. Hosted acceptance and exact-head CI are required before main release.
+Local release validation: **400 backend tests passed** (three intentional dialect skips), **240 frontend tests passed** with coverage thresholds satisfied, **29 Playwright regressions** and **40 contract tests passed**. The real isolated API/PostgreSQL/Hardhat journey, SLA/analytics/export assertions, canonical fork recovery and browser downloads are exercised by the integration workflow. The final additive migration was rehearsed on the isolated production copy without changing its one shipment or inventing SLA values. Hosted testing acceptance passed: 2 shipment records, 1 delivered/transit sample, no known SLA samples, and 6 canonical events. Filtered browser CSV/API counts matched; PDF and mobile checks passed without browser errors. Exact-head CI is required before main release.
 
 **Metric definitions**
 
@@ -330,8 +330,8 @@ After the reliable demo is complete and a specific user workflow has been valida
 
 ## Next implementation session
 
-Prioritize **production indexing enablement validation**, **increment 6: truthful analytics/exports**, and **release-gate enforcement**. Increment 5 transaction lifecycle and verification UX is delivered. Production indexing/backfill still requires its reviewed deployment anchor, identity/history dry run and explicit enablement. Keep that gate separate from ordinary application releases.
+Prioritize **production indexing enablement validation** and **increment 7: release-gate enforcement and the recovery runbook**. Increments 5 (transaction lifecycle/evidence) and 6 (truthful analytics/exports) are delivered. Production indexing/backfill still requires its reviewed deployment anchor, identity/history dry run and explicit enablement. Keep that gate separate from ordinary application releases.
 
-The small analytics presentation correction and release-gate verification can be separate changes without waiting for the complete indexer redesign. Do not combine those independent fixes into the identity migration.
+Preserve analytics definitions and sample/exclusion counts during subsequent work. Keep production indexing enablement and release-gate configuration as explicit reviewed changes.
 
 For each implementation PR, record changed behavior, tested commit, validation results, migration/configuration requirements and remaining acceptance criteria. Update this status dashboard after release. Completing a subset of tasks does not close the increment until its remaining acceptance criteria pass.
