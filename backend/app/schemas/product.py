@@ -64,6 +64,9 @@ class ProductListResponse(BaseModel):
 
 
 class SynchronizationResponse(BaseModel):
+    status: str = "unknown"
+    reason: Optional[str] = None
+    lag_blocks: Optional[int] = None
     confirmation_policy: Literal["depth"] = "depth"
     confirmations: int
     cursor_storage: Literal["database"] = "database"
@@ -78,3 +81,83 @@ class VerificationResponse(BaseModel):
     is_delivered: bool
     checkpoint_count: int
     synchronization: SynchronizationResponse
+    evidence: "RegistrationEvidence"
+
+
+class RegistrationSubmission(BaseModel):
+    tx_hash: str = Field(pattern=r"^0x[0-9a-fA-F]{64}$")
+    operation: Literal["registration", "metadata"] = "registration"
+    metadata_uri: Optional[str] = Field(default=None, max_length=500)
+    replaces_tx_hash: Optional[str] = Field(
+        default=None, pattern=r"^0x[0-9a-fA-F]{64}$"
+    )
+    model_config = ConfigDict(extra="forbid")
+
+
+class RegistrationAttemptResponse(BaseModel):
+    tx_hash: str
+    operation: Literal["registration", "metadata"]
+    metadata_uri: Optional[str]
+    status: Literal[
+        "submitted", "confirming", "indexing", "indexed", "failed", "replaced"
+    ]
+    reason: str
+    replaces_tx_hash: Optional[str]
+    replaced_by: Optional[str]
+    block_number: Optional[int]
+    block_hash: Optional[str]
+    created_at: datetime
+    checked_at: Optional[datetime]
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RegistrationLifecycleResponse(BaseModel):
+    product_id: str
+    attempts: list[RegistrationAttemptResponse]
+
+
+class RegistrationEvidence(BaseModel):
+    status: Literal[
+        "verified", "pending", "unavailable", "not_found", "mismatched", "failed"
+    ]
+    reason: str
+    registration_status: Literal[
+        "draft",
+        "submitted",
+        "confirming",
+        "indexing",
+        "indexed",
+        "failed",
+        "replaced",
+        "unregistered",
+        "legacy_unreconciled",
+        "superseded",
+    ]
+    chain_id: Optional[int] = None
+    registry_address: Optional[str] = None
+    on_chain_product_id: Optional[str] = None
+    manufacturer_address: str
+    transaction_hash: Optional[str] = None
+    block_number: Optional[int] = None
+    block_hash: Optional[str] = None
+    confirmation_policy: Literal["depth"] = "depth"
+    required_confirmations: int
+    observed_confirmations: Optional[int] = None
+    physical_authenticity_verified: Literal[False] = False
+
+
+class MetadataVersionResponse(BaseModel):
+    transaction_hash: str
+    block_number: int
+    block_hash: str
+    log_index: int
+    metadata_uri: Optional[str]
+    canonical: bool
+
+
+class MetadataHistoryResponse(BaseModel):
+    product_id: str
+    items: list[MetadataVersionResponse]
+
+
+VerificationResponse.model_rebuild()

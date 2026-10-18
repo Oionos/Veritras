@@ -1,6 +1,6 @@
 # Veritras implementation plan
 
-Originally prepared October 17, 2026 from [PROJECT_REVIEW.md](PROJECT_REVIEW.md). **Status updated October 18, 2026 from released `main` at `33c4745` plus the durable-indexing increment on `codex/durable-chain-indexing`.** This update includes the durable-indexing code, local and hosted acceptance checks, and the delivery evidence below.
+Originally prepared October 17, 2026 from [PROJECT_REVIEW.md](PROJECT_REVIEW.md). **Status updated October 18, 2026 from released `main` at `664e929`.** This update includes durable indexing, canonical product identity, indexer startup and health, local and hosted acceptance checks, and independently verified Render HTTP health settings.
 
 ## Status at a glance
 
@@ -14,10 +14,10 @@ Priority meanings: **P0 — release blocker** must be resolved before enabling p
 | --- | --- | --- | --- |
 | Isolated local and hosted testing | **Done** | Maintain | Separate database, API, Sepolia contracts, protected Vercel Preview, exact sign-in origins; full journey checked |
 | Wallet sign-in and write permissions | **Done** | Maintain | Persistent SIWE challenges, scoped tokens, owner-only API writes, browser session handling |
-| Indexer startup and health | **Implemented; platform setting pending** | P1 | Bounded startup/retries/shutdown, confirmed-progress health, app notices and release probes; actual Render HTTP paths need the service setting change |
+| Indexer startup and health | **Done** | **P1 addressed** | Bounded startup/retries/shutdown, confirmed-progress health, app notices and release probes; `/health/live` verified on both existing Render services |
 | Canonical product identity (increment 3) | **Done** | **P1 addressed** | Scoped identities, lifecycle timestamps, legacy aliases/reconciliation and one-shipment constraint; see [runbook](CANONICAL_PRODUCT_IDENTITY.md) |
 | Durable indexing (increment 4) | **Done** | **P0 addressed** | Transactional journal/cursor, ordered reversible projections, confirmation policy, single-writer lock, metadata events and resilient notifications; production enablement remains a separate gate |
-| Registration lifecycle and evidence (increment 5) | **Partial** | P1 | Receipt-backed registration checks delivered; persisted submissions, replacement handling and richer evidence states remain |
+| Registration lifecycle and evidence (increment 5) | **Implemented; release validation in progress** | P1 | Persisted submissions, checked replacements/cancellations, reload recovery, typed receipt/journal evidence and signed metadata/history; see [runbook](REGISTRATION_LIFECYCLE.md) |
 | Analytics and exports (increment 6) | **Pending** | **P1 — remove misleading metrics soon** | Fixed dashboard totals/trends, sample route charts, assumed 72-hour SLA and export semantics still need correction |
 | Integration and release controls (increment 7) | **Partial** | P1 | Real local/browser/Sepolia journeys and CI delivered; failure/reorg coverage, enforced release gates and recovery runbook remain |
 | QR verification, shipment detail and guided demo (increment 8) | **Pending** | P2 | Public verification exists; direct product links, QR labels, unified detail and guided/mobile journey remain |
@@ -78,7 +78,7 @@ The numbers below are **plan increment IDs**, not actual GitHub pull request num
 | Increment | Status / priority | Suggested branch | Remaining deliverable | Depends on |
 | --- | --- | --- | --- | --- |
 | 0 | Partial / P1 | Follow-up release controls | Testing setup done; verify/enforce CI and deployment gates | None |
-| 1 | Implemented / P1 platform follow-up | `codex/indexer-startup-and-health` | Confirm `/health/live` on both existing Render services; see [health runbook](INDEXER_HEALTH.md) | Finality policy from 4 |
+| 1 | **Done / P1 addressed** | Released in #20 | Maintain startup, recovery and health guarantees; both Render HTTP paths verified; see [health runbook](INDEXER_HEALTH.md) | Finality policy from 4 |
 | 2 | **Done** | Released in #16 | Maintain authentication and authorization | 0 environment setup |
 | 3 | **Done / P1 addressed** | `codex/canonical-product-identity` | Maintain identity/reconciliation guarantees; release tracked in PR #19 | 2 |
 | 4 | **Done / P0 addressed** | `codex/durable-chain-indexing` | Maintain recovery guarantees; production enablement remains a separate gate | Scoped identity binding included; broader increment 3 remains |
@@ -113,9 +113,9 @@ Delivered: local Compose isolation; a dedicated hosted Neon project/database and
 
 ## PR 1 — Restore indexer startup and truthful health reporting
 
-**Status: implementation and local/hosted acceptance complete; actual Render HTTP setting pending. Priority: P1 for platform completion.**
+**Status: Done, including local/hosted acceptance and verified Render HTTP settings. Priority: P1 addressed.**
 
-Delivered: bundled ABI loading and locked dependencies; validated chain/contract startup; capped exponential retries without hidden provider retries; cancellation and transactional shutdown rollback; typed cached confirmed-target health; startup, poll, cursor-progress and head freshness checks; bounded database probing; consistent disabled/failed states; app synchronization notices; structured transition logs; and bounded deployment/manual readiness workflows. Real local startup/runtime RPC failures recovered against Hardhat and PostgreSQL. The actual Render HTTP health paths still require Dashboard/API access because the available connector cannot edit existing service settings. Templates already specify `/health/live`; this does not establish the live setting. Continuous runtime alerting remains opt-in under the free-tier constraints. See [INDEXER_HEALTH.md](INDEXER_HEALTH.md). Production backfill remains disabled.
+Delivered: bundled ABI loading and locked dependencies; validated chain/contract startup; capped exponential retries without hidden provider retries; cancellation and transactional shutdown rollback; typed cached confirmed-target health; startup, poll, cursor-progress and head freshness checks; bounded database probing; consistent disabled/failed states; app synchronization notices; structured transition logs; and bounded deployment/manual readiness workflows. Real local startup/runtime RPC failures recovered against Hardhat and PostgreSQL. On October 18, 2026, both existing Render services were independently read back with `healthCheckPath=/health/live` after the Dashboard changes. Both liveness and readiness endpoints returned HTTP 200 with `Cache-Control: no-store`; the testing indexer was current with zero confirmed-target lag. Continuous runtime alerting remains opt-in under the free-tier constraints. See [INDEXER_HEALTH.md](INDEXER_HEALTH.md). Production backfill remains disabled.
 
 **Tasks**
 
@@ -201,11 +201,11 @@ Hosted acceptance passed: 12 canonical journal events, two products, six unique 
 
 ## PR 5 — Implement evidence-based registration and verification
 
-**Status: partial. Priority: P1, after identity and durable indexing.**
+**Status: implementation complete; final local and hosted release validation in progress. Priority: P1.**
 
 Delivered: verification checks successful receipt, chain, registry destination/emitter, block reference, canonical product ID, manufacturer and registered name; database presence alone cannot verify. The UI distinguishes transaction submission and exposes pending/confirmation state in memory. Increment 4 adds typed verification policy/indexed-block/last-sync fields and canonical block/depth checks. Local and hosted valid registrations were checked.
 
-Remaining: persist registration submissions and reload-safe progress; replacement/revert/retry reconciliation; richer evidence reasons and inspectable transaction/block references; synchronization health separate from transaction state; full metadata update/history flow. Current receipt checks do not implement the planned finality policy or durable transaction lifecycle.
+Implemented in this increment: persistent transaction attempts and payload snapshots; idempotent owner submissions; receipt/input/event/nonce validation; confirmation-depth and canonical-journal checks; retry/replacement/cancellation tracking; browser outbox and reload recovery; typed explanatory evidence with transaction/block references; separate synchronization health; manufacturer-signed metadata updates and canonical/orphaned history. Final acceptance and release evidence: [REGISTRATION_LIFECYCLE.md](REGISTRATION_LIFECYCLE.md).
 
 **Tasks**
 

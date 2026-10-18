@@ -129,6 +129,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/products/{product_id}/registration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Registration History */
+        get: operations["registration_history_products__product_id__registration_get"];
+        put?: never;
+        /** Submit Registration */
+        post: operations["submit_registration_products__product_id__registration_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/products/{product_id}/registration/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reconcile Registration */
+        post: operations["reconcile_registration_products__product_id__registration_reconcile_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/products/{product_id}/metadata-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Metadata History */
+        get: operations["metadata_history_products__product_id__metadata_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/shipments/": {
         parameters: {
             query?: never;
@@ -667,6 +719,28 @@ export interface components {
             /** Release Commit */
             release_commit?: string | null;
         };
+        /** MetadataHistoryResponse */
+        MetadataHistoryResponse: {
+            /** Product Id */
+            product_id: string;
+            /** Items */
+            items: components["schemas"]["MetadataVersionResponse"][];
+        };
+        /** MetadataVersionResponse */
+        MetadataVersionResponse: {
+            /** Transaction Hash */
+            transaction_hash: string;
+            /** Block Number */
+            block_number: number;
+            /** Block Hash */
+            block_hash: string;
+            /** Log Index */
+            log_index: number;
+            /** Metadata Uri */
+            metadata_uri: string | null;
+            /** Canonical */
+            canonical: boolean;
+        };
         /** NonceResponse */
         NonceResponse: {
             /** Nonce */
@@ -781,6 +855,107 @@ export interface components {
             release_commit?: string | null;
             indexer: components["schemas"]["IndexerHealthResponse"];
         };
+        /** RegistrationAttemptResponse */
+        RegistrationAttemptResponse: {
+            /** Tx Hash */
+            tx_hash: string;
+            /**
+             * Operation
+             * @enum {string}
+             */
+            operation: "registration" | "metadata";
+            /** Metadata Uri */
+            metadata_uri: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "submitted" | "confirming" | "indexing" | "indexed" | "failed" | "replaced";
+            /** Reason */
+            reason: string;
+            /** Replaces Tx Hash */
+            replaces_tx_hash: string | null;
+            /** Replaced By */
+            replaced_by: string | null;
+            /** Block Number */
+            block_number: number | null;
+            /** Block Hash */
+            block_hash: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Checked At */
+            checked_at: string | null;
+        };
+        /** RegistrationEvidence */
+        RegistrationEvidence: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "verified" | "pending" | "unavailable" | "not_found" | "mismatched" | "failed";
+            /** Reason */
+            reason: string;
+            /**
+             * Registration Status
+             * @enum {string}
+             */
+            registration_status: "draft" | "submitted" | "confirming" | "indexing" | "indexed" | "failed" | "replaced" | "unregistered" | "legacy_unreconciled" | "superseded";
+            /** Chain Id */
+            chain_id?: number | null;
+            /** Registry Address */
+            registry_address?: string | null;
+            /** On Chain Product Id */
+            on_chain_product_id?: string | null;
+            /** Manufacturer Address */
+            manufacturer_address: string;
+            /** Transaction Hash */
+            transaction_hash?: string | null;
+            /** Block Number */
+            block_number?: number | null;
+            /** Block Hash */
+            block_hash?: string | null;
+            /**
+             * Confirmation Policy
+             * @default depth
+             * @constant
+             */
+            confirmation_policy: "depth";
+            /** Required Confirmations */
+            required_confirmations: number;
+            /** Observed Confirmations */
+            observed_confirmations?: number | null;
+            /**
+             * Physical Authenticity Verified
+             * @default false
+             * @constant
+             */
+            physical_authenticity_verified: false;
+        };
+        /** RegistrationLifecycleResponse */
+        RegistrationLifecycleResponse: {
+            /** Product Id */
+            product_id: string;
+            /** Attempts */
+            attempts: components["schemas"]["RegistrationAttemptResponse"][];
+        };
+        /** RegistrationSubmission */
+        RegistrationSubmission: {
+            /** Tx Hash */
+            tx_hash: string;
+            /**
+             * Operation
+             * @default registration
+             * @enum {string}
+             */
+            operation: "registration" | "metadata";
+            /** Metadata Uri */
+            metadata_uri?: string | null;
+            /** Replaces Tx Hash */
+            replaces_tx_hash?: string | null;
+        };
         /** ShipmentCreate */
         ShipmentCreate: {
             /** Product Id */
@@ -865,6 +1040,15 @@ export interface components {
         /** SynchronizationResponse */
         SynchronizationResponse: {
             /**
+             * Status
+             * @default unknown
+             */
+            status: string;
+            /** Reason */
+            reason?: string | null;
+            /** Lag Blocks */
+            lag_blocks?: number | null;
+            /**
              * Confirmation Policy
              * @default depth
              * @constant
@@ -909,6 +1093,7 @@ export interface components {
             /** Checkpoint Count */
             checkpoint_count: number;
             synchronization: components["schemas"]["SynchronizationResponse"];
+            evidence: components["schemas"]["RegistrationEvidence"];
         };
         /** VerifyRequest */
         VerifyRequest: {
@@ -1183,6 +1368,136 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VerificationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    registration_history_products__product_id__registration_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationLifecycleResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    submit_registration_products__product_id__registration_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrationSubmission"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationAttemptResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reconcile_registration_products__product_id__registration_reconcile_post: {
+        parameters: {
+            query: {
+                tx_hash: string;
+            };
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistrationAttemptResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    metadata_history_products__product_id__metadata_history_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetadataHistoryResponse"];
                 };
             };
             /** @description Validation Error */

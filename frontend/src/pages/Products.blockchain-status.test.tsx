@@ -147,7 +147,7 @@ describe('Products blockchain status text', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole('button', { name: 'Registered!' }),
+        screen.getByRole('button', { name: 'Receipt received — awaiting indexing' }),
       ).toBeInTheDocument()
     })
   })

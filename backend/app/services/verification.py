@@ -1,60 +1,16 @@
-"""Receipt-backed registration checks; database presence alone is not proof."""
+"""Compatibility receipt check; public verification also requires indexed journal evidence."""
 
-from web3 import Web3
-from web3.logs import DISCARD
-
-from app.core.config import settings
-from app.core.product_id import canonical_product_id
-from app.services.indexer import load_abi
+from app.services.registration import observe
 
 
 def verify_registration(product) -> bool:
-    if getattr(product, "registration_status", None) != "indexed" or not getattr(
-        product, "on_chain_product_id", None
-    ):
-        return False
     if (
-        product.chain_id != settings.chain_id
-        or product.registry_address != settings.product_registry_contract.lower()
-    ):
-        raise ConnectionError(
-            "Product identity belongs to a different chain configuration"
-        )
-    if product.block_number <= 0 or not product.tx_hash or len(product.tx_hash) != 66:
-        return False
-    if not settings.sepolia_rpc_url or not settings.product_registry_contract:
-        raise ConnectionError("Registration evidence is unavailable")
-    w3 = Web3(
-        Web3.HTTPProvider(
-            settings.sepolia_rpc_url,
-            request_kwargs={"timeout": settings.indexer_rpc_timeout},
-        )
-    )
-    if w3.eth.chain_id != settings.chain_id:
-        raise ConnectionError("Configured chain is unavailable")
-    registry = w3.to_checksum_address(settings.product_registry_contract)
-    receipt = w3.eth.get_transaction_receipt(product.tx_hash)
-    if receipt["status"] != 1 or (receipt.get("to") or "").lower() != registry.lower():
-        return False
-    if receipt["blockNumber"] != product.block_number:
-        return False
-    if w3.eth.block_number - receipt["blockNumber"] < settings.indexer_confirmations:
-        return False
-    if bytes(w3.eth.get_block(receipt["blockNumber"])["hash"]) != bytes(
-        receipt["blockHash"]
+        getattr(product, "registration_status", None) != "indexed"
+        or not getattr(product, "on_chain_product_id", None)
+        or product.block_number <= 0
+        or not product.tx_hash
+        or len(product.tx_hash) != 66
     ):
         return False
-    try:
-        canonical_id = canonical_product_id(product.on_chain_product_id)
-    except ValueError:
-        return False
-    contract = w3.eth.contract(address=registry, abi=load_abi("ProductRegistry"))
-    return any(
-        log["address"].lower() == registry.lower()
-        and bytes(log["args"]["productId"]) == canonical_id
-        and log["args"]["manufacturer"].lower() == product.manufacturer_address.lower()
-        and log["args"]["name"] == product.name
-        for log in contract.events.ProductRegistered().process_receipt(
-            receipt, errors=DISCARD
-        )
-    )
+    result = observe(product)
+    return result["status"] == "indexing"

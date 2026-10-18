@@ -405,6 +405,202 @@
         }
       }
     },
+    "/products/{product_id}/registration": {
+      "post": {
+        "tags": [
+          "products"
+        ],
+        "summary": "Submit Registration",
+        "operationId": "submit_registration_products__product_id__registration_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Product Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationSubmission"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationAttemptResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "products"
+        ],
+        "summary": "Registration History",
+        "operationId": "registration_history_products__product_id__registration_get",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Product Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationLifecycleResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/products/{product_id}/registration/reconcile": {
+      "post": {
+        "tags": [
+          "products"
+        ],
+        "summary": "Reconcile Registration",
+        "operationId": "reconcile_registration_products__product_id__registration_reconcile_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Product Id"
+            }
+          },
+          {
+            "name": "tx_hash",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{64}$",
+              "title": "Tx Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegistrationAttemptResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/products/{product_id}/metadata-history": {
+      "get": {
+        "tags": [
+          "products"
+        ],
+        "summary": "Metadata History",
+        "operationId": "metadata_history_products__product_id__metadata_history_get",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Product Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetadataHistoryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/shipments/": {
       "get": {
         "tags": [
@@ -1755,6 +1951,72 @@
         ],
         "title": "LivenessResponse"
       },
+      "MetadataHistoryResponse": {
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "title": "Product Id"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MetadataVersionResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "product_id",
+          "items"
+        ],
+        "title": "MetadataHistoryResponse"
+      },
+      "MetadataVersionResponse": {
+        "properties": {
+          "transaction_hash": {
+            "type": "string",
+            "title": "Transaction Hash"
+          },
+          "block_number": {
+            "type": "integer",
+            "title": "Block Number"
+          },
+          "block_hash": {
+            "type": "string",
+            "title": "Block Hash"
+          },
+          "log_index": {
+            "type": "integer",
+            "title": "Log Index"
+          },
+          "metadata_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata Uri"
+          },
+          "canonical": {
+            "type": "boolean",
+            "title": "Canonical"
+          }
+        },
+        "type": "object",
+        "required": [
+          "transaction_hash",
+          "block_number",
+          "block_hash",
+          "log_index",
+          "metadata_uri",
+          "canonical"
+        ],
+        "title": "MetadataVersionResponse"
+      },
       "NonceResponse": {
         "properties": {
           "nonce": {
@@ -2136,6 +2398,336 @@
         ],
         "title": "ReadinessResponse"
       },
+      "RegistrationAttemptResponse": {
+        "properties": {
+          "tx_hash": {
+            "type": "string",
+            "title": "Tx Hash"
+          },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "registration",
+              "metadata"
+            ],
+            "title": "Operation"
+          },
+          "metadata_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata Uri"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "submitted",
+              "confirming",
+              "indexing",
+              "indexed",
+              "failed",
+              "replaced"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "replaces_tx_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replaces Tx Hash"
+          },
+          "replaced_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replaced By"
+          },
+          "block_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Block Number"
+          },
+          "block_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Block Hash"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tx_hash",
+          "operation",
+          "metadata_uri",
+          "status",
+          "reason",
+          "replaces_tx_hash",
+          "replaced_by",
+          "block_number",
+          "block_hash",
+          "created_at",
+          "checked_at"
+        ],
+        "title": "RegistrationAttemptResponse"
+      },
+      "RegistrationEvidence": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "verified",
+              "pending",
+              "unavailable",
+              "not_found",
+              "mismatched",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "registration_status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "submitted",
+              "confirming",
+              "indexing",
+              "indexed",
+              "failed",
+              "replaced",
+              "unregistered",
+              "legacy_unreconciled",
+              "superseded"
+            ],
+            "title": "Registration Status"
+          },
+          "chain_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chain Id"
+          },
+          "registry_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registry Address"
+          },
+          "on_chain_product_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On Chain Product Id"
+          },
+          "manufacturer_address": {
+            "type": "string",
+            "title": "Manufacturer Address"
+          },
+          "transaction_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transaction Hash"
+          },
+          "block_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Block Number"
+          },
+          "block_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Block Hash"
+          },
+          "confirmation_policy": {
+            "type": "string",
+            "const": "depth",
+            "title": "Confirmation Policy",
+            "default": "depth"
+          },
+          "required_confirmations": {
+            "type": "integer",
+            "title": "Required Confirmations"
+          },
+          "observed_confirmations": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed Confirmations"
+          },
+          "physical_authenticity_verified": {
+            "type": "boolean",
+            "const": false,
+            "title": "Physical Authenticity Verified",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "registration_status",
+          "manufacturer_address",
+          "required_confirmations"
+        ],
+        "title": "RegistrationEvidence"
+      },
+      "RegistrationLifecycleResponse": {
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "title": "Product Id"
+          },
+          "attempts": {
+            "items": {
+              "$ref": "#/components/schemas/RegistrationAttemptResponse"
+            },
+            "type": "array",
+            "title": "Attempts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "product_id",
+          "attempts"
+        ],
+        "title": "RegistrationLifecycleResponse"
+      },
+      "RegistrationSubmission": {
+        "properties": {
+          "tx_hash": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{64}$",
+            "title": "Tx Hash"
+          },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "registration",
+              "metadata"
+            ],
+            "title": "Operation",
+            "default": "registration"
+          },
+          "metadata_uri": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata Uri"
+          },
+          "replaces_tx_hash": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replaces Tx Hash"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "tx_hash"
+        ],
+        "title": "RegistrationSubmission"
+      },
       "ShipmentCreate": {
         "properties": {
           "product_id": {
@@ -2403,6 +2995,33 @@
       },
       "SynchronizationResponse": {
         "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "unknown"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "lag_blocks": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lag Blocks"
+          },
           "confirmation_policy": {
             "type": "string",
             "const": "depth",
@@ -2514,6 +3133,9 @@
           },
           "synchronization": {
             "$ref": "#/components/schemas/SynchronizationResponse"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/RegistrationEvidence"
           }
         },
         "type": "object",
@@ -2522,7 +3144,8 @@
           "is_registered",
           "is_delivered",
           "checkpoint_count",
-          "synchronization"
+          "synchronization",
+          "evidence"
         ],
         "title": "VerificationResponse"
       },
