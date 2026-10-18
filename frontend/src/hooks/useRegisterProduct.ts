@@ -29,11 +29,17 @@ export function useRegisterProduct() {
     onReplaced: ({ replacedTransaction, transaction }) => {
       const context = submission.current;
       if (context) {
-        void saveSubmission(context.productId, context.address, {
-          tx_hash: transaction.hash,
-          operation: "registration",
-          replaces_tx_hash: replacedTransaction.hash,
-        }).catch(() =>
+        void saveSubmission(
+          context.productId,
+          context.address,
+          {
+            tx_hash: transaction.hash,
+            operation: "registration",
+            replaces_tx_hash: replacedTransaction.hash,
+          },
+          activeAddress.current?.toLowerCase() !==
+            context.address.toLowerCase(),
+        ).catch(() =>
           toast.error(
             "Replacement tracking needs attention. Open the product registration panel.",
           ),

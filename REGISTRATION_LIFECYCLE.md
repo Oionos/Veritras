@@ -54,7 +54,7 @@ establish physical authenticity.
 Wallet replacement callbacks submit both hashes. The server requires the same
 validated sender and nonce; a wallet's replacement claim alone is insufficient.
 Canonical, sufficiently confirmed self-transfers with empty calldata are treated
-as cancellations. The old attempt retains its replacement link. There is no
+as cancellations. The old attempt is marked replaced only after the replacement is canonical and sufficiently confirmed; pending candidates do not retire the original. Manual reconciliation can restore an original transaction after a reorganization. Replacement links retain the observed relationship. There is no
 unbounded mempool or historical sender/nonce scan. If a provider has forgotten
 the original transaction and its nonce was never observed, replacement evidence
 requires operator review rather than a guessed association.
@@ -111,4 +111,19 @@ passed. The production-copy Neon rehearsal upgraded `a38f917bd260` to
 zero ownership bindings; its new attempt table is empty. Rehearsal branch
 `br-jolly-band-aojdyv96` expires October 19, 2026 at 18:00 UTC.
 
-Final suite and hosted release results are recorded with the implementation PR.
+Local validation: 235 frontend unit tests passed, with 70.63% statement and
+60.4% branch coverage; 29 Playwright regressions passed. The real browser journey
+passed registration after a draft edit, saved transaction recovery after reload,
+metadata signing and version history, wallet-switch logout and ownership checks.
+Backend regression results and final release references are recorded in
+[PR #21](https://github.com/Oionos/Veritras/pull/21).
+
+Hosted testing acceptance on source `bedbdef` passed with the indexer current and
+zero confirmed-target lag. The additive migration preserved three products, two
+shipments, six checkpoints and two custody transfers. An existing manufacturer's
+registration hash was submitted idempotently and reconciled to `indexed`;
+verification returned canonical `verified` evidence and metadata history. No
+chain transaction or test ETH was spent for this hosted acceptance. The testing
+Vercel deployment `dpl_8M39raUZ3bujQmeD5x4RLFjyLmuF` built successfully. A
+protected-preview browser access request requires separate approval; local real
+browser and hosted API acceptance are complete.
