@@ -961,14 +961,26 @@
     "/health/indexer": {
       "get": {
         "summary": "Health Indexer",
-        "description": "Expose blockchain indexer status and last processed block.",
+        "description": "Cached worker health; a progressing backfill is healthy but not ready.",
         "operationId": "health_indexer_health_indexer_get",
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/IndexerHealthResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndexerHealthResponse"
+                }
               }
             }
           }
@@ -984,7 +996,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/LivenessResponse"
+                }
               }
             }
           }
@@ -1000,7 +1014,19 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
               }
             }
           }
@@ -1010,6 +1036,7 @@
     "/health": {
       "get": {
         "summary": "Health Check",
+        "description": "Compatibility summary of readiness. Does not make a separate RPC call.",
         "operationId": "health_check_health_get",
         "responses": {
           "200": {
@@ -1311,6 +1338,327 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "IndexerHealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "disabled",
+              "not_started",
+              "starting",
+              "catching_up",
+              "current",
+              "degraded",
+              "stopping",
+              "stopped"
+            ],
+            "title": "Status"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "ready": {
+            "type": "boolean",
+            "title": "Ready",
+            "default": false
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "phase": {
+            "type": "string",
+            "title": "Phase",
+            "default": "not_started"
+          },
+          "last_processed_block": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Processed Block"
+          },
+          "chain_head": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chain Head"
+          },
+          "target_head": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Head"
+          },
+          "lag_blocks": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lag Blocks"
+          },
+          "finality_gap_blocks": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finality Gap Blocks"
+          },
+          "last_success_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Success At"
+          },
+          "last_poll_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Poll At"
+          },
+          "last_progress_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Progress At"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "observed_head_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed Head At"
+          },
+          "head_changed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Head Changed At"
+          },
+          "startup_age_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Startup Age Seconds"
+          },
+          "success_age_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Success Age Seconds"
+          },
+          "progress_age_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress Age Seconds"
+          },
+          "head_age_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Head Age Seconds"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "initialization_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initialization Error"
+          },
+          "consecutive_failures": {
+            "type": "integer",
+            "title": "Consecutive Failures",
+            "default": 0
+          },
+          "retry_delay_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry Delay Seconds"
+          },
+          "poll_interval_seconds": {
+            "type": "integer",
+            "title": "Poll Interval Seconds"
+          },
+          "startup_timeout_seconds": {
+            "type": "integer",
+            "title": "Startup Timeout Seconds"
+          },
+          "stale_after_seconds": {
+            "type": "integer",
+            "title": "Stale After Seconds"
+          },
+          "head_stale_after_seconds": {
+            "type": "integer",
+            "title": "Head Stale After Seconds"
+          },
+          "max_lag_blocks": {
+            "type": "integer",
+            "title": "Max Lag Blocks"
+          },
+          "chain_id": {
+            "type": "integer",
+            "title": "Chain Id"
+          },
+          "confirmation_policy": {
+            "type": "string",
+            "const": "depth",
+            "title": "Confirmation Policy",
+            "default": "depth"
+          },
+          "confirmations": {
+            "type": "integer",
+            "title": "Confirmations"
+          },
+          "cursor_storage": {
+            "type": "string",
+            "const": "database",
+            "title": "Cursor Storage",
+            "default": "database"
+          },
+          "last_reorg_ancestor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Reorg Ancestor"
+          },
+          "recovery_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recovery Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "poll_interval_seconds",
+          "startup_timeout_seconds",
+          "stale_after_seconds",
+          "head_stale_after_seconds",
+          "max_lag_blocks",
+          "chain_id",
+          "confirmations"
+        ],
+        "title": "IndexerHealthResponse"
+      },
       "KPIResponse": {
         "properties": {
           "avg_transit_time_hours": {
@@ -1371,6 +1719,41 @@
           "bottleneck_locations"
         ],
         "title": "KPIResponse"
+      },
+      "LivenessResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "alive",
+            "title": "Status",
+            "default": "alive"
+          },
+          "environment": {
+            "type": "string",
+            "title": "Environment"
+          },
+          "chain_id": {
+            "type": "integer",
+            "title": "Chain Id"
+          },
+          "release_commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release Commit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "environment",
+          "chain_id"
+        ],
+        "title": "LivenessResponse"
       },
       "NonceResponse": {
         "properties": {
@@ -1700,6 +2083,58 @@
         "additionalProperties": false,
         "type": "object",
         "title": "ProductUpdate"
+      },
+      "ReadinessResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "not_ready"
+            ],
+            "title": "Status"
+          },
+          "database": {
+            "type": "string",
+            "enum": [
+              "connected",
+              "disconnected",
+              "timed_out"
+            ],
+            "title": "Database"
+          },
+          "environment": {
+            "type": "string",
+            "title": "Environment"
+          },
+          "chain_id": {
+            "type": "integer",
+            "title": "Chain Id"
+          },
+          "release_commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release Commit"
+          },
+          "indexer": {
+            "$ref": "#/components/schemas/IndexerHealthResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "database",
+          "environment",
+          "chain_id",
+          "indexer"
+        ],
+        "title": "ReadinessResponse"
       },
       "ShipmentCreate": {
         "properties": {

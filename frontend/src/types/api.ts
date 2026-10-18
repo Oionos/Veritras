@@ -342,7 +342,7 @@ export interface paths {
         };
         /**
          * Health Indexer
-         * @description Expose blockchain indexer status and last processed block.
+         * @description Cached worker health; a progressing backfill is healthy but not ready.
          */
         get: operations["health_indexer_health_indexer_get"];
         put?: never;
@@ -394,7 +394,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Health Check */
+        /**
+         * Health Check
+         * @description Compatibility summary of readiness. Does not make a separate RPC call.
+         */
         get: operations["health_check_health_get"];
         put?: never;
         post?: never;
@@ -534,6 +537,102 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** IndexerHealthResponse */
+        IndexerHealthResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "disabled" | "not_started" | "starting" | "catching_up" | "current" | "degraded" | "stopping" | "stopped";
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Ready
+             * @default false
+             */
+            ready: boolean;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Phase
+             * @default not_started
+             */
+            phase: string;
+            /** Last Processed Block */
+            last_processed_block?: number | null;
+            /** Chain Head */
+            chain_head?: number | null;
+            /** Target Head */
+            target_head?: number | null;
+            /** Lag Blocks */
+            lag_blocks?: number | null;
+            /** Finality Gap Blocks */
+            finality_gap_blocks?: number | null;
+            /** Last Success At */
+            last_success_at?: string | null;
+            /** Last Poll At */
+            last_poll_at?: string | null;
+            /** Last Progress At */
+            last_progress_at?: string | null;
+            /** Started At */
+            started_at?: string | null;
+            /** Observed Head At */
+            observed_head_at?: string | null;
+            /** Head Changed At */
+            head_changed_at?: string | null;
+            /** Startup Age Seconds */
+            startup_age_seconds?: number | null;
+            /** Success Age Seconds */
+            success_age_seconds?: number | null;
+            /** Progress Age Seconds */
+            progress_age_seconds?: number | null;
+            /** Head Age Seconds */
+            head_age_seconds?: number | null;
+            /** Last Error */
+            last_error?: string | null;
+            /** Initialization Error */
+            initialization_error?: string | null;
+            /**
+             * Consecutive Failures
+             * @default 0
+             */
+            consecutive_failures: number;
+            /** Retry Delay Seconds */
+            retry_delay_seconds?: number | null;
+            /** Poll Interval Seconds */
+            poll_interval_seconds: number;
+            /** Startup Timeout Seconds */
+            startup_timeout_seconds: number;
+            /** Stale After Seconds */
+            stale_after_seconds: number;
+            /** Head Stale After Seconds */
+            head_stale_after_seconds: number;
+            /** Max Lag Blocks */
+            max_lag_blocks: number;
+            /** Chain Id */
+            chain_id: number;
+            /**
+             * Confirmation Policy
+             * @default depth
+             * @constant
+             */
+            confirmation_policy: "depth";
+            /** Confirmations */
+            confirmations: number;
+            /**
+             * Cursor Storage
+             * @default database
+             * @constant
+             */
+            cursor_storage: "database";
+            /** Last Reorg Ancestor */
+            last_reorg_ancestor?: number | null;
+            /** Recovery Reason */
+            recovery_reason?: string | null;
+        };
         /** KPIResponse */
         KPIResponse: {
             /** Avg Transit Time Hours */
@@ -552,6 +651,21 @@ export interface components {
             bottleneck_locations: {
                 [key: string]: unknown;
             }[];
+        };
+        /** LivenessResponse */
+        LivenessResponse: {
+            /**
+             * Status
+             * @default alive
+             * @constant
+             */
+            status: "alive";
+            /** Environment */
+            environment: string;
+            /** Chain Id */
+            chain_id: number;
+            /** Release Commit */
+            release_commit?: string | null;
         };
         /** NonceResponse */
         NonceResponse: {
@@ -646,6 +760,26 @@ export interface components {
             description?: string | null;
             /** Metadata Uri */
             metadata_uri?: string | null;
+        };
+        /** ReadinessResponse */
+        ReadinessResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ready" | "not_ready";
+            /**
+             * Database
+             * @enum {string}
+             */
+            database: "connected" | "disconnected" | "timed_out";
+            /** Environment */
+            environment: string;
+            /** Chain Id */
+            chain_id: number;
+            /** Release Commit */
+            release_commit?: string | null;
+            indexer: components["schemas"]["IndexerHealthResponse"];
         };
         /** ShipmentCreate */
         ShipmentCreate: {
@@ -1398,7 +1532,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["IndexerHealthResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndexerHealthResponse"];
                 };
             };
         };
@@ -1418,7 +1561,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["LivenessResponse"];
                 };
             };
         };
@@ -1438,7 +1581,16 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["ReadinessResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessResponse"];
                 };
             };
         };

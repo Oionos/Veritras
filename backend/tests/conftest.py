@@ -10,6 +10,7 @@ from sqlalchemy.pool import StaticPool
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 # Prevent live RPC connections during tests.
 os.environ["SEPOLIA_RPC_URL"] = ""
+os.environ["INDEXER_ENABLED"] = "false"
 os.environ["ENVIRONMENT"] = "development"
 os.environ["CHAIN_ID"] = "11155111"
 os.environ["PRODUCT_REGISTRY_CONTRACT"] = "0x" + "1" * 40

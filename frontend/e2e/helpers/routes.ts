@@ -53,6 +53,12 @@ export async function setupRoutes(page: Page): Promise<void> {
     route => route.fulfill({ status: 200, contentType: 'text/event-stream', body: '' })
   )
 
+  // Cached synchronization status is mocked with the business fixtures.
+  await page.route(
+    url => apiPath(url, '/health/ready'),
+    route => route.fulfill({ json: { status: 'ready', database: 'connected', indexer: { status: 'current' } } })
+  )
+
   // Analytics endpoints
   await page.route(
     url => apiPath(url, '/analytics/kpis'),
