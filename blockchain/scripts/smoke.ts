@@ -46,7 +46,7 @@ async function main() {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Anonymous write' }),
   })).status, 401);
   assert.equal((await api(`/products/${draft.product_id}/verify`)).is_registered, false);
-  const shipment = await api('/shipments/', json({ product_id: draft.product_id, origin: 'Test factory', destination: 'Test depot' }));
+  const shipment = await api('/shipments/', json({ product_id: draft.product_id, origin: 'Test factory', destination: 'Test depot', expected_arrival_at: new Date(Date.now()+86400000).toISOString() }));
   assert.equal((await fetch(`${base}/shipments/`, json({ product_id: draft.product_id, origin: 'Other', destination: 'Other' }))).status, 409);
   assert.equal(shipment.on_chain_product_id, draft.on_chain_product_id);
   assert.equal(shipment.tracker_address, manifest.contracts.ShipmentTracker.toLowerCase());
@@ -99,6 +99,23 @@ async function main() {
   assert.equal(rows.items.filter((p: { product_id: string }) => [draft.product_id, id].includes(p.product_id)).length, 1, 'Registration must reconcile the same draft');
   const shipments = await api('/shipments/?limit=100');
   assert.equal(shipments.items.find((s: { shipment_id: string }) => s.shipment_id === shipment.shipment_id).status, '3');
+  const cohort = '?origin=Test%20factory&destination=Test%20depot';
+  const metrics = await api('/analytics/kpis'+cohort);
+  const selected = shipments.items.filter((s: { origin: string; destination: string }) => s.origin === 'Test factory' && s.destination === 'Test depot');
+  assert.equal(metrics.total_shipments, selected.length);
+  assert.equal(metrics.delivered_shipments, selected.length);
+  assert.equal(metrics.transit_sample_size, selected.length);
+  assert.equal(metrics.sla_sample_size, selected.filter((s: {expected_arrival_at: string | null; expected_arrival_recorded_at: string | null; departed_at: string | null}) => s.expected_arrival_at && s.expected_arrival_recorded_at && s.departed_at && new Date(s.expected_arrival_recorded_at) <= new Date(s.departed_at)).length);
+  assert.equal(metrics.on_time_rate_percent, 100);
+  const lifecycle = selected.find((s: { shipment_id: string }) => s.shipment_id === shipment.shipment_id);
+  assert.ok(lifecycle.departed_at && lifecycle.delivered_at);
+  assert.equal((await fetch(`${base}/shipments/${shipment.shipment_id}`, { ...json({ expected_arrival_at: null }), method: 'PUT' })).status, 409);
+  const csv = await (await fetch(`${base}/analytics/export?format=csv&origin=Test%20factory&destination=Test%20depot`)).text();
+  assert.equal(csv.trim().split('\n').length-1, metrics.total_shipments);
+  assert.ok(csv.includes('departed_at_utc') && csv.includes(shipment.shipment_id));
+  const eventCsv = await (await fetch(`${base}/analytics/export?format=csv&report=events&origin=Test%20factory&destination=Test%20depot`)).text();
+  assert.equal(eventCsv.trim().split('\n').length-1, metrics.event_count);
+  assert.ok(eventCsv.includes(registration.hash.toLowerCase()));
   console.log('PASS: isolated API + PostgreSQL + wallet login + registration + custody + delivery + receipt verification');
 }
 

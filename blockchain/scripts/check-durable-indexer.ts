@@ -21,7 +21,7 @@ async function main() {
   const { message } = await api('/auth/challenge', post({ address: owner.address }));
   const { access_token } = await api('/auth/verify', post({ message, signature: await owner.signMessage(message) }));
   const draft = await api('/products/', post({ name: 'Durable recovery regression' }, access_token));
-  const shipment = await api('/shipments/', post({ product_id: draft.product_id, origin: 'Recovery factory', destination: 'Recovery depot', notes: 'Preserve planning' }, access_token));
+  const shipment = await api('/shipments/', post({ product_id: draft.product_id, origin: 'Recovery factory', destination: 'Recovery depot', notes: 'Preserve planning', expected_arrival_at: new Date(Date.now()+86400000).toISOString() }, access_token));
   const id = ethers.encodeBytes32String(draft.product_id);
   const registry = await ethers.getContractAt('ProductRegistry', manifest.contracts.ProductRegistry);
   const tracker = await ethers.getContractAt('ShipmentTracker', manifest.contracts.ShipmentTracker);
@@ -42,6 +42,10 @@ async function main() {
   await (await tracker.connect(handler).recordCheckpoint(id, 'Orphan delivery', 3, '')).wait();
   await wait(async () => (await api(`/products/${draft.product_id}/verify`)).is_delivered);
   assert.equal((await api(`/products/${draft.product_id}`)).transfers.length, 1);
+  const deliveredMetrics = await api('/analytics/kpis?origin=Recovery%20factory&destination=Recovery%20depot');
+  assert.equal(deliveredMetrics.delivered_shipments, 1);
+  assert.equal(deliveredMetrics.transit_sample_size, 1);
+  assert.equal(deliveredMetrics.sla_sample_size, 1);
   const oldHead = await ethers.provider.getBlockNumber();
   assert.equal(await network.provider.send('evm_revert', [snapshot]), true);
   // A shorter RPC head is treated as stale, not permission to erase history.
@@ -63,6 +67,14 @@ async function main() {
   assert.equal(current.status, '1');
   assert.equal(current.current_handler.toLowerCase(), owner.address.toLowerCase());
   assert.equal(current.notes, 'Preserve planning');
+  assert.ok(current.departed_at);
+  assert.equal(current.delivered_at, null);
+  assert.ok(current.expected_arrival_at);
+  const metrics = await api('/analytics/kpis?origin=Recovery%20factory&destination=Recovery%20depot');
+  assert.equal(metrics.delivered_shipments, 0);
+  assert.equal(metrics.transit_sample_size, 0);
+  assert.equal(metrics.sla_sample_size, 0);
+  assert.equal(metrics.on_time_rate_percent, null);
   console.log(`PASS: real chain reorganization restored metadata, custody, checkpoints and shipment; ${draft.product_id}`);
 }
 main().catch(error => { console.error(error.message); process.exitCode = 1; });

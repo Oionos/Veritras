@@ -209,4 +209,11 @@ describe('useApi hooks', () => {
       expect(body).not.toHaveProperty('manufacturer')
     })
   })
+  it('requests a recent product page with explicit descending creation order', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve(JSON.stringify({ items: [], total: 0 })) } as Response)
+    const { result } = renderHook(() => useProducts(true), { wrapper })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(globalThis.fetch).toHaveBeenCalledWith(expect.stringContaining('/products?sort_by=created_at&sort_order=desc&limit=5'), expect.any(Object))
+  })
+
 })

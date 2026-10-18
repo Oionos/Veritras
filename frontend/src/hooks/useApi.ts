@@ -9,7 +9,7 @@ const API_URL = appEnvironment.apiUrl
 export async function fetchApi(endpoint: string, options?: RequestInit) {
   const token = getAuthToken()
   const headers: Record<string, string> = {
-    ...(options?.headers as Record<string, string> || {}),
+    ...((options?.headers as Record<string, string>) || {}),
   }
 
   if (token) {
@@ -27,7 +27,9 @@ export async function fetchApi(endpoint: string, options?: RequestInit) {
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => response.statusText)
-    throw new Error(`API Error (${response.status}): ${errorText || response.statusText}`)
+    throw new Error(
+      `API Error (${response.status}): ${errorText || response.statusText}`
+    )
   }
   // Handle empty responses gracefully
   const text = await response.text()
@@ -41,10 +43,15 @@ export async function fetchApi(endpoint: string, options?: RequestInit) {
 
 // ─── Existing hooks (unchanged) ───────────────────────────────────────────────
 
-export function useProducts() {
+export function useProducts(recent = false) {
   return useQuery({
-    queryKey: ['products'],
-    queryFn: () => fetchApi('/products'),
+    queryKey: recent ? ['products', 'recent'] : ['products'],
+    queryFn: () =>
+      fetchApi(
+        recent
+          ? '/products?sort_by=created_at&sort_order=desc&limit=5'
+          : '/products'
+      ),
   })
 }
 
@@ -72,24 +79,45 @@ export function useProductTransfers(id: string) {
   })
 }
 
-export function useKPIData() {
+export interface AnalyticsFilterInput {
+  start_date?: string
+  end_date?: string
+  origin?: string
+  destination?: string
+}
+
+export function analyticsQuery(filters?: AnalyticsFilterInput) {
+  const params = new URLSearchParams()
+  Object.entries(filters ?? {}).forEach(([key, value]) => {
+    if (value) params.set(key, value)
+  })
+  return params.size ? `?${params}` : ''
+}
+
+export function useKPIData(filters?: AnalyticsFilterInput) {
   return useQuery({
-    queryKey: ['kpis'],
-    queryFn: () => fetchApi('/analytics/kpis'),
+    queryKey: ['kpis', filters],
+    queryFn: () =>
+      fetchApi(`/analytics/kpis${analyticsQuery(filters)}`) as Promise<
+        components['schemas']['KPIResponse']
+      >,
   })
 }
 
-export function useAnomalies() {
+export function useAnomalies(filters?: AnalyticsFilterInput) {
   return useQuery({
-    queryKey: ['anomalies'],
-    queryFn: () => fetchApi('/analytics/anomalies'),
+    queryKey: ['anomalies', filters],
+    queryFn: () => fetchApi(`/analytics/anomalies${analyticsQuery(filters)}`),
   })
 }
 
 export function useBottlenecks(minDwellHours?: number) {
   return useQuery({
     queryKey: ['bottlenecks', minDwellHours],
-    queryFn: () => fetchApi(`/analytics/bottlenecks${minDwellHours ? `?min_dwell_hours=${minDwellHours}` : ''}`),
+    queryFn: () =>
+      fetchApi(
+        `/analytics/bottlenecks${minDwellHours ? `?min_dwell_hours=${minDwellHours}` : ''}`
+      ),
   })
 }
 
@@ -103,19 +131,34 @@ export function useDailyVolume() {
 export function useVerifyProduct(id: string) {
   return useQuery({
     queryKey: ['verify', id],
-    queryFn: () => fetchApi(`/products/${id}/verify`) as Promise<components['schemas']['VerificationResponse']>,
+    queryFn: () =>
+      fetchApi(`/products/${id}/verify`) as Promise<
+        components['schemas']['VerificationResponse']
+      >,
     enabled: !!id,
     refetchInterval: 15_000,
     refetchIntervalInBackground: false,
   })
 }
 
-export async function exportAnalytics(format: 'csv' | 'pdf', startDate?: string, endDate?: string) {
+export async function exportAnalytics(
+  format: 'csv' | 'pdf',
+  startDate?: string,
+  endDate?: string,
+  filters?: AnalyticsFilterInput,
+  report: 'shipments' | 'events' = 'shipments'
+) {
   const params = new URLSearchParams({ format })
   if (startDate) params.append('start_date', startDate)
   if (endDate) params.append('end_date', endDate)
+  Object.entries(filters ?? {}).forEach(([key, value]) => {
+    if (value) params.set(key, value)
+  })
+  params.set('report', report)
   const response = await fetch(`${API_URL}/analytics/export?${params}`, {
-    headers: getAuthToken() ? { Authorization: `Bearer ${getAuthToken()}` } : {},
+    headers: getAuthToken()
+      ? { Authorization: `Bearer ${getAuthToken()}` }
+      : {},
   })
   if (response.status === 401) {
     clearAuthToken()
@@ -125,7 +168,7 @@ export async function exportAnalytics(format: 'csv' | 'pdf', startDate?: string,
   const url = window.URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `veritras-export.${format}`
+  a.download = `veritras-${report}.${format}`
   a.click()
   window.URL.revokeObjectURL(url)
 }
@@ -137,7 +180,13 @@ interface PaginatedResponse<T> {
   total: number
 }
 
-export function useProductsPaginated(page = 1, limit = 10, search?: string, sortBy?: string, sortOrder?: 'asc' | 'desc') {
+export function useProductsPaginated(
+  page = 1,
+  limit = 10,
+  search?: string,
+  sortBy?: string,
+  sortOrder?: 'asc' | 'desc'
+) {
   const skip = (page - 1) * limit
   const params = new URLSearchParams()
   params.set('skip', String(skip))
@@ -151,7 +200,14 @@ export function useProductsPaginated(page = 1, limit = 10, search?: string, sort
   })
 }
 
-export function useShipments(page = 1, limit = 10, status?: string, search?: string, sortBy?: string, sortOrder?: 'asc' | 'desc') {
+export function useShipments(
+  page = 1,
+  limit = 10,
+  status?: string,
+  search?: string,
+  sortBy?: string,
+  sortOrder?: 'asc' | 'desc'
+) {
   const skip = (page - 1) * limit
   const params = new URLSearchParams()
   params.set('skip', String(skip))
@@ -176,7 +232,10 @@ export type ProductMutationInput = components['schemas']['ProductCreate']
  * @default fields as required TypeScript properties). Callers never pass status
  * on creation — the backend defaults it — so we Omit it here.
  */
-export type ShipmentMutationInput = Omit<components['schemas']['ShipmentCreate'], 'status'>
+export type ShipmentMutationInput = Omit<
+  components['schemas']['ShipmentCreate'],
+  'status'
+>
 
 export function useCreateProduct() {
   const queryClient = useQueryClient()
@@ -197,7 +256,13 @@ export function useCreateProduct() {
 export function useUpdateProduct() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ product_id, data }: { product_id: string; data: components['schemas']['ProductUpdate'] }) => {
+    mutationFn: async ({
+      product_id,
+      data,
+    }: {
+      product_id: string
+      data: components['schemas']['ProductUpdate']
+    }) => {
       return fetchApi(`/products/${product_id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -207,8 +272,12 @@ export function useUpdateProduct() {
     onSuccess: async (_data, variables) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['products'] }),
-        queryClient.invalidateQueries({ queryKey: ['product', variables.product_id] }),
-        queryClient.invalidateQueries({ queryKey: ['verify', variables.product_id] }),
+        queryClient.invalidateQueries({
+          queryKey: ['product', variables.product_id],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ['verify', variables.product_id],
+        }),
       ])
     },
   })
@@ -225,7 +294,15 @@ export function useCreateShipment() {
       })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['shipments'] })
+      for (const key of [
+        'shipments',
+        'kpis',
+        'anomalies',
+        'bottlenecks',
+        'daily-volume',
+      ]) {
+        void queryClient.invalidateQueries({ queryKey: [key] })
+      }
     },
   })
 }
@@ -233,7 +310,13 @@ export function useCreateShipment() {
 export function useUpdateShipment() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ shipment_id, data }: { shipment_id: string; data: components['schemas']['ShipmentUpdate'] }) => {
+    mutationFn: async ({
+      shipment_id,
+      data,
+    }: {
+      shipment_id: string
+      data: components['schemas']['ShipmentUpdate']
+    }) => {
       return fetchApi(`/shipments/${shipment_id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -241,7 +324,15 @@ export function useUpdateShipment() {
       })
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['shipments'] })
+      for (const key of [
+        'shipments',
+        'kpis',
+        'anomalies',
+        'bottlenecks',
+        'daily-volume',
+      ]) {
+        void queryClient.invalidateQueries({ queryKey: [key] })
+      }
     },
   })
 }

@@ -94,12 +94,12 @@ export default function Shipments() {
 
   // ── Selected shipment for on-chain actions ────────────────────────────────
   const [selectedShipment, setSelectedShipment] = useState<Shipment | null>(
-    null,
+    null
   )
   const permissions = useShipmentPermissions(
     hasCurrentIdentity(selectedShipment)
       ? selectedShipment.on_chain_product_id
-      : undefined,
+      : undefined
   )
 
   // ── Blockchain action panel state ─────────────────────────────────────────
@@ -162,7 +162,7 @@ export default function Shipments() {
     page,
     limit,
     statusFilter,
-    debouncedSearch || undefined,
+    debouncedSearch || undefined
   )
 
   const createShipment = useCreateShipment()
@@ -187,6 +187,7 @@ export default function Shipments() {
       origin: '',
       destination: '',
       notes: '',
+      expected_arrival_at: '',
     },
   })
 
@@ -201,7 +202,13 @@ export default function Shipments() {
   const openAddModal = () => {
     if (!auth.isAuthenticated) return
     setEditingShipment(null)
-    reset({ product_id: '', origin: '', destination: '', notes: '' })
+    reset({
+      product_id: '',
+      origin: '',
+      destination: '',
+      notes: '',
+      expected_arrival_at: '',
+    })
     setModalOpen(true)
   }
 
@@ -214,6 +221,9 @@ export default function Shipments() {
       origin: shipment.origin,
       destination: shipment.destination,
       notes: shipment.notes ?? '',
+      expected_arrival_at: shipment.expected_arrival_at
+        ? shipment.expected_arrival_at.slice(0, 16)
+        : '',
     })
     setModalOpen(true)
   }
@@ -251,7 +261,7 @@ export default function Shipments() {
       selectedShipment.on_chain_product_id,
       cpLocation.trim(),
       cpStatus,
-      cpNotes.trim(),
+      cpNotes.trim()
     )
   }
 
@@ -268,14 +278,22 @@ export default function Shipments() {
   const onSubmit = async (formData: ShipmentFormData) => {
     if (!auth.isAuthenticated) return
     try {
+      const payload = {
+        ...formData,
+        expected_arrival_at: formData.expected_arrival_at
+          ? `${formData.expected_arrival_at}:00Z`
+          : null,
+      }
       if (editingShipment) {
-        const { product_id, ...updateData } = formData
+        const { product_id, ...updateData } = payload
+        if (editingShipment.departed_at || editingShipment.delivered_at)
+          Reflect.deleteProperty(updateData, 'expected_arrival_at')
         await updateShipment.mutateAsync({
           shipment_id: editingShipment.shipment_id,
           data: updateData,
         })
       } else {
-        await createShipment.mutateAsync(formData)
+        await createShipment.mutateAsync(payload)
       }
       setModalOpen(false)
       reset()
@@ -627,7 +645,7 @@ export default function Shipments() {
                           value={cpStatus}
                           onChange={(e) =>
                             setCpStatus(
-                              Number(e.target.value) as ShipmentStatus,
+                              Number(e.target.value) as ShipmentStatus
                             )
                           }
                           disabled={cpPending || cpConfirming}
@@ -871,6 +889,28 @@ export default function Shipments() {
             </div>
           </div>
 
+          <div className="space-y-2">
+            <label
+              htmlFor="expected-arrival"
+              className="block text-sm text-muted"
+            >
+              Expected arrival (UTC, optional)
+            </label>
+            <input
+              id="expected-arrival"
+              type="datetime-local"
+              {...register('expected_arrival_at')}
+              disabled={
+                !!(
+                  editingShipment?.departed_at || editingShipment?.delivered_at
+                )
+              }
+              className="w-full rounded-lg border border-white/10 bg-black/20 p-3 text-text"
+            />
+            <p className="text-xs text-muted">
+              Leave blank if unknown. The SLA is locked after indexed departure.
+            </p>
+          </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-text">
               Notes <span className="text-muted">(optional)</span>
