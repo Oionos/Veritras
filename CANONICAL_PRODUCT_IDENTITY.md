@@ -120,3 +120,30 @@ PostgreSQL and SQLite. The isolated real API/PostgreSQL/Hardhat journey verifies
 one product across registration, custody and delivery, nullable draft registration
 time and rejection of a second shipment. Deployment evidence is recorded in the
 implementation PR and release status below.
+
+### Accepted 18 October 2026 (Asia/Manila)
+
+- Release PR: [#19](https://github.com/Oionos/Veritras/pull/19). The PR records the
+  final tested source, CI results and main deployment references.
+- Backend: 280 passed, 3 intentional dialect-specific skips. Frontend: 215 passed,
+  coverage thresholds passed; 23 Playwright and 40 contract tests passed.
+- Real local chain round trip, second-shipment rejection, reorganization recovery,
+  API restart and browser wallet ownership checks passed.
+- Source-guarded migration rehearsed against matching PostgreSQL copies and Neon
+  production clone `br-flat-brook-aoh0f2p1` (expires 19 October). No records removed.
+- Testing restore branch `br-orange-brook-aonchlcn` retains the pre-release schema
+  and data until 25 October. Testing schema is `a38f917bd260`.
+- Hosted testing source `1327b91f53cbf7a7ac2b79d70772440bc692b95b` passed at
+  Render `dep-dba6h4jrjlhs73c9ufd0` and Vercel
+  `dpl_EAMrRbxw7Xc46TRaXidAWCvXtGrt`. Both existing indexed identities and
+  confirmed registration times survived migration.
+- Protected preview browser verified `PROD-31CBA002` as delivered with three
+  checkpoints, zero browser errors and zero production API requests. A separate
+  signed draft/shipment check verified stored scope, null registration time and
+  HTTP 409 for a second shipment. No chain transaction or real ETH was needed.
+- Confirmed Sepolia reconciliation on the migrated isolated copy reported no
+  conflicts or changes, for both dry run and explicit apply.
+- Production's unknown legacy product stays unowned and unregistered. Production
+  indexing/backfill remains disabled pending its separate reviewed enablement.
+- `npm run lint` remains blocked by the repository's missing ESLint configuration;
+  TypeScript, build, unit, coverage, browser and integration gates were run.
