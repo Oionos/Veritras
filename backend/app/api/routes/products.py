@@ -21,7 +21,12 @@ from app.schemas.product import (
 )
 from app.schemas.shipment import CheckpointResponse, CustodyTransferResponse
 from app.services.events import broadcaster
-from app.services.registration import evidence, reconcile, observe
+from app.services.registration import (
+    evidence,
+    reconcile,
+    observe,
+    confirmed_replacement,
+)
 from app.models.registration import RegistrationAttempt
 from app.models.chain import ChainEvent
 from app.schemas.product import (
@@ -373,7 +378,8 @@ def submit_registration(
             or previous["nonce"] != replacement["nonce"]
             or (
                 replacement["status"] == "failed"
-                and replacement["reason"] != "transaction_cancelled"
+                and replacement["reason"]
+                not in {"transaction_cancelled", "transaction_reverted"}
             )
         ):
             raise HTTPException(
@@ -381,11 +387,14 @@ def submit_registration(
                 "Replacement must match the original sender, nonce and product operation",
             )
         attempt.replaces_tx_hash = old.tx_hash
-        old.replaced_by, old.status, old.reason = (
-            tx_hash,
-            "replaced",
-            "transaction_replaced",
-        )
+        old.nonce = previous["nonce"]
+        attempt.nonce = replacement["nonce"]
+        if confirmed_replacement(replacement):
+            old.replaced_by, old.status, old.reason = (
+                tx_hash,
+                "replaced",
+                "transaction_replaced",
+            )
     db.add(attempt)
     try:
         db.commit()

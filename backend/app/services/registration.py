@@ -206,16 +206,46 @@ def indexed_observation(db, product, observation, tx_hash, operation):
     return observation
 
 
+def confirmed_replacement(observation):
+    return observation["status"] in {"indexing", "indexed"} or (
+        observation["status"] == "failed"
+        and observation["reason"] in {"transaction_reverted", "transaction_cancelled"}
+    )
+
+
 def reconcile(db, product, attempt):
-    if attempt.replaced_by:
-        return
     try:
+        if attempt.replaced_by:
+            replacement = (
+                db.query(RegistrationAttempt)
+                .filter_by(product_id=product.product_id, tx_hash=attempt.replaced_by)
+                .one()
+            )
+            if confirmed_replacement(observe(product, replacement)):
+                attempt.status, attempt.reason = "replaced", "transaction_replaced"
+                attempt.checked_at = datetime.now(timezone.utc)
+                return
         observation = observe(product, attempt)
         observation = indexed_observation(
             db, product, observation, attempt.tx_hash, attempt.operation
         )
+        if confirmed_replacement(observation) and attempt.replaced_by:
+            # A reorganization can restore the original transaction.
+            attempt.replaced_by = None
+        if attempt.replaces_tx_hash and confirmed_replacement(observation):
+            original = (
+                db.query(RegistrationAttempt)
+                .filter_by(
+                    product_id=product.product_id, tx_hash=attempt.replaces_tx_hash
+                )
+                .one()
+            )
+            original.replaced_by, original.status, original.reason = (
+                attempt.tx_hash,
+                "replaced",
+                "transaction_replaced",
+            )
     except Exception:
-        # Keep the last transaction state, exposing loss of evidence independently.
         attempt.reason = "evidence_unavailable"
         attempt.checked_at = datetime.now(timezone.utc)
         return

@@ -235,7 +235,7 @@ export default function RegistrationPanel({ product }: { product: Product }) {
               Replaced by <TransactionLink hash={attempt.replaced_by} />
             </p>
           )}
-          {owner && !attempt.replaced_by && (
+          {owner && (
             <Button
               variant="secondary"
               onClick={() => void reconcile(attempt.tx_hash)}

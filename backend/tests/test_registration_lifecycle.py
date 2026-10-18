@@ -364,3 +364,42 @@ def test_registration_snapshot_survives_later_metadata_updates(chain, db_session
     registration.reconcile(db_session, product, attempt)
     assert attempt.status == "indexing"
     assert attempt.reason == "awaiting_indexer"
+
+
+def test_pending_replacement_does_not_retire_original_until_confirmed(
+    chain, client_fixture, db_session
+):
+    product, attempt, w3, tx, receipt, *_ = chain
+    w3.eth.get_transaction_receipt.side_effect = lambda h: (
+        (_ for _ in ()).throw(TransactionNotFound("pending")) if h == OTHER else receipt
+    )
+    path = f"/products/{product.product_id}/registration"
+    response = client_fixture.post(
+        path, json={"tx_hash": OTHER, "replaces_tx_hash": HASH}
+    )
+    assert response.status_code == 200
+    db_session.refresh(attempt)
+    assert attempt.status == "submitted" and attempt.replaced_by is None
+    w3.eth.get_transaction_receipt.side_effect = None
+    client_fixture.post(path + "/reconcile", params={"tx_hash": OTHER})
+    db_session.refresh(attempt)
+    assert attempt.status == "replaced" and attempt.replaced_by == OTHER
+
+
+def test_reorganization_can_restore_original_after_replacement(
+    chain, client_fixture, db_session
+):
+    product, attempt, w3, tx, receipt, *_ = chain
+    path = f"/products/{product.product_id}/registration"
+    assert (
+        client_fixture.post(
+            path, json={"tx_hash": OTHER, "replaces_tx_hash": HASH}
+        ).status_code
+        == 200
+    )
+    w3.eth.get_transaction_receipt.side_effect = lambda h: (
+        (_ for _ in ()).throw(TransactionNotFound("orphan")) if h == OTHER else receipt
+    )
+    result = client_fixture.post(path + "/reconcile", params={"tx_hash": HASH})
+    assert result.json()["replaced_by"] is None
+    assert result.json()["status"] == "indexing"
