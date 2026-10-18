@@ -79,7 +79,7 @@ async def create_shipment(
         product_id=shipment_in.product_id,
         origin=shipment_in.origin,
         destination=shipment_in.destination,
-        status="0",
+        status=product.indexed_state.status if product.indexed_state else "0",
         notes=shipment_in.notes,
     )
     db.add(shipment)

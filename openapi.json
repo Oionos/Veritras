@@ -387,9 +387,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Verify Product Products  Product Id  Verify Get"
+                  "$ref": "#/components/schemas/VerificationResponse"
                 }
               }
             }
@@ -1725,6 +1723,17 @@
             ],
             "title": "Notes"
           },
+          "current_handler": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Handler"
+          },
           "id": {
             "type": "integer",
             "title": "Id"
@@ -1834,6 +1843,59 @@
         "type": "object",
         "title": "ShipmentUpdate"
       },
+      "SynchronizationResponse": {
+        "properties": {
+          "confirmation_policy": {
+            "type": "string",
+            "const": "depth",
+            "title": "Confirmation Policy",
+            "default": "depth"
+          },
+          "confirmations": {
+            "type": "integer",
+            "title": "Confirmations"
+          },
+          "cursor_storage": {
+            "type": "string",
+            "const": "database",
+            "title": "Cursor Storage",
+            "default": "database"
+          },
+          "indexer_enabled": {
+            "type": "boolean",
+            "title": "Indexer Enabled"
+          },
+          "indexed_block": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Indexed Block"
+          },
+          "last_successful_sync": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Successful Sync"
+          }
+        },
+        "type": "object",
+        "required": [
+          "confirmations",
+          "indexer_enabled"
+        ],
+        "title": "SynchronizationResponse"
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -1873,6 +1935,38 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VerificationResponse": {
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "title": "Product Id"
+          },
+          "is_registered": {
+            "type": "boolean",
+            "title": "Is Registered"
+          },
+          "is_delivered": {
+            "type": "boolean",
+            "title": "Is Delivered"
+          },
+          "checkpoint_count": {
+            "type": "integer",
+            "title": "Checkpoint Count"
+          },
+          "synchronization": {
+            "$ref": "#/components/schemas/SynchronizationResponse"
+          }
+        },
+        "type": "object",
+        "required": [
+          "product_id",
+          "is_registered",
+          "is_delivered",
+          "checkpoint_count",
+          "synchronization"
+        ],
+        "title": "VerificationResponse"
       },
       "VerifyRequest": {
         "properties": {

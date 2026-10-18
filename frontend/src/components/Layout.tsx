@@ -7,6 +7,7 @@ import LoadingSpinner from './ui/LoadingSpinner'
 import ConnectAndAuth from './ConnectAndAuth'
 import BrandLogo from './BrandLogo'
 import { appEnvironment } from '@/config/runtime'
+import { useChainEvents } from '@/hooks/useSSE'
 
 const navItems = [
   { to: '/', label: 'Dashboard' },
@@ -17,6 +18,7 @@ const navItems = [
 ]
 
 export default function Layout() {
+  useChainEvents()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
 

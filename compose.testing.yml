@@ -59,7 +59,7 @@ services:
       CHAIN_ID: "31337"
       INDEXER_ENABLED: "true"
       INDEXER_POLL_INTERVAL: "2"
-      INDEXER_STATE_PATH: /testing-state/indexer_state.json
+      INDEXER_CONFIRMATIONS: "0"
       DEPLOYMENT_MANIFEST: /testing-config/deployment.json
       NO_PROXY: localhost,127.0.0.1,postgres,backend,blockchain,frontend
       no_proxy: localhost,127.0.0.1,postgres,backend,blockchain,frontend

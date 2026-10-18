@@ -41,3 +41,7 @@ services:
         value: "true"
       - key: INDEXER_POLL_INTERVAL
         value: "30"
+      - key: INDEXER_CONFIRMATIONS
+        value: "12"
+      - key: INDEXER_MAX_REORG_DEPTH
+        value: "2048"

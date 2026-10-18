@@ -60,8 +60,8 @@ Vercel Deployment Protection remains enabled. Team members can open previews thr
 - Check the browser's API requests use `veritras-api-testing.onrender.com` and contract actions use the testing addresses above.
 - Confirm the production API remains healthy after testing. Do not seed testing data through the production endpoint.
 
-The current file-based indexer cursor is ephemeral on Render's free filesystem. A restart replays from the testing contracts' deployment blocks. Migration `c72b53d91e04` adds nullable unique source-event identities to checkpoints and custody transfers, so newly indexed logs are inserted once across replays and overlapping deploys. Identity includes chain, emitter, transaction, and log index; distinct logs from one transaction remain distinct. Legacy rows are preserved without inferring their event identity or deleting duplicates.
+The durable indexer uses a database cursor, event journal and canonical block anchors. Migration `f04d9c21a873` follows the earlier replay-identity migration and preserves existing records. New history rows remain identified by chain, emitter, transaction and log index; distinct logs in one transaction are preserved. Reorganizations retain orphaned journal occurrences and rebuild affected canonical projections transactionally.
 
-Durable cursor/event-journal work and reorganization recovery remain planned. Keep the testing contract history small. Production indexing stays disabled until that work is released.
+See [DURABLE_INDEXING.md](DURABLE_INDEXING.md) for the confirmation policy, legacy attribution, rollout and recovery procedure. Production indexing remains explicitly disabled until its identity/history reconciliation and enablement checks are complete. Free testing compute can still sleep; durable state does not imply continuous indexing.
 
 Do not reset `testing` to `main` with a force push as a routine workflow. Merge current `main` into `testing` to keep it updated, then resolve conflicts explicitly.

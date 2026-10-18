@@ -3,9 +3,7 @@ import { motion } from 'framer-motion'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import PremiumHero from '@/components/PremiumHero'
 import { useKPIData, useProducts, useDailyVolume } from '@/hooks/useApi'
-import { useAnalyticsEvents } from '@/hooks/useSSE'
 import { formatDate } from '@/utils/formatters'
-import { useQueryClient } from '@tanstack/react-query'
 import {
   Package,
   Truck,
@@ -74,13 +72,7 @@ export default function Dashboard() {
   const { data: kpiData, isLoading: kpiLoading, error: kpiError } = useKPIData()
   const { data: productsData, isLoading: productsLoading } = useProducts()
   const { data: volumeData, isLoading: volumeLoading } = useDailyVolume()
-  const queryClient = useQueryClient()
 
-  useAnalyticsEvents((_type) => {
-    queryClient.invalidateQueries({ queryKey: ['kpis'] })
-    queryClient.invalidateQueries({ queryKey: ['products'] })
-    queryClient.invalidateQueries({ queryKey: ['daily-volume'] })
-  })
 
   const chartData = useMemo(() => {
     if (volumeData?.items && volumeData.items.length > 0) {

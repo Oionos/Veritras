@@ -22,6 +22,10 @@ def verify_registration(product) -> bool:
         return False
     if receipt["blockNumber"] != product.block_number:
         return False
+    if w3.eth.block_number - receipt["blockNumber"] < settings.indexer_confirmations:
+        return False
+    if bytes(w3.eth.get_block(receipt["blockNumber"])["hash"]) != bytes(receipt["blockHash"]):
+        return False
     try:
         canonical_id = canonical_product_id(product.product_id)
     except ValueError:

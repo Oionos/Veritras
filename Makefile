@@ -22,3 +22,7 @@ testing-down:
 # Destructive only to this explicitly named disposable testing project.
 testing-reset:
 	$(TEST_COMPOSE) down --volumes
+
+# Reorg regression only: refuses hosted APIs and non-Hardhat chains.
+testing-indexer-check:
+	$(TEST_COMPOSE) --profile checks run --no-deps --rm smoke npx hardhat run scripts/check-durable-indexer.ts --network localhost

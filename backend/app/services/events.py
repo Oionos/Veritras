@@ -1,24 +1,57 @@
+"""Bounded SSE subscriptions; indexer notifications cross the thread boundary."""
+
 import asyncio
 import json
-from typing import List
+import threading
 
 
 class EventBroadcaster:
     def __init__(self):
-        self._queues: List[asyncio.Queue] = []
+        self._queues = {}
+        self._lock = threading.Lock()
 
-    def subscribe(self) -> asyncio.Queue:
-        queue = asyncio.Queue()
-        self._queues.append(queue)
+    def subscribe(self):
+        queue = asyncio.Queue(maxsize=64)
+        with self._lock:
+            self._queues[queue] = asyncio.get_running_loop()
         return queue
 
-    def unsubscribe(self, queue: asyncio.Queue) -> None:
-        self._queues.remove(queue)
+    def unsubscribe(self, queue):
+        with self._lock:
+            self._queues.pop(queue, None)
 
-    async def broadcast(self, event_type: str, data: dict) -> None:
+    @staticmethod
+    def _put(queue, message):
+        if queue.full():
+            queue.get_nowait()
+            message = "event: resync\ndata: {}\n\n"
+        queue.put_nowait(message)
+
+    def publish_from_thread(self, event_type, data):
         message = f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
-        for queue in self._queues:
-            await queue.put(message)
+        with self._lock:
+            subscriptions = list(self._queues.items())
+        for queue, loop in subscriptions:
+            if not loop.is_closed():
+                try:
+                    loop.call_soon_threadsafe(self._put, queue, message)
+                except RuntimeError:
+                    self.unsubscribe(queue)
+
+    async def broadcast(self, event_type, data):
+        self.publish_from_thread(event_type, data)
 
 
 broadcaster = EventBroadcaster()
+
+
+def chain_revision():
+    """Database polling also observes commits from another API worker/process."""
+    from app.core.database import SessionLocal
+    from app.models.chain import IndexerCursor
+
+    with SessionLocal() as db:
+        return "|".join(
+            f"{row.scope}:{row.updated_at.isoformat()}"
+            for row in db.query(IndexerCursor).order_by(IndexerCursor.scope)
+        )

@@ -668,6 +668,8 @@ export interface components {
             status: string;
             /** Notes */
             notes?: string | null;
+            /** Current Handler */
+            current_handler?: string | null;
             /** Id */
             id: number;
             /** Shipment Id */
@@ -700,6 +702,29 @@ export interface components {
             /** Notes */
             notes?: string | null;
         };
+        /** SynchronizationResponse */
+        SynchronizationResponse: {
+            /**
+             * Confirmation Policy
+             * @default depth
+             * @constant
+             */
+            confirmation_policy: "depth";
+            /** Confirmations */
+            confirmations: number;
+            /**
+             * Cursor Storage
+             * @default database
+             * @constant
+             */
+            cursor_storage: "database";
+            /** Indexer Enabled */
+            indexer_enabled: boolean;
+            /** Indexed Block */
+            indexed_block?: number | null;
+            /** Last Successful Sync */
+            last_successful_sync?: string | null;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -712,6 +737,18 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VerificationResponse */
+        VerificationResponse: {
+            /** Product Id */
+            product_id: string;
+            /** Is Registered */
+            is_registered: boolean;
+            /** Is Delivered */
+            is_delivered: boolean;
+            /** Checkpoint Count */
+            checkpoint_count: number;
+            synchronization: components["schemas"]["SynchronizationResponse"];
         };
         /** VerifyRequest */
         VerifyRequest: {
@@ -985,9 +1022,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["VerificationResponse"];
                 };
             };
             /** @description Validation Error */
