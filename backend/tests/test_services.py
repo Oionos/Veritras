@@ -480,3 +480,32 @@ def test_lagged_indexing_cannot_accept_a_retrospective_sla(db_session):
     shipment.expected_arrival_recorded_at = None
     db_session.commit()
     assert get_kpi_summary(db_session)["sla_sample_size"] == 0
+
+
+def test_resubmitting_unchanged_deadline_preserves_original_plan_time(
+    client_fixture, db_session
+):
+    shipment = record(db_session, 0, departed=False, delivered=False)
+    original = shipment.expected_arrival_recorded_at
+    db_session.commit()
+    response = client_fixture.put(
+        "/shipments/SHIP-0",
+        json={
+            "expected_arrival_at": (START + timedelta(hours=12)).isoformat(),
+            "notes": "Updated plan notes",
+        },
+    )
+    assert response.status_code == 200
+    assert (
+        datetime.fromisoformat(
+            response.json()["expected_arrival_recorded_at"].replace("Z", "+00:00")
+        )
+        == original
+    )
+    assert (
+        client_fixture.put(
+            "/shipments/SHIP-0",
+            json={"expected_arrival_recorded_at": "2026-01-01T00:00:00Z"},
+        ).status_code
+        == 422
+    )

@@ -286,7 +286,8 @@ export default function Shipments() {
       }
       if (editingShipment) {
         const { product_id, ...updateData } = payload
-        if (editingShipment.departed_at || editingShipment.delivered_at)
+        if (editingShipment.departed_at || editingShipment.delivered_at ||
+            (formData.expected_arrival_at ?? '') === (editingShipment.expected_arrival_at?.slice(0, 16) ?? ''))
           Reflect.deleteProperty(updateData, 'expected_arrival_at')
         await updateShipment.mutateAsync({
           shipment_id: editingShipment.shipment_id,
