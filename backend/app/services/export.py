@@ -140,7 +140,7 @@ def export_to_pdf(
                     p.product_id,
                     p.name,
                     p.manufacturer_address,
-                    p.registered_at.isoformat() if p.registered_at else "",
+                    p.chain_registered_at.isoformat() if p.chain_registered_at else "",
                 ]
             )
         shipment_table = Table(shipment_data, hAlign="LEFT")
