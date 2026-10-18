@@ -111,8 +111,8 @@ passed. The production-copy Neon rehearsal upgraded `a38f917bd260` to
 zero ownership bindings; its new attempt table is empty. Rehearsal branch
 `br-jolly-band-aojdyv96` expires October 19, 2026 at 18:00 UTC.
 
-Local validation: 235 frontend unit tests passed, with 70.63% statement and
-60.4% branch coverage; 29 Playwright regressions passed. The real browser journey
+Local validation: 359 backend tests passed with 3 intentional dialect skips.
+235 frontend unit tests passed, with 70.63% statement and 60.46% branch coverage; 29 Playwright regressions passed. The real browser journey
 passed registration after a draft edit, saved transaction recovery after reload,
 metadata signing and version history, wallet-switch logout and ownership checks.
 Backend regression results and final release references are recorded in
@@ -124,9 +124,12 @@ shipments, six checkpoints and two custody transfers. An existing manufacturer's
 registration hash was submitted idempotently and reconciled to `indexed`;
 verification returned canonical `verified` evidence and metadata history. No
 chain transaction or test ETH was spent for this hosted acceptance. The testing
-Vercel deployment `dpl_8M39raUZ3bujQmeD5x4RLFjyLmuF` built successfully. Protected-preview browser access was explicitly approved using a private, temporary
-23-hour link. Local real browser and hosted API acceptance are complete; final
-protected-browser results are recorded in PR #21.
+Vercel deployment `dpl_8M39raUZ3bujQmeD5x4RLFjyLmuF` built successfully. Protected-preview browser acceptance passed through the stable testing alias
+using an explicitly approved private 23-hour link: real verified registration,
+persisted transaction state, metadata history and injected pending/unavailable/
+mismatched states, with zero browser errors or production API requests. The
+stable alias respects the existing exact-origin CORS policy; no origin wildcard
+or deployment-protection change was needed. Final release results are in PR #21.
 
 A pre-release production restore branch, `br-empty-sunset-ao28fn9e`, has no compute
 and expires October 25, 2026 at 18:00 UTC. It preserves the predecessor schema.

@@ -735,7 +735,7 @@ export default function Products() {
             <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                  <h2 className="font-mono text-xl font-semibold text-text">
+                  <h2 className="break-all font-mono text-xl font-semibold text-text">
                     {product.product_id}
                   </h2>
                   <Badge variant={isDelivered ? 'success' : 'blue'}>
