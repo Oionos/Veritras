@@ -118,7 +118,9 @@ class TestProductEndpointContracts:
 
     def test_update_product_contract(self, client_fixture, seeded_product):
         payload = {"name": "Updated Contract Name"}
-        response = client_fixture.put(f"/products/{seeded_product.product_id}", json=payload)
+        response = client_fixture.put(
+            f"/products/{seeded_product.product_id}", json=payload
+        )
         assert response.status_code == 200
         data = response.json()
         validated = ProductResponse.model_validate(data)
@@ -140,7 +142,14 @@ class TestProductEndpointContracts:
         response = client_fixture.get(f"/products/{seeded_product.product_id}/verify")
         assert response.status_code == 200
         data = response.json()
-        assert set(data.keys()) == {"product_id", "is_registered", "is_delivered", "checkpoint_count", "synchronization", "evidence"}
+        assert set(data.keys()) == {
+            "product_id",
+            "is_registered",
+            "is_delivered",
+            "checkpoint_count",
+            "synchronization",
+            "evidence",
+        }
         assert data["product_id"] == seeded_product.product_id
         assert data["is_registered"] is False  # A seeded row is not receipt evidence.
         assert isinstance(data["is_delivered"], bool)
@@ -189,14 +198,18 @@ class TestShipmentEndpointContracts:
 
     def test_update_shipment_contract(self, client_fixture, seeded_shipment):
         payload = {"origin": "Updated Origin"}
-        response = client_fixture.put(f"/shipments/{seeded_shipment.shipment_id}", json=payload)
+        response = client_fixture.put(
+            f"/shipments/{seeded_shipment.shipment_id}", json=payload
+        )
         assert response.status_code == 200
         data = response.json()
         validated = ShipmentResponse.model_validate(data)
         assert validated.origin == "Updated Origin"
 
     def test_get_history_contract(self, client_fixture, seeded_shipment):
-        response = client_fixture.get(f"/shipments/{seeded_shipment.product_id}/history")
+        response = client_fixture.get(
+            f"/shipments/{seeded_shipment.product_id}/history"
+        )
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
@@ -210,7 +223,9 @@ class TestShipmentEndpointContracts:
         assert data == []
 
     def test_get_transfers_contract(self, client_fixture, seeded_shipment):
-        response = client_fixture.get(f"/shipments/{seeded_shipment.product_id}/transfers")
+        response = client_fixture.get(
+            f"/shipments/{seeded_shipment.product_id}/transfers"
+        )
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
@@ -218,13 +233,17 @@ class TestShipmentEndpointContracts:
             CustodyTransferResponse.model_validate(ct)
 
     def test_get_transfers_empty_contract(self, client_fixture, seeded_product):
-        response = client_fixture.get(f"/shipments/{seeded_product.product_id}/transfers")
+        response = client_fixture.get(
+            f"/shipments/{seeded_product.product_id}/transfers"
+        )
         assert response.status_code == 200
         data = response.json()
         assert data == []
 
     def test_get_shipment_404_contract(self, client_fixture, seeded_shipment):
-        response = client_fixture.put("/shipments/SHIP-NONEXISTENT", json={"origin": "New"})
+        response = client_fixture.put(
+            "/shipments/SHIP-NONEXISTENT", json={"origin": "New"}
+        )
         assert response.status_code == 404
         data = response.json()
         assert "detail" in data
@@ -236,15 +255,7 @@ class TestAnalyticsEndpointContracts:
         response = client_fixture.get("/analytics/kpis")
         assert response.status_code == 200
         data = response.json()
-        assert set(data.keys()) == {
-            "avg_transit_time_hours",
-            "on_time_rate_percent",
-            "total_shipments",
-            "active_shipments",
-            "delivered_shipments",
-            "avg_checkpoints_per_shipment",
-            "bottleneck_locations",
-        }
+        assert set(data.keys()) == set(KPIResponse.model_fields)
         validated = KPIResponse.model_validate(data)
         assert isinstance(validated.bottleneck_locations, list)
         assert validated.total_shipments >= 0
@@ -256,7 +267,13 @@ class TestAnalyticsEndpointContracts:
         assert isinstance(data, list)
         for item in data:
             AnomalyResponse.model_validate(item)
-            assert set(item.keys()) == {"product_id", "transit_time_hours", "z_score", "severity", "flagged_at"}
+            assert set(item.keys()) == {
+                "product_id",
+                "transit_time_hours",
+                "z_score",
+                "severity",
+                "flagged_at",
+            }
 
     def test_get_anomalies_empty_contract(self, client_fixture, db_session):
         response = client_fixture.get("/analytics/anomalies")
@@ -270,7 +287,11 @@ class TestAnalyticsEndpointContracts:
         data = response.json()
         assert isinstance(data, list)
         if data:
-            assert set(data[0].keys()) == {"location", "avg_dwell_hours", "incident_count"}
+            assert set(data[0].keys()) == {
+                "location",
+                "avg_dwell_hours",
+                "incident_count",
+            }
 
     def test_export_csv_contract(self, client_fixture, seeded_shipment):
         response = client_fixture.get("/analytics/export?format=csv")
@@ -336,4 +357,6 @@ class TestOpenAPISchema:
             "ValidationError",
         ]
         for name in expected_schemas:
-            assert name in schemas, f"Expected schema {name} not found in OpenAPI schema"
+            assert (
+                name in schemas
+            ), f"Expected schema {name} not found in OpenAPI schema"

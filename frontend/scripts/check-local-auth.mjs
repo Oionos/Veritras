@@ -1,7 +1,7 @@
 // Real browser -> API -> PostgreSQL regression, using unlocked Hardhat wallets.
 // Run only after `make testing-up`; no hosted credentials or funded wallets.
 import assert from 'node:assert/strict'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { chromium } from 'playwright'
 
@@ -170,6 +170,28 @@ try {
     return [edit.status, plan.status, shipmentEdit.status, anonymous.status, publicRead.status]
   }, { api, productId: draft.product_id, shipmentId: shipment.shipment_id })
   assert.deepEqual(checks, [403, 403, 403, 401, 200])
+  // Real browser analytics and downloads must agree with the same API cohort.
+  await page.goto('http://localhost:13000/analytics', { waitUntil: 'domcontentloaded' })
+  await page.getByRole('region', { name: 'Shipment sample counts' }).waitFor()
+  await page.getByLabel('Origin', { exact: true }).fill(shipment.origin)
+  await page.getByLabel('Destination', { exact: true }).fill(shipment.destination)
+  const cohortResponse = page.waitForResponse(response => response.ok() && response.url().includes('/analytics/kpis?') && response.url().includes('origin='))
+  await page.getByRole('button', { name: 'Apply filters' }).click()
+  const metrics = await (await cohortResponse).json()
+  const sampleRegion = page.getByRole('region', { name: 'Shipment sample counts' })
+  assert.ok((await sampleRegion.innerText()).includes(`Total shipments: ${metrics.total_shipments}`))
+  assert.ok((await sampleRegion.innerText()).includes(`SLA: ${metrics.sla_sample_size} samples`))
+  const downloadPromise = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Export CSV', exact: true }).click()
+  const download = await downloadPromise
+  const csv = readFileSync(await download.path(), 'utf8')
+  assert.equal(csv.trim().split('\n').length-1, metrics.total_shipments)
+  assert.ok(csv.includes(shipment.shipment_id))
+  const pdfPromise = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Export PDF', exact: true }).click()
+  const pdf = await pdfPromise
+  assert.ok(readFileSync(await pdf.path()).subarray(0,4).equals(Buffer.from('%PDF')))
+  await page.screenshot({ path: '../.testing/analytics-local-browser.png', fullPage: true })
   assert.deepEqual(errors, [])
   mkdirSync('../.testing', { recursive: true })
   await page.screenshot({ path: '../.testing/auth-browser.png', fullPage: true })

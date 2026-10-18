@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import PremiumHero from '@/components/PremiumHero'
@@ -9,7 +9,6 @@ import {
   Truck,
   Clock,
   TrendingUp,
-  TrendingDown,
   Activity,
   AlertCircle,
   ArrowUpRight,
@@ -26,30 +25,6 @@ import {
 } from 'recharts'
 import type { Product } from '@/types'
 
-const defaultChartData = [
-  { name: 'Mon', shipments: 0, products: 0 },
-  { name: 'Tue', shipments: 0, products: 0 },
-  { name: 'Wed', shipments: 0, products: 0 },
-  { name: 'Thu', shipments: 0, products: 0 },
-  { name: 'Fri', shipments: 0, products: 0 },
-  { name: 'Sat', shipments: 0, products: 0 },
-  { name: 'Sun', shipments: 0, products: 0 },
-]
-
-/** Mock trend data for KPI cards (direction + percentage change). */
-const KPI_TRENDS: Record<string, { direction: 'up' | 'down'; percent: number }> = {
-  'Total Shipments': { direction: 'up', percent: 18 },
-  'Active Shipments': { direction: 'up', percent: 12 },
-  'Avg Transit Time': { direction: 'down', percent: 8 },
-  'On-Time Rate': { direction: 'up', percent: 5 },
-}
-
-/** Mock summary metrics displayed above the KPI grid. */
-const SUMMARY_MOCK = {
-  totalShipments: 1247,
-  percentChange: 18,
-}
-
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -63,23 +38,24 @@ const itemVariants = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
+    transition: {
+      duration: 0.5,
+      ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+    },
   },
 }
 
 export default function Dashboard() {
   const [hoveredKpi, setHoveredKpi] = useState<number | null>(null)
   const { data: kpiData, isLoading: kpiLoading, error: kpiError } = useKPIData()
-  const { data: productsData, isLoading: productsLoading } = useProducts()
-  const { data: volumeData, isLoading: volumeLoading } = useDailyVolume()
+  const { data: productsData, isLoading: productsLoading } = useProducts(true)
+  const {
+    data: volumeData,
+    isLoading: volumeLoading,
+    error: volumeError,
+  } = useDailyVolume()
 
-
-  const chartData = useMemo(() => {
-    if (volumeData?.items && volumeData.items.length > 0) {
-      return volumeData.items
-    }
-    return defaultChartData
-  }, [volumeData])
+  const chartData = volumeData?.items ?? []
 
   const isLoading = kpiLoading || productsLoading
   const error = kpiError
@@ -123,10 +99,9 @@ export default function Dashboard() {
       ]
     : []
 
-  const recentProducts: Product[] =
-    Array.isArray(productsData) && productsData.length > 0
-      ? [...productsData].reverse().slice(0, 5)
-      : []
+  const recentProducts: Product[] = (
+    productsData?.items ?? (Array.isArray(productsData) ? productsData : [])
+  ).slice(0, 5)
 
   return (
     <div className="relative">
@@ -158,7 +133,8 @@ export default function Dashboard() {
                 Supply Chain
               </h2>
               <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted">
-                Real-time visibility into your product journey from manufacturer to consumer.
+                Real-time visibility into your product journey from manufacturer
+                to consumer.
               </p>
             </div>
             <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 backdrop-blur-xl sm:flex">
@@ -166,7 +142,7 @@ export default function Dashboard() {
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
               </span>
-              <span className="text-xs font-medium text-muted">Live</span>
+              <span className="text-xs font-medium text-muted">Recorded</span>
             </div>
           </div>
         </motion.div>
@@ -187,9 +163,13 @@ export default function Dashboard() {
           >
             <AlertCircle className="h-5 w-5 shrink-0 text-red-400" />
             <div>
-              <p className="font-medium text-red-400">Failed to load dashboard data</p>
+              <p className="font-medium text-red-400">
+                Failed to load dashboard data
+              </p>
               <p className="text-sm text-red-400/70">
-                {error instanceof Error ? error.message : 'Please try again later.'}
+                {error instanceof Error
+                  ? error.message
+                  : 'Please try again later.'}
               </p>
             </div>
           </motion.div>
@@ -205,15 +185,14 @@ export default function Dashboard() {
               transition={{ duration: 0.5 }}
               className="mb-6 text-sm text-muted"
             >
-              Your platform tracked{' '}
-              <span className="font-mono text-text">
-                {SUMMARY_MOCK.totalShipments.toLocaleString()}
-              </span>{' '}
-              shipments this month — up{' '}
-              <span className="font-mono text-accent">
-                {SUMMARY_MOCK.percentChange}%
-              </span>{' '}
-              from last month
+              {kpiData?.total_shipments?.toLocaleString() ?? 'Unknown'} shipment
+              records across all time (UTC). Transit uses{' '}
+              {kpiData?.transit_sample_size ?? 0} completed journeys; on-time
+              performance uses {kpiData?.sla_sample_size ?? 0} journeys with a
+              planned SLA. Unknown SLA deliveries:{' '}
+              {kpiData?.unknown_sla_deliveries ?? 0}. Active includes shipments
+              awaiting departure. Trends are unavailable without two explicit
+              comparable periods.
             </motion.p>
 
             {/* KPI Grid */}
@@ -234,16 +213,17 @@ export default function Dashboard() {
                   <div
                     className="group relative overflow-hidden rounded-3xl border border-white/5 bg-white/[0.02] p-6 backdrop-blur-2xl transition-all duration-500 hover:border-white/10 hover:bg-white/[0.04]"
                     style={{
-                      boxShadow: hoveredKpi === index
-                        ? `0 0 40px ${kpi.color}15, 0 8px 32px rgba(0,0,0,0.3)`
-                        : '0 4px 24px rgba(0,0,0,0.2)',
+                      boxShadow:
+                        hoveredKpi === index
+                          ? `0 0 40px ${kpi.color}15, 0 8px 32px rgba(0,0,0,0.3)`
+                          : '0 4px 24px rgba(0,0,0,0.2)',
                     }}
                   >
                     {/* Gradient background on hover */}
                     <div
                       className={`absolute inset-0 bg-linear-to-br ${kpi.gradient} opacity-0 transition-opacity duration-500 group-hover:opacity-100`}
                     />
-                    
+
                     {/* Halo ring */}
                     <div
                       className="absolute -right-6 -top-6 h-16 w-16 rounded-full border opacity-0 transition-all duration-500 group-hover:opacity-100"
@@ -253,42 +233,29 @@ export default function Dashboard() {
                     <div className="relative">
                       <div className="flex items-start justify-between">
                         <div className="space-y-2">
-                          <p className="text-xs font-medium uppercase tracking-wider text-muted">{kpi.label}</p>
+                          <p className="text-xs font-medium uppercase tracking-wider text-muted">
+                            {kpi.label}
+                          </p>
                           <p className="font-mono text-3xl font-medium text-text">
                             {kpi.value}
                           </p>
-                          {(() => {
-                            const trend = KPI_TRENDS[kpi.label];
-                            if (!trend) return null;
-                            const invert = kpi.label === 'Avg Transit Time';
-                            const positive = invert
-                              ? trend.direction === 'down'
-                              : trend.direction === 'up';
-                            const TrendIcon =
-                              trend.direction === 'up' ? TrendingUp : TrendingDown;
-                            const trendColor = positive
-                              ? 'text-accent'
-                              : 'text-red-400';
-                            return (
-                              <div className={`flex items-center gap-1 pt-1 ${trendColor}`}>
-                                <TrendIcon className="h-3 w-3" />
-                                <span className="text-xs font-medium">
-                                  {trend.percent}%
-                                </span>
-                              </div>
-                            );
-                          })()}
                         </div>
                         <div
                           className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 transition-all group-hover:scale-110"
                           style={{
-                            boxShadow: hoveredKpi === index ? `0 0 20px ${kpi.color}20` : 'none',
+                            boxShadow:
+                              hoveredKpi === index
+                                ? `0 0 20px ${kpi.color}20`
+                                : 'none',
                           }}
                         >
-                          <kpi.icon className="h-4 w-4" style={{ color: kpi.color }} />
+                          <kpi.icon
+                            className="h-4 w-4"
+                            style={{ color: kpi.color }}
+                          />
                         </div>
                       </div>
-                      
+
                       {/* Bottom accent line */}
                       <div
                         className="mt-4 h-px w-full bg-linear-to-r opacity-40"
@@ -316,8 +283,12 @@ export default function Dashboard() {
                     <div className="flex items-center gap-3">
                       <span className="inline-block h-px w-4 bg-accent" />
                       <div>
-                        <h2 className="font-sans text-lg font-semibold text-text">Shipment Volume</h2>
-                        <p className="text-xs text-muted">Daily shipments and product registrations</p>
+                        <h2 className="font-sans text-lg font-semibold text-text">
+                          Shipment Volume
+                        </h2>
+                        <p className="text-xs text-muted">
+                          Daily shipments and product registrations
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 text-xs text-muted">
@@ -336,22 +307,69 @@ export default function Dashboard() {
                       <div className="flex h-full items-center justify-center">
                         <LoadingSpinner size="sm" />
                       </div>
+                    ) : volumeError || !volumeData ? (
+                      <p className="text-sm text-muted">
+                        Volume data unavailable.
+                      </p>
                     ) : (
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={chartData}>
                           <defs>
-                            <linearGradient id="shipments" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#c8f060" stopOpacity={0.15} />
-                              <stop offset="95%" stopColor="#c8f060" stopOpacity={0} />
+                            <linearGradient
+                              id="shipments"
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="5%"
+                                stopColor="#c8f060"
+                                stopOpacity={0.15}
+                              />
+                              <stop
+                                offset="95%"
+                                stopColor="#c8f060"
+                                stopOpacity={0}
+                              />
                             </linearGradient>
-                            <linearGradient id="products" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#60d0f0" stopOpacity={0.15} />
-                              <stop offset="95%" stopColor="#60d0f0" stopOpacity={0} />
+                            <linearGradient
+                              id="products"
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="5%"
+                                stopColor="#60d0f0"
+                                stopOpacity={0.15}
+                              />
+                              <stop
+                                offset="95%"
+                                stopColor="#60d0f0"
+                                stopOpacity={0}
+                              />
                             </linearGradient>
                           </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#ffffff08" vertical={false} />
-                          <XAxis dataKey="name" stroke="#ffffff15" fontSize={11} tickLine={false} axisLine={false} />
-                          <YAxis stroke="#ffffff15" fontSize={11} tickLine={false} axisLine={false} />
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke="#ffffff08"
+                            vertical={false}
+                          />
+                          <XAxis
+                            dataKey="name"
+                            stroke="#ffffff15"
+                            fontSize={11}
+                            tickLine={false}
+                            axisLine={false}
+                          />
+                          <YAxis
+                            stroke="#ffffff15"
+                            fontSize={11}
+                            tickLine={false}
+                            axisLine={false}
+                          />
                           <Tooltip
                             contentStyle={{
                               backgroundColor: '#0a0a0a',
@@ -363,8 +381,20 @@ export default function Dashboard() {
                             }}
                             itemStyle={{ color: '#f0ece4' }}
                           />
-                          <Area type="monotone" dataKey="shipments" stroke="#c8f060" strokeWidth={2} fill="url(#shipments)" />
-                          <Area type="monotone" dataKey="products" stroke="#60d0f0" strokeWidth={2} fill="url(#products)" />
+                          <Area
+                            type="monotone"
+                            dataKey="shipments"
+                            stroke="#c8f060"
+                            strokeWidth={2}
+                            fill="url(#shipments)"
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="products"
+                            stroke="#60d0f0"
+                            strokeWidth={2}
+                            fill="url(#products)"
+                          />
                         </AreaChart>
                       </ResponsiveContainer>
                     )}
@@ -382,7 +412,9 @@ export default function Dashboard() {
                   <div className="mb-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <span className="inline-block h-px w-4 bg-accent2" />
-                      <h2 className="font-sans text-lg font-semibold text-text">Recent Products</h2>
+                      <h2 className="font-sans text-lg font-semibold text-text">
+                        Recent Products
+                      </h2>
                     </div>
                     <Activity className="h-4 w-4 text-muted" />
                   </div>
@@ -390,7 +422,9 @@ export default function Dashboard() {
                     {recentProducts.length === 0 && (
                       <div className="flex flex-col items-center justify-center py-8 text-center">
                         <Shield className="mb-3 h-8 w-8 text-muted/30" />
-                        <p className="text-sm text-muted">No products registered yet.</p>
+                        <p className="text-sm text-muted">
+                          No products registered yet.
+                        </p>
                       </div>
                     )}
                     {recentProducts.map((item, i) => (
@@ -409,9 +443,13 @@ export default function Dashboard() {
                             </span>
                             <ArrowUpRight className="h-3 w-3 text-muted opacity-0 transition-all group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                           </div>
-                          <p className="text-xs text-muted truncate">{item.name}</p>
+                          <p className="text-xs text-muted truncate">
+                            {item.name}
+                          </p>
                           <p className="text-xs text-muted/40">
-                            {item.registered_at ? formatDate(item.registered_at) : 'Not registered'}
+                            {item.registered_at
+                              ? formatDate(item.registered_at)
+                              : 'Not registered'}
                           </p>
                         </div>
                       </motion.div>

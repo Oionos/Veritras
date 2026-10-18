@@ -314,7 +314,7 @@ export interface paths {
         };
         /**
          * Get Bottlenecks
-         * @description Identify bottleneck locations based on average dwell time between checkpoints.
+         * @description Compatibility URL: return canonical checkpoint intervals, not dwell times.
          */
         get: operations["get_bottlenecks_analytics_bottlenecks_get"];
         put?: never;
@@ -483,6 +483,21 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AnalyticsFilters */
+        AnalyticsFilters: {
+            /** Start */
+            start: string | null;
+            /** End Exclusive */
+            end_exclusive: string | null;
+            /** Origin */
+            origin: string | null;
+            /** Destination */
+            destination: string | null;
+            /** Timezone */
+            timezone: string;
+            /** Cohort */
+            cohort: string;
+        };
         /** AnomalyResponse */
         AnomalyResponse: {
             /** Product Id */
@@ -495,6 +510,21 @@ export interface components {
             severity: string;
             /** Flagged At */
             flagged_at: string;
+            /**
+             * Origin
+             * @default
+             */
+            origin: string;
+            /**
+             * Destination
+             * @default
+             */
+            destination: string;
+            /**
+             * Sample Size
+             * @default 0
+             */
+            sample_size: number;
         };
         /** ChallengeRequest */
         ChallengeRequest: {
@@ -523,6 +553,15 @@ export interface components {
             expires_at: string;
             /** Message */
             message: string;
+        };
+        /** CheckpointInterval */
+        CheckpointInterval: {
+            /** Location */
+            location: string;
+            /** Avg Interval Hours */
+            avg_interval_hours: number;
+            /** Incident Count */
+            incident_count: number;
         };
         /** CheckpointResponse */
         CheckpointResponse: {
@@ -700,9 +739,39 @@ export interface components {
             /** Avg Checkpoints Per Shipment */
             avg_checkpoints_per_shipment: number;
             /** Bottleneck Locations */
-            bottleneck_locations: {
-                [key: string]: unknown;
-            }[];
+            bottleneck_locations: components["schemas"]["CheckpointInterval"][];
+            /** Transit Sample Size */
+            transit_sample_size: number;
+            /** Incomplete Transit Shipments */
+            incomplete_transit_shipments: number;
+            /** On Time Shipments */
+            on_time_shipments: number;
+            /** Sla Sample Size */
+            sla_sample_size: number;
+            /** Late Sla Deliveries */
+            late_sla_deliveries: number;
+            /** Incomplete Sla Deliveries */
+            incomplete_sla_deliveries: number;
+            /** Unknown Sla Deliveries */
+            unknown_sla_deliveries: number;
+            /** Avg Active Elapsed Hours */
+            avg_active_elapsed_hours: number | null;
+            /** Active Elapsed Sample Size */
+            active_elapsed_sample_size: number;
+            /** Awaiting Departure Shipments */
+            awaiting_departure_shipments: number;
+            /** Checkpoint Count */
+            checkpoint_count: number;
+            /** Event Count */
+            event_count: number;
+            /** Routes */
+            routes: components["schemas"]["RouteMetrics"][];
+            filters: components["schemas"]["AnalyticsFilters"];
+            /** As Of */
+            as_of: string;
+            /** Anomaly Rule */
+            anomaly_rule: string;
+            trend: components["schemas"]["ShipmentTrend"] | null;
         };
         /** LivenessResponse */
         LivenessResponse: {
@@ -956,8 +1025,55 @@ export interface components {
             /** Replaces Tx Hash */
             replaces_tx_hash?: string | null;
         };
+        /** RouteMetrics */
+        RouteMetrics: {
+            /** Avg Transit Time Hours */
+            avg_transit_time_hours: number | null;
+            /** On Time Rate Percent */
+            on_time_rate_percent: number | null;
+            /** Total Shipments */
+            total_shipments: number;
+            /** Active Shipments */
+            active_shipments: number;
+            /** Delivered Shipments */
+            delivered_shipments: number;
+            /** Avg Checkpoints Per Shipment */
+            avg_checkpoints_per_shipment: number;
+            /** Bottleneck Locations */
+            bottleneck_locations: components["schemas"]["CheckpointInterval"][];
+            /** Transit Sample Size */
+            transit_sample_size: number;
+            /** Incomplete Transit Shipments */
+            incomplete_transit_shipments: number;
+            /** On Time Shipments */
+            on_time_shipments: number;
+            /** Sla Sample Size */
+            sla_sample_size: number;
+            /** Late Sla Deliveries */
+            late_sla_deliveries: number;
+            /** Incomplete Sla Deliveries */
+            incomplete_sla_deliveries: number;
+            /** Unknown Sla Deliveries */
+            unknown_sla_deliveries: number;
+            /** Avg Active Elapsed Hours */
+            avg_active_elapsed_hours: number | null;
+            /** Active Elapsed Sample Size */
+            active_elapsed_sample_size: number;
+            /** Awaiting Departure Shipments */
+            awaiting_departure_shipments: number;
+            /** Checkpoint Count */
+            checkpoint_count: number;
+            /** Event Count */
+            event_count: number;
+            /** Origin */
+            origin: string;
+            /** Destination */
+            destination: string;
+        };
         /** ShipmentCreate */
         ShipmentCreate: {
+            /** Expected Arrival At */
+            expected_arrival_at?: string | null;
             /** Product Id */
             product_id: string;
             /** Origin */
@@ -995,6 +1111,14 @@ export interface components {
             status: string;
             /** Notes */
             notes?: string | null;
+            /** Expected Arrival Recorded At */
+            expected_arrival_recorded_at?: string | null;
+            /** Expected Arrival At */
+            expected_arrival_at?: string | null;
+            /** Departed At */
+            departed_at?: string | null;
+            /** Delivered At */
+            delivered_at?: string | null;
             /** On Chain Product Id */
             on_chain_product_id?: string | null;
             /** Registry Address */
@@ -1028,8 +1152,23 @@ export interface components {
             /** Tx Hash */
             tx_hash: string;
         };
+        /** ShipmentTrend */
+        ShipmentTrend: {
+            /** Current Count */
+            current_count: number;
+            /** Previous Count */
+            previous_count: number;
+            /** Percent Change */
+            percent_change: number | null;
+            /** Previous Start */
+            previous_start: string;
+            /** Previous End Exclusive */
+            previous_end_exclusive: string;
+        };
         /** ShipmentUpdate */
         ShipmentUpdate: {
+            /** Expected Arrival At */
+            expected_arrival_at?: string | null;
             /** Origin */
             origin?: string | null;
             /** Destination */
@@ -1679,7 +1818,12 @@ export interface operations {
     };
     get_kpis_analytics_kpis_get: {
         parameters: {
-            query?: never;
+            query?: {
+                start_date?: string | null;
+                end_date?: string | null;
+                origin?: string | null;
+                destination?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1695,12 +1839,25 @@ export interface operations {
                     "application/json": components["schemas"]["KPIResponse"];
                 };
             };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
     get_anomalies_analytics_anomalies_get: {
         parameters: {
             query?: {
                 z_threshold?: number;
+                start_date?: string | null;
+                end_date?: string | null;
+                origin?: string | null;
+                destination?: string | null;
             };
             header?: never;
             path?: never;
@@ -1732,6 +1889,10 @@ export interface operations {
         parameters: {
             query?: {
                 min_dwell_hours?: number;
+                start_date?: string | null;
+                end_date?: string | null;
+                origin?: string | null;
+                destination?: string | null;
             };
             header?: never;
             path?: never;
@@ -1745,7 +1906,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["CheckpointInterval"][];
                 };
             };
             /** @description Validation Error */
@@ -1763,8 +1924,11 @@ export interface operations {
         parameters: {
             query?: {
                 format?: "csv" | "pdf";
+                report?: "shipments" | "events";
                 start_date?: string | null;
                 end_date?: string | null;
+                origin?: string | null;
+                destination?: string | null;
             };
             header?: never;
             path?: never;
@@ -1794,7 +1958,12 @@ export interface operations {
     };
     get_daily_volume_analytics_daily_volume_get: {
         parameters: {
-            query?: never;
+            query?: {
+                start_date?: string | null;
+                end_date?: string | null;
+                origin?: string | null;
+                destination?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1808,6 +1977,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DailyVolumeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

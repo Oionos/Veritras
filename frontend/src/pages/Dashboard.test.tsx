@@ -50,7 +50,12 @@ describe('Dashboard', () => {
 
     vi.mocked(useProducts).mockReturnValue({
       data: [
-        { id: 1, product_id: 'PROD-001', name: 'Widget', registered_at: '2024-01-15T10:00:00Z' },
+        {
+          id: 1,
+          product_id: 'PROD-001',
+          name: 'Widget',
+          registered_at: '2024-01-15T10:00:00Z',
+        },
       ],
       isLoading: false,
       error: null,
@@ -68,13 +73,13 @@ describe('Dashboard', () => {
     renderWithProviders(<Dashboard />)
 
     expect(screen.getByText('Shipment Volume')).toBeInTheDocument()
-    expect(screen.getByTestId('responsive-container')).toBeInTheDocument()
+    expect(screen.getByText('Volume data unavailable.')).toBeInTheDocument()
   })
 
-  it('renders Live badge', () => {
+  it('renders recorded data badge', () => {
     renderWithProviders(<Dashboard />)
 
-    expect(screen.getByText('Live')).toBeInTheDocument()
+    expect(screen.getByText('Recorded')).toBeInTheDocument()
   })
 
   it('renders loading state when KPI data is loading', () => {
@@ -104,7 +109,32 @@ describe('Dashboard', () => {
 
     renderWithProviders(<Dashboard />)
 
-    expect(screen.getByText('Failed to load dashboard data')).toBeInTheDocument()
+    expect(
+      screen.getByText('Failed to load dashboard data')
+    ).toBeInTheDocument()
     expect(screen.getByText('Network failure')).toBeInTheDocument()
+  })
+  it('consumes paginated recent products and requests a recent sort', () => {
+    vi.mocked(useProducts).mockReturnValue({
+      data: {
+        items: [
+          {
+            id: 1,
+            product_id: 'PROD-RECENT',
+            name: 'Recent widget',
+            registration_status: 'draft',
+            registered_at: null,
+          },
+        ],
+        total: 60,
+      },
+      isLoading: false,
+      error: null,
+    } as any)
+    renderWithProviders(<Dashboard />)
+    expect(useProducts).toHaveBeenCalledWith(true)
+    expect(screen.getByText('Recent widget')).toBeInTheDocument()
+    expect(screen.queryByText('1,247')).not.toBeInTheDocument()
+    expect(screen.queryByText('18%')).not.toBeInTheDocument()
   })
 })

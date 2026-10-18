@@ -1,5 +1,5 @@
 export BUILDX_CONFIG ?= $(CURDIR)/.testing/buildx
-TEST_COMPOSE = docker compose -f compose.testing.yml
+TEST_COMPOSE = docker compose $(if $(TESTING_COMPOSE_PROJECT),-p $(TESTING_COMPOSE_PROJECT)) -f compose.testing.yml
 ifneq ($(strip $(CODEX_PROXY_CERT)),)
 TEST_COMPOSE += -f compose.testing.cloud.yml
 endif

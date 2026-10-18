@@ -60,6 +60,8 @@ class Shipment(Base):
     destination = Column(String, nullable=False)
     status = Column(String, nullable=False, default="0")
     notes = Column(String, nullable=True)
+    expected_arrival_at = Column(DateTime(timezone=True), nullable=True)
+    expected_arrival_recorded_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(
         DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
