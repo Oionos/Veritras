@@ -124,6 +124,11 @@ shipments, six checkpoints and two custody transfers. An existing manufacturer's
 registration hash was submitted idempotently and reconciled to `indexed`;
 verification returned canonical `verified` evidence and metadata history. No
 chain transaction or test ETH was spent for this hosted acceptance. The testing
-Vercel deployment `dpl_8M39raUZ3bujQmeD5x4RLFjyLmuF` built successfully. A
-protected-preview browser access request requires separate approval; local real
-browser and hosted API acceptance are complete.
+Vercel deployment `dpl_8M39raUZ3bujQmeD5x4RLFjyLmuF` built successfully. Protected-preview browser access was explicitly approved using a private, temporary
+23-hour link. Local real browser and hosted API acceptance are complete; final
+protected-browser results are recorded in PR #21.
+
+A pre-release production restore branch, `br-empty-sunset-ao28fn9e`, has no compute
+and expires October 25, 2026 at 18:00 UTC. It preserves the predecessor schema.
+Chain-event notifications also invalidate registration and metadata-history
+queries so newly indexed values appear without a manual reload.
