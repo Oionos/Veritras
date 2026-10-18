@@ -20,7 +20,7 @@ from app.schemas.shipment import (
     ShipmentResponse,
     ShipmentUpdate,
 )
-from app.services.analytics import hydrate_lifecycle
+from app.services.analytics import hydrate_lifecycle, utc
 from app.services.events import broadcaster
 from app.services.identity import resolve_product, require_current_scope
 
@@ -152,7 +152,9 @@ def update_shipment(
         shipment.departed_at or shipment.delivered_at
     ):
         raise HTTPException(409, "Expected arrival is locked after indexed departure")
-    if "expected_arrival_at" in update_data:
+    if "expected_arrival_at" in update_data and utc(
+        update_data["expected_arrival_at"]
+    ) != utc(shipment.expected_arrival_at):
         shipment.expected_arrival_recorded_at = (
             datetime.now(timezone.utc) if update_data["expected_arrival_at"] else None
         )
