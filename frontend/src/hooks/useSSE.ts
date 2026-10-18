@@ -1,5 +1,6 @@
 import { appEnvironment } from '@/config/runtime'
 import { useEffect, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 
 const API_URL = appEnvironment.apiUrl
 
@@ -14,23 +15,15 @@ export function useAnalyticsEvents(onEvent: (type: string, data: unknown) => voi
     const connect = () => {
       eventSource = new EventSource(`${API_URL}/analytics/events`)
 
-      eventSource.addEventListener('product_created', (e) => {
-        try {
-          const data = JSON.parse(e.data)
-          onEventRef.current('product_created', data)
-        } catch {
-          onEventRef.current('product_created', e.data)
-        }
-      })
-
-      eventSource.addEventListener('shipment_created', (e) => {
-        try {
-          const data = JSON.parse(e.data)
-          onEventRef.current('shipment_created', data)
-        } catch {
-          onEventRef.current('shipment_created', e.data)
-        }
-      })
+      for (const type of ['product_created', 'shipment_created', 'chain_updated', 'resync']) {
+        eventSource.addEventListener(type, (event) => {
+          try {
+            onEventRef.current(type, JSON.parse((event as MessageEvent).data))
+          } catch {
+            onEventRef.current(type, {})
+          }
+        })
+      }
 
       eventSource.onerror = () => {
         eventSource?.close()
@@ -46,4 +39,15 @@ export function useAnalyticsEvents(onEvent: (type: string, data: unknown) => voi
       eventSource?.close()
     }
   }, [])
+}
+
+/** One stream for every page; a reconnect/resync refreshes committed state. */
+export function useChainEvents() {
+  const queryClient = useQueryClient()
+  useAnalyticsEvents(() => {
+    for (const key of ['products', 'product', 'product-history', 'product-transfers',
+      'shipments', 'verify', 'kpis', 'anomalies', 'bottlenecks', 'daily-volume']) {
+      void queryClient.invalidateQueries({ queryKey: [key] })
+    }
+  })
 }

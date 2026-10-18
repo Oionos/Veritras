@@ -24,7 +24,9 @@ class Settings(BaseSettings):
     indexer_retry_interval: int = Field(default=5, ge=1)
     indexer_batch_size: int = Field(default=1000, ge=1, le=10000)
     indexer_stale_after: int = Field(default=120, ge=1)
-    indexer_state_path: str = Field(default="")
+    indexer_state_path: str = Field(default="")  # Deprecated: file cursors are never trusted.
+    indexer_confirmations: int = Field(default=12, ge=0, le=256)
+    indexer_max_reorg_depth: int = Field(default=2048, ge=1, le=100000)
     api_host: str = Field(default="0.0.0.0")
     api_port: int = Field(default=8000)
     jwt_secret_key: str = Field(default="dev-secret-change-in-production", repr=False)

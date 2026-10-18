@@ -1,10 +1,49 @@
 # Veritras implementation plan
 
-Prepared October 17, 2026. Based on [PROJECT_REVIEW.md](PROJECT_REVIEW.md) and repository checkout `9b06a15`.
+Originally prepared October 17, 2026 from [PROJECT_REVIEW.md](PROJECT_REVIEW.md). **Status updated October 18, 2026 from released `main` at `33c4745` plus the durable-indexing increment on `codex/durable-chain-indexing`.** This update includes the durable-indexing code, local and hosted acceptance checks, and the delivery evidence below.
 
-Implementation started on `codex/isolated-testing-environment`. The local stack, preview configuration guards, indexer startup/health fixes, receipt checks, and initial ID/status reconciliation are implemented. Hosted Neon/Render provisioning is pending service access and a separate Sepolia test deployment. See [TESTING.md](TESTING.md) for commands, validation, and remaining boundaries; subsequent PRs below remain planned unless explicitly noted there.
+## Status at a glance
 
-Increment 2 is implemented on `codex/wallet-auth-and-permissions`: database-backed SIWE challenges, scoped tokens, explicit draft ownership and write authorization, shared browser sessions, and owner/handler controls. Security regressions, the real local wallet journey, and an isolated Neon migration rehearsal have passed. See [AUTHENTICATION.md](AUTHENTICATION.md) for behavior, migration/configuration requirements, and validation. Hosted release is tracked by the implementation PR; canonical identity and durable indexing are still subsequent increments.
+**The testing environment and wallet security are delivered. The complete reliable-demo milestone is still open.** Durable indexing is complete with local and hosted recovery/persistence coverage; canonical product identity is the next implementation priority. Hosted rollout evidence is recorded in [DURABLE_INDEXING.md](DURABLE_INDEXING.md).
+
+Status meanings: **Done** = implemented and validated for the stated scope; **Partial** = some work delivered with remaining acceptance criteria; **Pending** = planned work remains; **Deferred** = after the reliable-demo milestone. Partial work is not currently being implemented simply because it is listed here.
+
+Priority meanings: **P0 — release blocker** must be resolved before enabling production indexing/backfill; **P1 — important next** protects correctness or trust; **P2 — later** improves usability and operations after those foundations.
+
+| Workstream | Status | Priority | Delivered / remaining |
+| --- | --- | --- | --- |
+| Isolated local and hosted testing | **Done** | Maintain | Separate database, API, Sepolia contracts, protected Vercel Preview, exact sign-in origins; full journey checked |
+| Wallet sign-in and write permissions | **Done** | Maintain | Persistent SIWE challenges, scoped tokens, owner-only API writes, browser session handling |
+| Indexer startup and health | **Partial** | P1 | Startup/retry/readiness fixes delivered; finality-aware health, hosted HTTP checks and monitoring remain |
+| Canonical product identity (increment 3) | **Partial** | **P1 — next implementation** | Conversion and draft matching exist; explicit identity columns, constraints and legacy reconciliation remain |
+| Durable indexing (increment 4) | **Done** | **P0 addressed** | Transactional journal/cursor, ordered reversible projections, confirmation policy, single-writer lock, metadata events and resilient notifications; production enablement remains a separate gate |
+| Registration lifecycle and evidence (increment 5) | **Partial** | P1 | Receipt-backed registration checks delivered; persisted submissions, replacement handling and richer evidence states remain |
+| Analytics and exports (increment 6) | **Pending** | **P1 — remove misleading metrics soon** | Fixed dashboard totals/trends, sample route charts, assumed 72-hour SLA and export semantics still need correction |
+| Integration and release controls (increment 7) | **Partial** | P1 | Real local/browser/Sepolia journeys and CI delivered; failure/reorg coverage, enforced release gates and recovery runbook remain |
+| QR verification, shipment detail and guided demo (increment 8) | **Pending** | P2 | Public verification exists; direct product links, QR labels, unified detail and guided/mobile journey remain |
+| Shipment exceptions (increment 9) | **Pending** | P2 | Depends on trustworthy lifecycle timestamps, SLA definitions and synchronization |
+| Performance and operations (increment 10) | **Pending** | P2 | Existing lazy routes/Lighthouse checks provide a baseline; measured optimization and operational completion remain |
+| Business pilot integrations | **Deferred** | Later | Organizations, evidence files, imports, standards integrations and repeated journeys |
+
+### Urgent safeguards and next actions
+
+1. **Keep production `INDEXER_ENABLED=false`.** The new indexer has durable database progress and reorganization recovery. Production enablement still requires its reviewed deployment anchor, identity/history reconciliation and release checks; implementation alone does not authorize a backfill.
+2. **Implement increment 3 next**; increment 4 now establishes scoped projection bindings and stops on identity/history conflicts. Preserve existing display IDs/URLs, inspect conflicts, and reconcile legacy rows against chain evidence before granting ownership or rebuilding projections.
+3. **Remove or explicitly label illustrative metrics promptly.** `Dashboard.tsx` still contains `SUMMARY_MOCK` (1,247 shipments) and fixed KPI trends; `Analytics.tsx` has hard-coded route volumes/delays. The API also assumes a 72-hour delivery target without per-shipment SLA data. This presentation correction can ship before the full analytics increment.
+4. **Finish release enforcement.** CI workflows exist and passed for the released changes. Required branch checks and hosting behavior when CI fails still need explicit verification/configuration; both production hosts currently auto-deploy from `main`.
+5. **Preserve testing isolation and free-tier limits.** Use the stable `testing` preview for full-stack checks. Production and testing Render services share the workspace's 750 free instance hours/month; avoid continuous keep-alive pings. See [HOSTED_TESTING.md](HOSTED_TESTING.md).
+
+### Completed releases and evidence
+
+| Release | Main commit | Completed work |
+| --- | --- | --- |
+| [PR #15](https://github.com/Oionos/Veritras/pull/15) | `70a4a1e` | Local isolated stack, environment guards, startup/health repairs, initial identity/status matching and receipt verification |
+| [PR #16](https://github.com/Oionos/Veritras/pull/16) | `e493afb` | Wallet authentication, ownership enforcement, shared sessions and guarded schema adoption/migration; released to Vercel and Render |
+| [PR #17](https://github.com/Oionos/Veritras/pull/17) | `33c4745` | Hosted testing resources, Preview repair, unique source-event identities and replay regressions; released to Vercel and Render |
+
+Latest durable-indexing validation: **236 backend tests, 192 frontend tests, 23 Playwright regressions and 40 contract tests passed**, plus builds, generated-type checks, Lighthouse and real local integration/browser journeys. Hosted Sepolia registration → checkpoints → custody → delivery passed; a same-code testing redeploy preserved event counts. The backend matrix covers SQLite and PostgreSQL, with two intentional skips for PostgreSQL-only checks in the SQLite variant. A real local chain fork/recovery and hosted same-code redeploy also passed.
+
+Released schema before this increment: `c72b53d91e04`. The durable-indexing migration is `f04d9c21a873`, applied in hosted testing and rehearsed on an isolated production copy without changing business counts or granting ownership. Production code/schema rollout is tracked by [PR #18](https://github.com/Oionos/Veritras/pull/18); production indexing remains explicitly disabled. Testing uses a dedicated Neon project/database (`Veritras Testing` / `veritras_preview`), a separate Render API and distinct Sepolia contracts. Setup and resource details: [TESTING.md](TESTING.md), [HOSTED_TESTING.md](HOSTED_TESTING.md), [AUTHENTICATION.md](AUTHENTICATION.md).
 
 ## Goal and completion criteria
 
@@ -12,49 +51,56 @@ Deliver a reliable supply chain demonstration in which a manufacturer registers 
 
 The first release is complete when:
 
-- Feature previews use isolated API, database, and contract state.
-- Signed login works, and API writes enforce ownership.
-- Drafts and submitted transactions cannot appear as blockchain verified.
-- Confirmed events reconcile into one product and one shipment lifecycle.
-- Restarting or replaying the indexer cannot duplicate checkpoints or lose committed progress.
-- Shipment status and analytics reflect indexed events, with no unlabeled example metrics.
-- A complete journey passes through the browser, API, database, and local contracts, followed by a Sepolia check in the testing environment.
+- [x] Feature previews use API, database, and contract state isolated from production. Feature previews share one testing backend; they are not isolated from one another.
+- [x] Signed login works, and API writes enforce ownership.
+- [x] Receipt-backed checks prevent database-only drafts and placeholder transaction fields from receiving verified registration.
+- [ ] Confirmed events reconcile into one product and one shipment lifecycle under explicit canonical identities and database constraints.
+- [x] Journal, projections and cursor commit atomically; restart/replay and reorganization recovery are implemented and validated against SQLite, PostgreSQL and the real local chain. Conflicting legacy data stops for review.
+- [ ] Shipment status and analytics reflect indexed events, with no unlabeled example metrics.
+- [x] A complete journey passes through the browser, API, database, and local contracts, followed by a Sepolia check in testing.
+- [ ] Production indexing/backfill passes identity reconciliation, durable recovery and release-control acceptance checks before enablement.
 
 ## Working decisions
 
 1. Retain React/Vite, FastAPI, SQLAlchemy, Neon, Vercel, Render, and the current contracts for the first release.
 2. Use `main` for production and short-lived feature branches with pull requests and Vercel Previews.
-3. Start with one shared testing API and Neon test branch. Introduce per-PR services only when concurrent work requires them.
+3. Use the provisioned shared testing API and a dedicated Neon testing project/database. Deploy matching frontend/backend code through the persistent `testing` branch. Introduce per-PR services only when concurrent work requires them.
 4. Keep a single indexer owner. API replica scaling requires a separate worker or leadership lock first.
 5. Model one shipment lifecycle per tracked item, matching the existing product-keyed contract. Repeated journeys require a separately planned contract version keyed by shipment ID.
 6. Preserve existing public product IDs and already registered bytes32 values. Store their relationship explicitly.
 7. Treat manufacturer identity and physical-item authenticity as separate evidence from blockchain registration.
 8. Keep public verification available without wallet login; require authentication and ownership for mutations.
 
-## Pull request sequence
+## Remaining delivery sequence
 
-| PR | Suggested branch | Deliverable | Depends on |
-| --- | --- | --- | --- |
-| 0 | `chore/testing-environment` | Isolated testing configuration and release baseline | None |
-| 1 | `fix/indexer-startup-and-health` | ABI loading, startup recovery, useful health checks, conservative verification | PR 0 for hosted testing |
-| 2 | `fix/wallet-auth-and-permissions` | Working SIWE login and authorized API writes | PR 0 |
-| 3 | `feat/canonical-product-identity` | Stable IDs, additive schema migrations, one shipment per item | PR 2 for draft ownership |
-| 4 | `fix/durable-chain-indexing` | Replay-safe event storage, persistent cursor, consistent projections | PRs 1 and 3 |
-| 5 | `feat/evidence-based-verification` | Complete transaction lifecycle and proof-backed verification | PRs 2–4 |
-| 6 | `fix/live-analytics-and-reports` | Real metrics and consistent exports | PR 4 |
-| 7 | `test/complete-provenance-flow` | Integration coverage, CI gates, release and recovery runbook | PRs 2–6 |
-| 8 | `feat/qr-verification-and-demo` | Shareable verification, mobile usability, guided sample journey | PRs 5 and 7 |
-| 9 | `feat/shipment-exceptions` | Expected arrival, overdue and dwell exception list | PRs 6–8 |
-| 10 | `perf/frontend-and-operations` | Measured loading improvements and operational cleanup | Stable first release |
+The numbers below are **plan increment IDs**, not actual GitHub pull request numbers. Initial increments were combined across PRs #15–17. Detailed sections retain the full intended scope; each status note distinguishes delivered work from remaining tasks.
+
+| Increment | Status / priority | Suggested branch | Remaining deliverable | Depends on |
+| --- | --- | --- | --- | --- |
+| 0 | Partial / P1 | Follow-up release controls | Testing setup done; verify/enforce CI and deployment gates | None |
+| 1 | Partial / P1 | Follow-up health operations | Finality-aware progress, hosted HTTP checks and monitoring | Finality policy from 4 |
+| 2 | **Done** | Released in #16 | Maintain authentication and authorization | 0 environment setup |
+| 3 | Partial / **P1 next** | `feat/canonical-product-identity` | Identity schema, reconciliation and one-shipment constraint | 2 |
+| 4 | **Done / P0 addressed** | `codex/durable-chain-indexing` | Maintain recovery guarantees; production enablement remains a separate gate | Scoped identity binding included; broader increment 3 remains |
+| 5 | Partial / P1 | `feat/evidence-based-verification` | Persistent transaction lifecycle and rich evidence responses | 2–4 |
+| 6 | Pending / P1 | `fix/live-analytics-and-reports` | Accurate metrics, SLA semantics and consistent safe exports | 4 for complete aggregates; mock removal can ship now |
+| 7 | Partial / P1 | `test/complete-provenance-flow` | Failure/reorg coverage, enforced gates and recovery runbook | 2–6 for final acceptance |
+| 8 | Pending / P2 | `feat/qr-verification-and-demo` | QR links, unified shipment detail, mobile and guided demo | 5 and 7 |
+| 9 | Pending / P2 | `feat/shipment-exceptions` | Expected arrival, overdue and dwell exception list | 6–8 |
+| 10 | Pending / P2 | `perf/frontend-and-operations` | Measured loading improvements and operational cleanup | Stable reliable-demo milestone |
 
 Tests and migration checks belong in each implementation PR. PR 7 assembles the complete flow and release gates; it is not the first testing work.
 
 ## PR 0 — Establish isolated testing
 
+**Status: testing environment done; release controls partial. Priority: P1 for remaining controls.**
+
+Delivered: local Compose isolation; a dedicated hosted Neon project/database and Render testing API; separate Sepolia contracts and manifest; scoped Vercel Preview configuration; exact CORS/SIWE origins; protected preview access; documented `feature → testing → main` workflow. Real hosted writes and chain actions were checked without changing production business data. Remaining: verify/enforce required merge checks and deployment release gates. Production auto-deploy is enabled; successful historical CI alone does not establish enforcement.
+
 **Tasks**
 
 - Record the actual production frontend/backend deployment commits, runtime versions, database migration state, contract addresses, and deployment blocks using logs and non-secret metadata. Reconcile differences from the repository configuration.
-- Create a Neon test branch and configure a dedicated Render testing service to use its connection string. Use production-like validation in the testing service with distinct environment identifiers and secrets.
+- Maintain the dedicated Neon testing project/branch/database and Render testing service with production-like validation, distinct environment identifiers and separate secrets. This was provisioned without copying production rows.
 - Deploy the existing contracts to local Hardhat for integration work and separate Sepolia addresses for hosted testing. Record addresses, chain IDs, ABIs, and deployment blocks in a reproducible manifest.
 - Configure Vercel Preview variables to target the testing API and contracts. Generate/configure CSP for the selected API origin; configure the testing backend with the intended preview origins. Keep production CORS limited to production clients.
 - Ensure SIWE origin configuration follows the same environment selection. Use explicit preview hosts or a narrowly scoped project-specific rule, rather than allowing arbitrary hosted domains.
@@ -66,6 +112,10 @@ Tests and migration checks belong in each implementation PR. PR 7 assembles the 
 **Acceptance:** a preview can read/write a labeled test record without changing live database records or using live contract addresses. API calls, wallet connections, and signed login requests are permitted by the intended CSP/CORS/origin settings.
 
 ## PR 1 — Restore indexer startup and truthful health reporting
+
+**Status: partial; core repairs released in #15. Priority: P1 for remaining operations.**
+
+Delivered: bundled ABI loading, compatible locked dependencies, enablement/configuration guards, bounded polling/timeouts, startup retries, interruptible shutdown, liveness/readiness/progress reporting, and conservative receipt-backed registration verification. Remaining: a confirmed/finalized target and lag policy with increment 4, explicit hosted HTTP health-check configuration and readiness alerting. Both existing Render services currently use default TCP platform checks; the YAML templates specify `/health/live`, but are not attached to those services. Production backfill remains disabled.
 
 **Tasks**
 
@@ -82,6 +132,10 @@ Tests and migration checks belong in each implementation PR. PR 7 assembles the 
 **Acceptance:** real ABI loading succeeds; simulated initial RPC failure recovers; stopped/stalled indexing is visible in readiness; a database-only product cannot receive a verified badge. Exercise startup recovery against test contracts. Production backfill waits for PRs 3–4.
 
 ## PR 2 — Fix authentication and enforce ownership
+
+**Status: done and released in #16. Priority: maintain.**
+
+All tasks below are implemented: persistent single-use scoped SIWE challenges and expiry cleanup, strict token policy and hosted secrets, shared session invalidation, signed ownership and object-level write authorization, legacy read-only handling, and rejection of SQL edits to registered chain-controlled fields. Security regressions, local real-wallet journeys and hosted checks passed. See [AUTHENTICATION.md](AUTHENTICATION.md). Contract-wallet sign-in and server-side token revocation are separate future scope.
 
 **Tasks**
 
@@ -100,6 +154,12 @@ Tests and migration checks belong in each implementation PR. PR 7 assembles the 
 
 ## PR 3 — Introduce canonical identity and migration discipline
 
+**Status: partial. Priority: P1 — next implementation.**
+
+Delivered ahead of this increment: frontend/backend bytes32 conversion helpers, display/hex draft lookup with conflict detection, explicit ownership provenance, packaged Alembic migrations, guarded baseline inspection/adoption, startup migrations and disabled hosted `create_all`. Production adoption and additive migrations were rehearsed before release.
+
+Remaining: persisted canonical chain/contract/product identity and uniqueness; shared conversion fixtures; idempotent dry-run/apply legacy reconciliation; one-shipment-per-item constraint after conflict inspection; explicit registration lifecycle/timestamps; and a separately controlled migration/release stage. Current migrations run through the guarded Docker startup entrypoint, rather than an independent release job.
+
 **Schema and behavior**
 
 - Retain `product_id` as the stable public/display ID. Add canonical `on_chain_product_id`, `chain_id`, registry address, explicit ownership provenance, and registration lifecycle fields.
@@ -117,6 +177,14 @@ Tests and migration checks belong in each implementation PR. PR 7 assembles the 
 
 ## PR 4 — Make indexing durable and synchronize shipments
 
+**Status: done — implementation and local/hosted validation. Priority: P0 addressed.**
+
+Delivered: database cursor and canonical block anchors; retained event journal with unique canonical identities; atomic journal/projection/cursor batches; ordered metadata/checkpoint/custody/delivery processing; transaction-level single-writer locking; confirmation-depth policy; canonical ancestor detection and transactional projection rebuild; exact legacy-history attribution with dry-run/apply safeguards; bounded SSE queues, heartbeat/reconnect resync and cross-process commit detection. Old file cursors are ignored.
+
+Validated: interruption/rollback, restart persistence, competing PostgreSQL writers and process-loss lock release, registration re-inclusion, orphan metadata/custody/delivery recovery, malformed delivery pairs, stale RPC heads and bounded-recovery stops. The real local PostgreSQL/API/Hardhat fork/recovery and full journey passed. The additive migration preserved the production copy's product/shipment with zero ownership bindings. See [DURABLE_INDEXING.md](DURABLE_INDEXING.md).
+
+Hosted acceptance passed: 12 canonical journal events, two products, six unique checkpoints, two unique custody transfers and a delivered shipment. Same-code Render redeploy preserved counts and resumed database progress. The protected Vercel preview verified the delivered record without browser errors or production API requests. Code/schema release is tracked by PR #18. Production indexing stays disabled until the separate identity/history reconciliation and explicit enablement checks are complete. The broader canonical public identity work remains increment 3; conflicts are rejected rather than silently merged.
+
 **Tasks**
 
 - Add a chain-event journal with chain ID, contract, transaction hash, log index, block number/hash, transaction index, event type/payload, canonical flag, and processing metadata.
@@ -133,6 +201,12 @@ Tests and migration checks belong in each implementation PR. PR 7 assembles the 
 
 ## PR 5 — Implement evidence-based registration and verification
 
+**Status: partial. Priority: P1, after identity and durable indexing.**
+
+Delivered: verification checks successful receipt, chain, registry destination/emitter, block reference, canonical product ID, manufacturer and registered name; database presence alone cannot verify. The UI distinguishes transaction submission and exposes pending/confirmation state in memory. Increment 4 adds typed verification policy/indexed-block/last-sync fields and canonical block/depth checks. Local and hosted valid registrations were checked.
+
+Remaining: persist registration submissions and reload-safe progress; replacement/revert/retry reconciliation; richer evidence reasons and inspectable transaction/block references; synchronization health separate from transaction state; full metadata update/history flow. Current receipt checks do not implement the planned finality policy or durable transaction lifecycle.
+
 **Tasks**
 
 - Represent transaction progress separately from synchronization health: draft → submitted → confirmed/indexing → indexed, with failed/replaced transaction handling; track stale/degraded synchronization independently.
@@ -146,6 +220,10 @@ Tests and migration checks belong in each implementation PR. PR 7 assembles the 
 **Acceptance:** a draft, invented hash, reverted receipt, wrong-contract transaction, or mismatched product event cannot verify. A valid indexed registration does verify with inspectable evidence. API outage or indexer lag produces an explanatory state rather than a false positive or counterfeit claim.
 
 ## PR 6 — Replace placeholder analytics and repair exports
+
+**Status: pending correction; existing analytics/export endpoints remain. Priority: P1.**
+
+Immediate slice: remove or label fixed dashboard summary/trends and illustrative route/delay charts; return unknown for on-time performance without a real SLA. This can proceed before increment 4. Full completion then requires canonical indexed data, lifecycle/SLA timestamps, consistent filters/sample definitions and exports. Current PDF reporting labels product counts as shipments; CSV formula-injection protection and full-day date semantics remain to be implemented.
 
 **Metric definitions**
 
@@ -171,6 +249,12 @@ Tests and migration checks belong in each implementation PR. PR 7 assembles the 
 
 ## PR 7 — Complete integration coverage and release controls
 
+**Status: partial; substantial validation already delivered. Priority: P1, alongside every remaining increment.**
+
+Delivered: reproducible PostgreSQL/Hardhat/API/frontend stack; real registration/checkpoint/custody/delivery integration; real Chromium authentication/ownership checks; challenge persistence after restart; replay/deduplication regressions; backend/frontend/contract/browser/build CI, generated-type checks and a Python-application-to-OpenAPI drift check; migration rehearsals; dedicated-wallet hosted Sepolia journey. Latest recorded suite counts are listed above.
+
+Remaining: database-write interruption and reorganization recovery acceptance tests after increment 4; verify/enforce required merge/deployment gates; document and rehearse the full release/backfill/recovery runbook. Do not count the existing complete happy-path journey as completion of these recovery criteria.
+
 **Tasks**
 
 - Start PostgreSQL, local Hardhat contracts, the API/indexer, and the frontend in a reproducible test environment. Generate contract configuration from the test deployment manifest.
@@ -187,6 +271,8 @@ Tests and migration checks belong in each implementation PR. PR 7 assembles the 
 
 ### PR 8: QR verification, shipment detail, and guided demo
 
+**Status: pending; existing public verification and branding are foundations. Priority: P2.** Public `/verify` lookup works, but `/verify/:productId`, downloadable QR labels, unified shipment detail and a complete guided/mobile journey remain. Existing owner/handler controls came from increment 2; mobile wallet and accessibility acceptance still need dedicated work.
+
 - Add `/verify/:productId` links with direct loading and downloadable QR labels. A phone's native camera can open the link; a custom in-app scanner is optional later.
 - Build a unified shipment detail view with checkpoint/custody history, current handler, registration evidence, synchronization status, and only the actions allowed for the connected account/current state.
 - Add mobile wallet access; complete modal naming, focus management, Escape handling, scrolling, and reduced-motion support.
@@ -197,6 +283,8 @@ Tests and migration checks belong in each implementation PR. PR 7 assembles the 
 
 ### PR 9: Shipment exception list
 
+**Status: pending. Priority: P2, after trustworthy metrics and synchronization.** Existing anomaly calculations do not satisfy the planned deduplicated, acknowledged exception lifecycle.
+
 - Add configurable expected arrival and checkpoint-interval/dwell thresholds with explicit meanings.
 - Show overdue shipments, stale checkpoint activity, and unresolved custody handoffs in an in-app exception list.
 - Make exceptions reproducible, deduplicated, and resolved when conditions change. Do not treat a stale indexer as proof of a delayed shipment.
@@ -205,6 +293,8 @@ Tests and migration checks belong in each implementation PR. PR 7 assembles the 
 **Acceptance:** controlled clock/data scenarios open, update, and resolve the expected exceptions without duplicate alerts.
 
 ### PR 10: Performance and operations
+
+**Status: pending completion. Priority: P2.** Existing lazy routes, error reporting configuration and Lighthouse CI are a baseline. Measured optimization, environment-aware observability, readiness alerts and rehearsed backup/restore remain.
 
 - Measure mobile loading and interaction before changing bundles; investigate wallet/provider startup, chart imports, and unnecessary SDK loading.
 - Defer optional wallet/chart code where measurements justify it. Compare before/after Lighthouse and field metrics using the same scenario.
@@ -236,8 +326,10 @@ After the reliable demo is complete and a specific user workflow has been valida
 - A contract version for repeated shipment journeys, including address/version rollout and existing-item transition.
 - Optional notification integrations and route-specific analytics based on enough real observations.
 
-## First implementation session
+## Next implementation session
 
-Start with PR 0's environment inventory and reproducible local test configuration. Prepare PR 1's ABI/startup/health fixes and conservative verification behavior against the isolated setup. Complete PR 2's login and permission fixes before enabling broader mutation testing. Continue through canonical identity and durable indexing before starting production catchup.
+Start **increment 3: canonical product identity** from current `main`. Inspect existing display/hex identities and shipment relationships, design additive schema changes, and build the reconciliation dry-run before applying changes. Rehearse migrations and the real journey in isolation, then use `testing` for matching hosted frontend/backend checks. Use the delivered increment 4 recovery machinery only after reviewing identity/history reconciliation before enabling production catchup.
 
-Each implementation PR should describe the changed behavior, validation performed, migration/configuration requirements, and its acceptance criteria. This document is the plan; its tasks have not been implemented by creating it.
+The small analytics presentation correction and release-gate verification can be separate changes without waiting for the complete indexer redesign. Do not combine those independent fixes into the identity migration.
+
+For each implementation PR, record changed behavior, tested commit, validation results, migration/configuration requirements and remaining acceptance criteria. Update this status dashboard after release. Completing a subset of tasks does not close the increment until its remaining acceptance criteria pass.

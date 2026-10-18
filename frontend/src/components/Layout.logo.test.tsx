@@ -4,6 +4,8 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import Layout from './Layout'
 
+vi.mock('@/hooks/useSSE', () => ({ useChainEvents: vi.fn() }))
+
 vi.mock('./ConnectAndAuth', () => ({
   default: () => <button>Connect Wallet</button>,
 }))

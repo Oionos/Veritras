@@ -136,7 +136,7 @@ class TestProductEndpointContracts:
         response = client_fixture.get(f"/products/{seeded_product.product_id}/verify")
         assert response.status_code == 200
         data = response.json()
-        assert set(data.keys()) == {"product_id", "is_registered", "is_delivered", "checkpoint_count"}
+        assert set(data.keys()) == {"product_id", "is_registered", "is_delivered", "checkpoint_count", "synchronization"}
         assert data["product_id"] == seeded_product.product_id
         assert data["is_registered"] is False  # A seeded row is not receipt evidence.
         assert isinstance(data["is_delivered"], bool)

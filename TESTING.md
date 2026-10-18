@@ -36,7 +36,7 @@ make testing-reset
 make testing-up
 ```
 
-Hardhat's chain is ephemeral. After destroying/recreating its container, reset the testing database and cursor volumes together. Restarting only the API preserves its cursor. A cursor ahead of the chain is reported as degraded instead of silently claiming the data is current.
+Hardhat's chain is ephemeral. After destroying/recreating its container, reset the testing database and cursor volumes together. Restarting only the API resumes its database cursor. Old JSON cursor files are ignored. A cursor ahead of the chain is reported as degraded instead of silently claiming the data is current.
 
 In a managed cloud workspace, Make automatically adds `compose.testing.cloud.yml` when `CODEX_PROXY_CERT` is present. That override mounts the proxy CA only during dependency installation and bind-mounts current source for iteration without repeatedly rebuilding large source layers. It preserves the environment's proxy and registry configuration. `BUILDX_CONFIG` is written under ignored `.testing/`; no global Docker settings are changed.
 
@@ -61,7 +61,7 @@ Preview builds fail closed if `VITE_APP_ENV` is not `testing`, if test contract/
 
 This first increment provides isolated local services and hosted configuration, indexer ABI/startup fixes, bounded polling, retry/health reporting, stable bytes32 handling, draft reconciliation, delivery checkpoint deduplication, shipment-status updates, and receipt checks before verification. The login response field now matches the API.
 
-The complete implementation plan remains in `IMPLEMENTATION_PLAN.md`. The authentication increment now implements object-level API permissions and SIWE scope/session validation. A transactional database event journal/cursor, reorganization recovery, metadata event handling, and revised analytics remain subsequent increments. Do not treat the local smoke check as coverage of those unimplemented guarantees. The file-based cursor still requires a persistent volume for hosted restarts; Render's free filesystem is ephemeral. Production replay/backfill waits for the durable-indexing increment.
+The complete implementation plan remains in `IMPLEMENTATION_PLAN.md`. The authentication increment now implements object-level API permissions and SIWE scope/session validation. A transactional database event journal/cursor, reorganization recovery and metadata event handling are implemented in the durable-indexing increment. Revised analytics remain pending. Do not treat the local smoke check as coverage of those unimplemented guarantees. The durable-indexing increment replaces the file cursor with transactional database state and adds canonical replay/reorganization recovery; see [DURABLE_INDEXING.md](DURABLE_INDEXING.md). Production replay/backfill remains gated on its reviewed identity/history reconciliation and enablement checks.
 
 Hosted resource IDs, endpoints, deployed contracts, and the workflow are recorded in `HOSTED_TESTING.md`. A template alone does not establish a hosted testing environment; inspect both live deployments and readiness before testing.
 
@@ -71,7 +71,7 @@ Neon, Render, and Vercel connectors are available. The temporary `codex-wallet-a
 
 Vercel uses `frontend/build-vercel.mjs`. Only a Vercel **Production** build receives the public defaults recorded in `frontend/deployment.production.json`; explicitly configured variables take precedence. WalletConnect's project ID remains in the existing Vercel configuration. Preview builds still require isolated settings and fail closed until hosted testing is configured.
 
-The backend Docker image defaults `INDEXER_ENABLED=false`, and the production Render Blueprint records the same setting. This keeps the repaired file-based indexer from automatically replaying history into the live database on an ephemeral filesystem. The local and hosted testing configurations explicitly enable indexing. Registration verification continues to check receipts directly when indexing is disabled; newly submitted chain events will not appear automatically in the API until durable indexing is released and enabled. `/health/ready` reports indexing as disabled. Render's Blueprint uses `/health/live` for platform liveness.
+The backend Docker image defaults `INDEXER_ENABLED=false`, and the production Render Blueprint records the same setting. This keeps indexing an explicit release decision after migration and identity/history reconciliation. The local and hosted testing configurations explicitly enable indexing. Registration verification continues to check receipts directly when indexing is disabled; newly submitted chain events will not appear automatically in the API until production indexing is explicitly enabled after its release checks. `/health/ready` reports indexing as disabled. Render's Blueprint uses `/health/live` for platform liveness.
 
 The first release retained Render's legacy `ENVIRONMENT=development` setting and did not migrate the database. The authentication release requires production scope, a strong JWT key, and the reviewed Alembic adoption/additive migration described in `AUTHENTICATION.md`. Backfill remains disabled.
 
@@ -103,3 +103,7 @@ node scripts/check-local-auth.mjs
 ```
 
 Use `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium` if relying on system Chromium. The script only accepts fixed local testing URLs and chain 31337. It creates testing records without clearing the database.
+
+## Durable indexing increment
+
+See [DURABLE_INDEXING.md](DURABLE_INDEXING.md) for recovery guarantees and rollout. `make testing-indexer-check` runs a real local chain reorganization and verifies canonical API projections. Local Hardhat uses `INDEXER_CONFIRMATIONS=0`; hosted testing defaults to 12.

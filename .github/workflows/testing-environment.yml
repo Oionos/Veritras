@@ -24,6 +24,8 @@ jobs:
         run: make testing-up
       - name: Register, track, transfer, deliver, and verify
         run: make testing-check
+      - name: Recover a real chain reorganization
+        run: make testing-indexer-check
       - uses: actions/setup-node@v4
         with:
           node-version: 22

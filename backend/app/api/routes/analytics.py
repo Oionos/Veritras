@@ -9,7 +9,7 @@ from typing import Literal, Optional, List
 from app.core.database import get_db
 from app.core.limiter import limiter
 from app.services.analytics import get_kpi_summary, detect_anomalies, get_bottleneck_locations, get_daily_volume_data
-from app.services.events import broadcaster
+from app.services.events import broadcaster, chain_revision
 from app.services.export import export_to_csv, export_to_pdf
 from app.schemas.analytics import KPIResponse, AnomalyResponse, DailyVolumeResponse
 
@@ -86,9 +86,18 @@ async def analytics_events():
 
     async def event_generator():
         try:
+            revision = await asyncio.to_thread(chain_revision)
+            yield 'event: resync\ndata: {}\n\n'
             while True:
-                message = await queue.get()
-                yield message
+                try:
+                    message = await asyncio.wait_for(queue.get(), timeout=5)
+                    yield message
+                except asyncio.TimeoutError:
+                    yield ': heartbeat\n\n'
+                latest = await asyncio.to_thread(chain_revision)
+                if latest != revision:
+                    revision = latest
+                    yield 'event: chain_updated\ndata: {}\n\n'
         finally:
             broadcaster.unsubscribe(queue)
 

@@ -9,6 +9,7 @@ from typing import List, Optional
 
 from app.core.database import get_db
 from app.core.limiter import limiter
+from app.core.config import settings
 from app.models.product import Product
 from app.models.shipment import Checkpoint, CustodyTransfer
 from app.schemas.product import (
@@ -20,6 +21,8 @@ from app.schemas.product import (
 from app.schemas.shipment import CheckpointResponse, CustodyTransferResponse
 from app.services.events import broadcaster
 from app.services.verification import verify_registration
+from app.models.chain import IndexerCursor
+from app.schemas.product import VerificationResponse
 
 router = APIRouter()
 
@@ -125,7 +128,7 @@ def get_product(product_id: str, db: Session = Depends(get_db)):
     }
 
 
-@router.get("/{product_id}/verify", response_model=dict)
+@router.get("/{product_id}/verify", response_model=VerificationResponse)
 def verify_product(product_id: str, db: Session = Depends(get_db)):
     """Return verification status for a product."""
     product = db.query(Product).filter(Product.product_id == product_id).first()
@@ -144,9 +147,19 @@ def verify_product(product_id: str, db: Session = Depends(get_db)):
         registered = verify_registration(product)
     except Exception:
         raise HTTPException(status_code=503, detail="Registration evidence is temporarily unavailable")
+    binding = product.indexed_state
+    cursor = db.get(IndexerCursor, binding.scope) if binding else None
     return {
         "product_id": product_id,
         "is_registered": registered,
         "is_delivered": is_delivered,
         "checkpoint_count": checkpoint_count,
+        "synchronization": {
+            "confirmation_policy": "depth",
+            "confirmations": settings.indexer_confirmations,
+            "cursor_storage": "database",
+            "indexer_enabled": settings.indexer_enabled,
+            "indexed_block": cursor.last_processed_block if cursor else None,
+            "last_successful_sync": cursor.updated_at if cursor else None,
+        },
     }

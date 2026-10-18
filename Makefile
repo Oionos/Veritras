@@ -4,7 +4,7 @@ ifneq ($(strip $(CODEX_PROXY_CERT)),)
 TEST_COMPOSE += -f compose.testing.cloud.yml
 endif
 
-.PHONY: testing-up testing-build testing-check testing-status testing-logs testing-down testing-reset testing-restart-api
+.PHONY: testing-up testing-build testing-check testing-status testing-logs testing-down testing-reset testing-restart-api testing-indexer-check
 testing-up:
 	$(TEST_COMPOSE) up -d --wait --wait-timeout 180
 testing-build:
@@ -22,3 +22,7 @@ testing-down:
 # Destructive only to this explicitly named disposable testing project.
 testing-reset:
 	$(TEST_COMPOSE) down --volumes
+
+# Reorg regression only: refuses hosted APIs and non-Hardhat chains.
+testing-indexer-check:
+	$(TEST_COMPOSE) --profile checks run --no-deps --rm smoke npx hardhat run scripts/check-durable-indexer.ts --network localhost
