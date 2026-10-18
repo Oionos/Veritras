@@ -2,7 +2,8 @@ name: Hosted API Readiness
 on:
   push:
     branches: [main, testing]
-    paths: ['backend/**', '.github/workflows/hosted-health.yml']
+    # Production Render's rootDir is backend: other paths do not redeploy it.
+    paths: ['backend/**']
   workflow_dispatch:
     inputs:
       environment:
