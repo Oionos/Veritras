@@ -4,7 +4,7 @@ ifneq ($(strip $(CODEX_PROXY_CERT)),)
 TEST_COMPOSE += -f compose.testing.cloud.yml
 endif
 
-.PHONY: testing-up testing-build testing-check testing-status testing-logs testing-down testing-reset testing-restart-api
+.PHONY: testing-up testing-build testing-check testing-status testing-logs testing-down testing-reset testing-restart-api testing-indexer-check
 testing-up:
 	$(TEST_COMPOSE) up -d --wait --wait-timeout 180
 testing-build:

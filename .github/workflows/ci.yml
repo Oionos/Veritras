@@ -100,7 +100,7 @@ jobs:
 
       - name: Check OpenAPI matches the application
         env:
-          DATABASE_URL: sqlite:///:memory:
+          DATABASE_URL: "sqlite:///:memory:"
           ENVIRONMENT: development
           SEPOLIA_RPC_URL: ""
         run: |

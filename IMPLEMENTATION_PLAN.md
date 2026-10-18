@@ -1,10 +1,10 @@
 # Veritras implementation plan
 
-Originally prepared October 17, 2026 from [PROJECT_REVIEW.md](PROJECT_REVIEW.md). **Status updated October 18, 2026 from released `main` at `33c4745` plus the durable-indexing increment on `codex/durable-chain-indexing`.** This update uses repository code and previously recorded release checks; it does not represent a new live health check or test run.
+Originally prepared October 17, 2026 from [PROJECT_REVIEW.md](PROJECT_REVIEW.md). **Status updated October 18, 2026 from released `main` at `33c4745` plus the durable-indexing increment on `codex/durable-chain-indexing`.** This update includes the durable-indexing code, local and hosted acceptance checks, and the delivery evidence below.
 
 ## Status at a glance
 
-**The testing environment and wallet security are delivered. The complete reliable-demo milestone is still open.** Durable indexing is implemented with recovery coverage; canonical product identity is the next implementation priority. Hosted rollout evidence is recorded in [DURABLE_INDEXING.md](DURABLE_INDEXING.md).
+**The testing environment and wallet security are delivered. The complete reliable-demo milestone is still open.** Durable indexing is complete with local and hosted recovery/persistence coverage; canonical product identity is the next implementation priority. Hosted rollout evidence is recorded in [DURABLE_INDEXING.md](DURABLE_INDEXING.md).
 
 Status meanings: **Done** = implemented and validated for the stated scope; **Partial** = some work delivered with remaining acceptance criteria; **Pending** = planned work remains; **Deferred** = after the reliable-demo milestone. Partial work is not currently being implemented simply because it is listed here.
 
@@ -16,7 +16,7 @@ Priority meanings: **P0 — release blocker** must be resolved before enabling p
 | Wallet sign-in and write permissions | **Done** | Maintain | Persistent SIWE challenges, scoped tokens, owner-only API writes, browser session handling |
 | Indexer startup and health | **Partial** | P1 | Startup/retry/readiness fixes delivered; finality-aware health, hosted HTTP checks and monitoring remain |
 | Canonical product identity (increment 3) | **Partial** | **P1 — next implementation** | Conversion and draft matching exist; explicit identity columns, constraints and legacy reconciliation remain |
-| Durable indexing (increment 4) | **Done — implementation and local validation; hosted rollout in progress** | **P0 addressed in code** | Transactional journal/cursor, ordered reversible projections, confirmation policy, single-writer lock, metadata events and resilient notifications; production enablement remains a separate gate |
+| Durable indexing (increment 4) | **Done** | **P0 addressed** | Transactional journal/cursor, ordered reversible projections, confirmation policy, single-writer lock, metadata events and resilient notifications; production enablement remains a separate gate |
 | Registration lifecycle and evidence (increment 5) | **Partial** | P1 | Receipt-backed registration checks delivered; persisted submissions, replacement handling and richer evidence states remain |
 | Analytics and exports (increment 6) | **Pending** | **P1 — remove misleading metrics soon** | Fixed dashboard totals/trends, sample route charts, assumed 72-hour SLA and export semantics still need correction |
 | Integration and release controls (increment 7) | **Partial** | P1 | Real local/browser/Sepolia journeys and CI delivered; failure/reorg coverage, enforced release gates and recovery runbook remain |
@@ -41,9 +41,9 @@ Priority meanings: **P0 — release blocker** must be resolved before enabling p
 | [PR #16](https://github.com/Oionos/Veritras/pull/16) | `e493afb` | Wallet authentication, ownership enforcement, shared sessions and guarded schema adoption/migration; released to Vercel and Render |
 | [PR #17](https://github.com/Oionos/Veritras/pull/17) | `33c4745` | Hosted testing resources, Preview repair, unique source-event identities and replay regressions; released to Vercel and Render |
 
-Latest recorded validation: **195 backend tests, 191 frontend tests, 23 Playwright regressions and 40 contract tests passed**, plus builds, generated-type checks, Lighthouse and real local integration/browser journeys. Hosted Sepolia registration → checkpoints → custody → delivery passed; a same-code testing redeploy preserved event counts. These checks do not establish the pending durable-cursor or reorganization guarantees.
+Latest durable-indexing validation: **236 backend tests, 192 frontend tests, 23 Playwright regressions and 40 contract tests passed**, plus builds, generated-type checks, Lighthouse and real local integration/browser journeys. Hosted Sepolia registration → checkpoints → custody → delivery passed; a same-code testing redeploy preserved event counts. The backend matrix covers SQLite and PostgreSQL, with two intentional skips for PostgreSQL-only checks in the SQLite variant. A real local chain fork/recovery and hosted same-code redeploy also passed.
 
-Released schema before this increment: `c72b53d91e04`. The durable-indexing migration is `f04d9c21a873`, rehearsed on an isolated production copy without changing business counts or granting ownership. Testing uses a dedicated Neon project/database (`Veritras Testing` / `veritras_preview`), a separate Render API and distinct Sepolia contracts. Setup and resource details: [TESTING.md](TESTING.md), [HOSTED_TESTING.md](HOSTED_TESTING.md), [AUTHENTICATION.md](AUTHENTICATION.md).
+Released schema before this increment: `c72b53d91e04`. The durable-indexing migration is `f04d9c21a873`, applied in hosted testing and rehearsed on an isolated production copy without changing business counts or granting ownership. Production code/schema rollout is tracked by [PR #18](https://github.com/Oionos/Veritras/pull/18); production indexing remains explicitly disabled. Testing uses a dedicated Neon project/database (`Veritras Testing` / `veritras_preview`), a separate Render API and distinct Sepolia contracts. Setup and resource details: [TESTING.md](TESTING.md), [HOSTED_TESTING.md](HOSTED_TESTING.md), [AUTHENTICATION.md](AUTHENTICATION.md).
 
 ## Goal and completion criteria
 
@@ -81,7 +81,7 @@ The numbers below are **plan increment IDs**, not actual GitHub pull request num
 | 1 | Partial / P1 | Follow-up health operations | Finality-aware progress, hosted HTTP checks and monitoring | Finality policy from 4 |
 | 2 | **Done** | Released in #16 | Maintain authentication and authorization | 0 environment setup |
 | 3 | Partial / **P1 next** | `feat/canonical-product-identity` | Identity schema, reconciliation and one-shipment constraint | 2 |
-| 4 | **Implemented / hosted rollout in progress** | `codex/durable-chain-indexing` | Complete hosted validation/release; preserve production enablement gate | Scoped identity binding included; broader increment 3 remains |
+| 4 | **Done / P0 addressed** | `codex/durable-chain-indexing` | Maintain recovery guarantees; production enablement remains a separate gate | Scoped identity binding included; broader increment 3 remains |
 | 5 | Partial / P1 | `feat/evidence-based-verification` | Persistent transaction lifecycle and rich evidence responses | 2–4 |
 | 6 | Pending / P1 | `fix/live-analytics-and-reports` | Accurate metrics, SLA semantics and consistent safe exports | 4 for complete aggregates; mock removal can ship now |
 | 7 | Partial / P1 | `test/complete-provenance-flow` | Failure/reorg coverage, enforced gates and recovery runbook | 2–6 for final acceptance |
@@ -177,13 +177,13 @@ Remaining: persisted canonical chain/contract/product identity and uniqueness; s
 
 ## PR 4 — Make indexing durable and synchronize shipments
 
-**Status: implementation and local validation done; hosted rollout in progress. Priority: P0 implementation addressed.**
+**Status: done — implementation and local/hosted validation. Priority: P0 addressed.**
 
 Delivered: database cursor and canonical block anchors; retained event journal with unique canonical identities; atomic journal/projection/cursor batches; ordered metadata/checkpoint/custody/delivery processing; transaction-level single-writer locking; confirmation-depth policy; canonical ancestor detection and transactional projection rebuild; exact legacy-history attribution with dry-run/apply safeguards; bounded SSE queues, heartbeat/reconnect resync and cross-process commit detection. Old file cursors are ignored.
 
 Validated: interruption/rollback, restart persistence, competing PostgreSQL writers and process-loss lock release, registration re-inclusion, orphan metadata/custody/delivery recovery, malformed delivery pairs, stale RPC heads and bounded-recovery stops. The real local PostgreSQL/API/Hardhat fork/recovery and full journey passed. The additive migration preserved the production copy's product/shipment with zero ownership bindings. See [DURABLE_INDEXING.md](DURABLE_INDEXING.md).
 
-Remaining release work: hosted testing deployment and restart checks, CI and production code rollout. Production indexing stays disabled until the separate identity/history reconciliation and explicit enablement checks are complete. The broader canonical public identity work remains increment 3; conflicts are rejected rather than silently merged.
+Hosted acceptance passed: 12 canonical journal events, two products, six unique checkpoints, two unique custody transfers and a delivered shipment. Same-code Render redeploy preserved counts and resumed database progress. The protected Vercel preview verified the delivered record without browser errors or production API requests. Code/schema release is tracked by PR #18. Production indexing stays disabled until the separate identity/history reconciliation and explicit enablement checks are complete. The broader canonical public identity work remains increment 3; conflicts are rejected rather than silently merged.
 
 **Tasks**
 
@@ -203,9 +203,9 @@ Remaining release work: hosted testing deployment and restart checks, CI and pro
 
 **Status: partial. Priority: P1, after identity and durable indexing.**
 
-Delivered: verification checks successful receipt, chain, registry destination/emitter, block reference, canonical product ID, manufacturer and registered name; database presence alone cannot verify. The UI distinguishes transaction submission and exposes pending/confirmation state in memory. Local and hosted valid registrations were checked.
+Delivered: verification checks successful receipt, chain, registry destination/emitter, block reference, canonical product ID, manufacturer and registered name; database presence alone cannot verify. The UI distinguishes transaction submission and exposes pending/confirmation state in memory. Increment 4 adds typed verification policy/indexed-block/last-sync fields and canonical block/depth checks. Local and hosted valid registrations were checked.
 
-Remaining: persist registration submissions and reload-safe progress; replacement/revert/retry reconciliation; richer typed evidence reasons and confirmation/finality references; synchronization health separate from transaction state; full metadata update/history flow. Current receipt checks do not implement the planned finality policy or durable transaction lifecycle.
+Remaining: persist registration submissions and reload-safe progress; replacement/revert/retry reconciliation; richer evidence reasons and inspectable transaction/block references; synchronization health separate from transaction state; full metadata update/history flow. Current receipt checks do not implement the planned finality policy or durable transaction lifecycle.
 
 **Tasks**
 
@@ -251,9 +251,9 @@ Immediate slice: remove or label fixed dashboard summary/trends and illustrative
 
 **Status: partial; substantial validation already delivered. Priority: P1, alongside every remaining increment.**
 
-Delivered: reproducible PostgreSQL/Hardhat/API/frontend stack; real registration/checkpoint/custody/delivery integration; real Chromium authentication/ownership checks; challenge persistence after restart; replay/deduplication regressions; backend/frontend/contract/browser/build CI and generated-type checks; migration rehearsals; dedicated-wallet hosted Sepolia journey. Latest recorded suite counts are listed above.
+Delivered: reproducible PostgreSQL/Hardhat/API/frontend stack; real registration/checkpoint/custody/delivery integration; real Chromium authentication/ownership checks; challenge persistence after restart; replay/deduplication regressions; backend/frontend/contract/browser/build CI, generated-type checks and a Python-application-to-OpenAPI drift check; migration rehearsals; dedicated-wallet hosted Sepolia journey. Latest recorded suite counts are listed above.
 
-Remaining: database-write interruption and reorganization recovery acceptance tests after increment 4; verify generated OpenAPI against the running Python application's schema rather than only checked-in JSON-to-types drift; verify/enforce required merge/deployment gates; document and rehearse the full release/backfill/recovery runbook. Do not count the existing complete happy-path journey as completion of these recovery criteria.
+Remaining: database-write interruption and reorganization recovery acceptance tests after increment 4; verify/enforce required merge/deployment gates; document and rehearse the full release/backfill/recovery runbook. Do not count the existing complete happy-path journey as completion of these recovery criteria.
 
 **Tasks**
 
