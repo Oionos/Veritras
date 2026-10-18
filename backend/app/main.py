@@ -198,7 +198,7 @@ def indexer_state():
     response_model=IndexerHealthResponse,
     responses={503: {"model": IndexerHealthResponse}},
 )
-def health_indexer():
+async def health_indexer():
     """Cached worker health; a progressing backfill is healthy but not ready."""
     state = indexer_state()
     healthy = state.status in {"current", "catching_up", "disabled"}
@@ -206,7 +206,7 @@ def health_indexer():
 
 
 @app.get("/health/live", response_model=LivenessResponse)
-def health_live():
+async def health_live():
     # No database/RPC work: backfill and dependency outages must not restart APIs.
     return LivenessResponse(
         environment=settings.environment,

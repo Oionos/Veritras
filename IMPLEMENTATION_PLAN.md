@@ -113,7 +113,7 @@ Delivered: local Compose isolation; a dedicated hosted Neon project/database and
 
 ## PR 1 — Restore indexer startup and truthful health reporting
 
-**Status: implementation complete; release validation and actual Render HTTP setting follow-up in progress. Priority: P1 for platform completion.**
+**Status: implementation and local/hosted acceptance complete; actual Render HTTP setting pending. Priority: P1 for platform completion.**
 
 Delivered: bundled ABI loading and locked dependencies; validated chain/contract startup; capped exponential retries without hidden provider retries; cancellation and transactional shutdown rollback; typed cached confirmed-target health; startup, poll, cursor-progress and head freshness checks; bounded database probing; consistent disabled/failed states; app synchronization notices; structured transition logs; and bounded deployment/manual readiness workflows. Real local startup/runtime RPC failures recovered against Hardhat and PostgreSQL. The actual Render HTTP health paths still require Dashboard/API access because the available connector cannot edit existing service settings. Templates already specify `/health/live`; this does not establish the live setting. Continuous runtime alerting remains opt-in under the free-tier constraints. See [INDEXER_HEALTH.md](INDEXER_HEALTH.md). Production backfill remains disabled.
 

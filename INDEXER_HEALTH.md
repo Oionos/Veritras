@@ -9,7 +9,7 @@ current data. Production indexing remains disabled pending its separate enableme
 
 | Endpoint | HTTP 200 | HTTP 503 | Work performed |
 | --- | --- | --- | --- |
-| `/health/live` | API process responds | Process unavailable | No database or RPC calls |
+| `/health/live` | API process responds | Process unavailable | No database, RPC or blocking request-pool work |
 | `/health/ready` | Database responds and enabled indexer is current | Database unavailable/timeout, startup, backfill, stopped or degraded worker | Bounded, single-flight database probe; cached worker observations |
 | `/health/indexer` | Current worker, progressing backfill, or explicitly disabled indexing | Missing/failed/stalled/stopping worker | Cached observations only |
 | `/health` | Compatibility readiness summary | Not ready | Same bounded database probe; no separate RPC request |
@@ -140,3 +140,28 @@ Free Render services can sleep, so an on-demand cold-start check can initially f
 A progressing backfill can be healthy while not yet API-ready. Wait or extend an
 explicit operator probe deadline; do not change the platform path to readiness,
 weaken confirmation depth or enable production indexing to silence the signal.
+
+## Acceptance and release evidence
+
+- Release tracked by [PR #20](https://github.com/Oionos/Veritras/pull/20).
+- Local: 337 backend tests passed with 3 intentional dialect-specific skips;
+  228 frontend tests passed with coverage thresholds. The existing 23 browser
+  regressions and three new synchronization-state checks passed. TypeScript and
+  production builds passed.
+- Real local API/PostgreSQL/Hardhat round trip, chain reorganization and browser
+  wallet ownership checks passed. A separate isolated database and controlled RPC
+  proxy proved both initial and runtime RPC failure recovery, persisted cursor
+  progress and graceful shutdown without changing hosted data.
+- Hosted testing source `e100325df5cbe6371c1a02c40cc8915a8f162be2`:
+  Render `dep-dba7mn1srm7s73a5p2ig` live; Vercel
+  `dpl_DoLNa1adbEHd21aNtki5JfQ4Pkz5` ready. Exact-commit health workflow
+  [39109458594](https://github.com/Oionos/Veritras/actions/runs/39109458594) passed.
+- The protected preview reported current data with zero confirmed lag and depth
+  12, returned no-store health responses, verified the existing delivered product,
+  and displayed injected catching-up/degraded/disabled UI states with no browser
+  errors or production requests. Structured current-state logs were verified.
+- Actual Render HTTP health paths remain a separate pending configuration item
+  until the authenticated Dashboard/API setting is applied and read back. The
+  readiness workflow's HTTP checks do not silently change the platform setting.
+- Final tested source, complete CI results and production deployment references
+  are recorded in PR #20. No schema migration or production backfill is included.
