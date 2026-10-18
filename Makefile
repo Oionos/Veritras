@@ -26,3 +26,16 @@ testing-reset:
 # Reorg regression only: refuses hosted APIs and non-Hardhat chains.
 testing-indexer-check:
 	$(TEST_COMPOSE) --profile checks run --no-deps --rm smoke npx hardhat run scripts/check-durable-indexer.ts --network localhost
+
+# Actual PostgreSQL write failure, full API restart, repair and replay. Local only.
+.PHONY: testing-recovery-check
+testing-recovery-check:
+	$(TEST_COMPOSE) exec -T backend python check_local_recovery.py prepare
+	$(TEST_COMPOSE) restart backend
+	$(TEST_COMPOSE) exec -T backend python check_local_recovery.py recover
+	$(TEST_COMPOSE) restart backend
+	$(TEST_COMPOSE) exec -T backend python check_local_recovery.py verify
+
+.PHONY: testing-release-rehearsal
+testing-release-rehearsal:
+	bash release/rehearse-local.sh

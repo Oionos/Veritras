@@ -1,0 +1,25 @@
+{
+  "repository": "Oionos/Veritras",
+  "branch": "main",
+  "app_id": 15368,
+  "workflows": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "jobs": [
+        "Blockchain Tests",
+        "Backend Tests",
+        "Frontend Unit Tests",
+        "Frontend E2E Tests",
+        "Frontend Build",
+        "Frontend Lighthouse",
+        "OpenAPI Types Drift Check"
+      ]
+    },
+    {
+      "path": ".github/workflows/testing-environment.yml",
+      "jobs": [
+        "API and Contract Integration"
+      ]
+    }
+  ]
+}

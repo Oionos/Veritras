@@ -17,6 +17,8 @@ services:
     volumes:
       - ./backend/app:/app/app:ro
       - ./backend/start_testing.py:/app/start_testing.py:ro
+      - ./backend/check_local_recovery.py:/app/check_local_recovery.py:ro
+      - ./backend/rehearse_local_release.py:/app/rehearse_local_release.py:ro
       - ./backend/alembic:/app/alembic:ro
   frontend:
     build:

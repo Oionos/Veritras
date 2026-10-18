@@ -43,6 +43,7 @@ from app.services.identity import (
 )
 from app.models.chain import IndexerCursor
 from app.schemas.product import VerificationResponse
+from app.schemas.product_detail import ProductDetailResponse
 
 router = APIRouter()
 
@@ -186,7 +187,7 @@ def update_product(
     return product
 
 
-@router.get("/{product_id}", response_model=dict)
+@router.get("/{product_id}", response_model=ProductDetailResponse)
 def get_product(product_id: str, db: Session = Depends(get_db)):
     """Get a single product by its product_id, including history and custody transfers."""
     product = resolve_product(db, product_id)
