@@ -314,21 +314,20 @@ def test_pdf_does_not_label_a_draft_creation_as_registration(
     client_fixture, db_session, monkeypatch
 ):
     from app.services import export
-    from reportlab.platypus import Table
+    from reportlab.platypus import Paragraph
 
     client_fixture.post("/products/", json={"name": "Unregistered draft"})
-    tables = []
+    paragraphs = []
     monkeypatch.setattr(
         export.SimpleDocTemplate,
         "build",
-        lambda self, story: tables.extend(
-            item._cellvalues for item in story if isinstance(item, Table)
+        lambda self, story: paragraphs.extend(
+            item.getPlainText() for item in story if isinstance(item, Paragraph)
         ),
     )
     export.export_to_pdf(db_session, None, None)
-    rows = next(
-        rows
-        for rows in tables
-        if rows[0] == ["Product ID", "Name", "Manufacturer", "Registered At"]
-    )
-    assert rows[1][3] == ""
+    text = "\n".join(paragraphs)
+    assert "Total Shipments: 0" in text
+    assert "No shipments in this cohort." in text
+    assert "Unregistered draft" not in text
+    assert "Registered At" not in text

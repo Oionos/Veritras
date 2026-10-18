@@ -146,3 +146,36 @@ def test_postgres_export_rehearses_rolls_back_and_guards_source(
             for statement in statements:
                 conn.exec_driver_sql(statement)
     manage_schema.require_current_schema()
+
+
+def test_sla_upgrade_preserves_historical_shipments_as_unknown(migration_db):
+    engine = migration_db
+    config = Config("alembic.ini")
+    config.attributes["configure_logger"] = False
+    with engine.begin() as conn:
+        config.attributes["connection"] = conn
+        command.upgrade(config, "b47e203fa951")
+        conn.execute(
+            sa.text(
+                "INSERT INTO products (product_id,name,manufacturer_address,registered_at,block_number,tx_hash,registration_status) VALUES ('SLA-LEGACY','Legacy','untrusted','2026-01-01',0,'0x','legacy_unreconciled')"
+            )
+        )
+        conn.execute(
+            sa.text(
+                "INSERT INTO shipments (shipment_id,product_id,origin,destination,status,created_at,updated_at,block_number,tx_hash) VALUES ('SLA-SHIP','SLA-LEGACY','A','B','3','2026-01-01','2026-01-01',0,'0x')"
+            )
+        )
+        command.upgrade(config, "c62a904df318")
+        assert (
+            conn.execute(
+                sa.text("SELECT expected_arrival_at FROM shipments")
+            ).scalar_one()
+            is None
+        )
+        assert conn.execute(sa.text("SELECT count(*) FROM shipments")).scalar_one() == 1
+        assert (
+            conn.execute(
+                sa.text("SELECT version_num FROM alembic_version")
+            ).scalar_one()
+            == "c62a904df318"
+        )

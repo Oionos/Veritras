@@ -928,6 +928,78 @@
         "summary": "Get Kpis",
         "description": "Return key performance indicators for the supply chain.",
         "operationId": "get_kpis_analytics_kpis_get",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 10
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 10
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "origin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Origin"
+            }
+          },
+          {
+            "name": "destination",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Destination"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -935,6 +1007,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/KPIResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -960,6 +1042,76 @@
               "minimum": 0.5,
               "default": 2.0,
               "title": "Z Threshold"
+            }
+          },
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 10
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 10
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "origin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Origin"
+            }
+          },
+          {
+            "name": "destination",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Destination"
             }
           }
         ],
@@ -997,7 +1149,7 @@
           "analytics"
         ],
         "summary": "Get Bottlenecks",
-        "description": "Identify bottleneck locations based on average dwell time between checkpoints.",
+        "description": "Compatibility URL: return canonical checkpoint intervals, not dwell times.",
         "operationId": "get_bottlenecks_analytics_bottlenecks_get",
         "parameters": [
           {
@@ -1010,6 +1162,76 @@
               "default": 24.0,
               "title": "Min Dwell Hours"
             }
+          },
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 10
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 10
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "origin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Origin"
+            }
+          },
+          {
+            "name": "destination",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Destination"
+            }
           }
         ],
         "responses": {
@@ -1017,7 +1239,13 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CheckpointInterval"
+                  },
+                  "title": "Response Get Bottlenecks Analytics Bottlenecks Get"
+                }
               }
             }
           },
@@ -1058,13 +1286,28 @@
             }
           },
           {
+            "name": "report",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "shipments",
+                "events"
+              ],
+              "type": "string",
+              "default": "shipments",
+              "title": "Report"
+            }
+          },
+          {
             "name": "start_date",
             "in": "query",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 10
                 },
                 {
                   "type": "null"
@@ -1080,13 +1323,50 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 10
                 },
                 {
                   "type": "null"
                 }
               ],
               "title": "End Date"
+            }
+          },
+          {
+            "name": "origin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Origin"
+            }
+          },
+          {
+            "name": "destination",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Destination"
             }
           }
         ],
@@ -1120,6 +1400,78 @@
         "summary": "Get Daily Volume",
         "description": "Return daily shipment and product registration counts for the last 7 days.",
         "operationId": "get_daily_volume_analytics_daily_volume_get",
+        "parameters": [
+          {
+            "name": "start_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 10
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Date"
+            }
+          },
+          {
+            "name": "end_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 10
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Date"
+            }
+          },
+          {
+            "name": "origin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Origin"
+            }
+          },
+          {
+            "name": "destination",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Destination"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1127,6 +1479,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DailyVolumeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -1266,11 +1628,76 @@
   },
   "components": {
     "schemas": {
+      "AnalyticsFilters": {
+        "properties": {
+          "start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          },
+          "end_exclusive": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Exclusive"
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin"
+          },
+          "destination": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "cohort": {
+            "type": "string",
+            "title": "Cohort"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end_exclusive",
+          "origin",
+          "destination",
+          "timezone",
+          "cohort"
+        ],
+        "title": "AnalyticsFilters"
+      },
       "AnomalyResponse": {
         "properties": {
           "product_id": {
             "type": "string",
-            "maxLength": 100,
             "title": "Product Id"
           },
           "transit_time_hours": {
@@ -1283,13 +1710,26 @@
           },
           "severity": {
             "type": "string",
-            "maxLength": 50,
             "title": "Severity"
           },
           "flagged_at": {
             "type": "string",
-            "maxLength": 50,
             "title": "Flagged At"
+          },
+          "origin": {
+            "type": "string",
+            "title": "Origin",
+            "default": ""
+          },
+          "destination": {
+            "type": "string",
+            "title": "Destination",
+            "default": ""
+          },
+          "sample_size": {
+            "type": "integer",
+            "title": "Sample Size",
+            "default": 0
           }
         },
         "type": "object",
@@ -1360,6 +1800,29 @@
           "message"
         ],
         "title": "ChallengeResponse"
+      },
+      "CheckpointInterval": {
+        "properties": {
+          "location": {
+            "type": "string",
+            "title": "Location"
+          },
+          "avg_interval_hours": {
+            "type": "number",
+            "title": "Avg Interval Hours"
+          },
+          "incident_count": {
+            "type": "integer",
+            "title": "Incident Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "location",
+          "avg_interval_hours",
+          "incident_count"
+        ],
+        "title": "CheckpointInterval"
       },
       "CheckpointResponse": {
         "properties": {
@@ -1479,12 +1942,10 @@
         "properties": {
           "name": {
             "type": "string",
-            "maxLength": 50,
             "title": "Name"
           },
           "date": {
             "type": "string",
-            "maxLength": 50,
             "title": "Date"
           },
           "shipments": {
@@ -1897,11 +2358,93 @@
           },
           "bottleneck_locations": {
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/CheckpointInterval"
             },
             "type": "array",
             "title": "Bottleneck Locations"
+          },
+          "transit_sample_size": {
+            "type": "integer",
+            "title": "Transit Sample Size"
+          },
+          "incomplete_transit_shipments": {
+            "type": "integer",
+            "title": "Incomplete Transit Shipments"
+          },
+          "on_time_shipments": {
+            "type": "integer",
+            "title": "On Time Shipments"
+          },
+          "sla_sample_size": {
+            "type": "integer",
+            "title": "Sla Sample Size"
+          },
+          "late_sla_deliveries": {
+            "type": "integer",
+            "title": "Late Sla Deliveries"
+          },
+          "incomplete_sla_deliveries": {
+            "type": "integer",
+            "title": "Incomplete Sla Deliveries"
+          },
+          "unknown_sla_deliveries": {
+            "type": "integer",
+            "title": "Unknown Sla Deliveries"
+          },
+          "avg_active_elapsed_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Active Elapsed Hours"
+          },
+          "active_elapsed_sample_size": {
+            "type": "integer",
+            "title": "Active Elapsed Sample Size"
+          },
+          "awaiting_departure_shipments": {
+            "type": "integer",
+            "title": "Awaiting Departure Shipments"
+          },
+          "checkpoint_count": {
+            "type": "integer",
+            "title": "Checkpoint Count"
+          },
+          "event_count": {
+            "type": "integer",
+            "title": "Event Count"
+          },
+          "routes": {
+            "items": {
+              "$ref": "#/components/schemas/RouteMetrics"
+            },
+            "type": "array",
+            "title": "Routes"
+          },
+          "filters": {
+            "$ref": "#/components/schemas/AnalyticsFilters"
+          },
+          "as_of": {
+            "type": "string",
+            "title": "As Of"
+          },
+          "anomaly_rule": {
+            "type": "string",
+            "title": "Anomaly Rule"
+          },
+          "trend": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShipmentTrend"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -1912,7 +2455,24 @@
           "active_shipments",
           "delivered_shipments",
           "avg_checkpoints_per_shipment",
-          "bottleneck_locations"
+          "bottleneck_locations",
+          "transit_sample_size",
+          "incomplete_transit_shipments",
+          "on_time_shipments",
+          "sla_sample_size",
+          "late_sla_deliveries",
+          "incomplete_sla_deliveries",
+          "unknown_sla_deliveries",
+          "avg_active_elapsed_hours",
+          "active_elapsed_sample_size",
+          "awaiting_departure_shipments",
+          "checkpoint_count",
+          "event_count",
+          "routes",
+          "filters",
+          "as_of",
+          "anomaly_rule",
+          "trend"
         ],
         "title": "KPIResponse"
       },
@@ -2728,8 +3288,157 @@
         ],
         "title": "RegistrationSubmission"
       },
+      "RouteMetrics": {
+        "properties": {
+          "avg_transit_time_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Transit Time Hours"
+          },
+          "on_time_rate_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On Time Rate Percent"
+          },
+          "total_shipments": {
+            "type": "integer",
+            "title": "Total Shipments"
+          },
+          "active_shipments": {
+            "type": "integer",
+            "title": "Active Shipments"
+          },
+          "delivered_shipments": {
+            "type": "integer",
+            "title": "Delivered Shipments"
+          },
+          "avg_checkpoints_per_shipment": {
+            "type": "number",
+            "title": "Avg Checkpoints Per Shipment"
+          },
+          "bottleneck_locations": {
+            "items": {
+              "$ref": "#/components/schemas/CheckpointInterval"
+            },
+            "type": "array",
+            "title": "Bottleneck Locations"
+          },
+          "transit_sample_size": {
+            "type": "integer",
+            "title": "Transit Sample Size"
+          },
+          "incomplete_transit_shipments": {
+            "type": "integer",
+            "title": "Incomplete Transit Shipments"
+          },
+          "on_time_shipments": {
+            "type": "integer",
+            "title": "On Time Shipments"
+          },
+          "sla_sample_size": {
+            "type": "integer",
+            "title": "Sla Sample Size"
+          },
+          "late_sla_deliveries": {
+            "type": "integer",
+            "title": "Late Sla Deliveries"
+          },
+          "incomplete_sla_deliveries": {
+            "type": "integer",
+            "title": "Incomplete Sla Deliveries"
+          },
+          "unknown_sla_deliveries": {
+            "type": "integer",
+            "title": "Unknown Sla Deliveries"
+          },
+          "avg_active_elapsed_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Active Elapsed Hours"
+          },
+          "active_elapsed_sample_size": {
+            "type": "integer",
+            "title": "Active Elapsed Sample Size"
+          },
+          "awaiting_departure_shipments": {
+            "type": "integer",
+            "title": "Awaiting Departure Shipments"
+          },
+          "checkpoint_count": {
+            "type": "integer",
+            "title": "Checkpoint Count"
+          },
+          "event_count": {
+            "type": "integer",
+            "title": "Event Count"
+          },
+          "origin": {
+            "type": "string",
+            "title": "Origin"
+          },
+          "destination": {
+            "type": "string",
+            "title": "Destination"
+          }
+        },
+        "type": "object",
+        "required": [
+          "avg_transit_time_hours",
+          "on_time_rate_percent",
+          "total_shipments",
+          "active_shipments",
+          "delivered_shipments",
+          "avg_checkpoints_per_shipment",
+          "bottleneck_locations",
+          "transit_sample_size",
+          "incomplete_transit_shipments",
+          "on_time_shipments",
+          "sla_sample_size",
+          "late_sla_deliveries",
+          "incomplete_sla_deliveries",
+          "unknown_sla_deliveries",
+          "avg_active_elapsed_hours",
+          "active_elapsed_sample_size",
+          "awaiting_departure_shipments",
+          "checkpoint_count",
+          "event_count",
+          "origin",
+          "destination"
+        ],
+        "title": "RouteMetrics"
+      },
       "ShipmentCreate": {
         "properties": {
+          "expected_arrival_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Arrival At"
+          },
           "product_id": {
             "type": "string",
             "maxLength": 100,
@@ -2828,6 +3537,54 @@
               }
             ],
             "title": "Notes"
+          },
+          "expected_arrival_recorded_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Arrival Recorded At"
+          },
+          "expected_arrival_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Arrival At"
+          },
+          "departed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Departed At"
+          },
+          "delivered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivered At"
           },
           "on_chain_product_id": {
             "anyOf": [
@@ -2950,8 +3707,60 @@
         ],
         "title": "ShipmentResponse"
       },
+      "ShipmentTrend": {
+        "properties": {
+          "current_count": {
+            "type": "integer",
+            "title": "Current Count"
+          },
+          "previous_count": {
+            "type": "integer",
+            "title": "Previous Count"
+          },
+          "percent_change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percent Change"
+          },
+          "previous_start": {
+            "type": "string",
+            "title": "Previous Start"
+          },
+          "previous_end_exclusive": {
+            "type": "string",
+            "title": "Previous End Exclusive"
+          }
+        },
+        "type": "object",
+        "required": [
+          "current_count",
+          "previous_count",
+          "percent_change",
+          "previous_start",
+          "previous_end_exclusive"
+        ],
+        "title": "ShipmentTrend"
+      },
       "ShipmentUpdate": {
         "properties": {
+          "expected_arrival_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Arrival At"
+          },
           "origin": {
             "anyOf": [
               {

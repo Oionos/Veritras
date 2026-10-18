@@ -14,6 +14,8 @@ make testing-status
 
 Compose builds missing images on first use and reuses them afterward. Run `make testing-build` explicitly after changing dependencies or Dockerfiles. This avoids repeatedly copying large images on a `vfs` Docker daemon. In the managed workspace, frontend source updates reload automatically; use `make testing-restart-api` after changing Python code.
 
+If a previous local Hardhat process has lost its in-memory chain while its PostgreSQL volume remains, preserve that volume and use a fresh Compose project for a new rehearsal. Stop the prior project first because loopback ports are fixed. For example, `TESTING_COMPOSE_PROJECT=veritras-analytics-testing make testing-up`; pass the same variable to all Make targets and `frontend/scripts/check-local-auth.mjs`. This changes only the local project/volume namespace. It never resets hosted databases or deletes previous named volumes.
+
 | Service | URL |
 | --- | --- |
 | Frontend | http://localhost:13000 |
@@ -61,7 +63,7 @@ Preview builds fail closed if `VITE_APP_ENV` is not `testing`, if test contract/
 
 This first increment provides isolated local services and hosted configuration, indexer ABI/startup fixes, bounded polling, retry/health reporting, stable bytes32 handling, draft reconciliation, delivery checkpoint deduplication, shipment-status updates, and receipt checks before verification. The login response field now matches the API.
 
-The complete implementation plan remains in `IMPLEMENTATION_PLAN.md`. The authentication increment now implements object-level API permissions and SIWE scope/session validation. A transactional database event journal/cursor, reorganization recovery and metadata event handling are implemented in the durable-indexing increment. Revised analytics remain pending. Do not treat the local smoke check as coverage of those unimplemented guarantees. The durable-indexing increment replaces the file cursor with transactional database state and adds canonical replay/reorganization recovery; see [DURABLE_INDEXING.md](DURABLE_INDEXING.md). Production replay/backfill remains gated on its reviewed identity/history reconciliation and enablement checks.
+The complete implementation plan remains in `IMPLEMENTATION_PLAN.md`. The authentication increment now implements object-level API permissions and SIWE scope/session validation. A transactional database event journal/cursor, reorganization recovery and metadata event handling are implemented in the durable-indexing increment. Canonical shipment analytics and matching safe exports are implemented; see [ANALYTICS.md](ANALYTICS.md). Do not treat the local smoke check as coverage of those unimplemented guarantees. The durable-indexing increment replaces the file cursor with transactional database state and adds canonical replay/reorganization recovery; see [DURABLE_INDEXING.md](DURABLE_INDEXING.md). Production replay/backfill remains gated on its reviewed identity/history reconciliation and enablement checks.
 
 Hosted resource IDs, endpoints, deployed contracts, and the workflow are recorded in `HOSTED_TESTING.md`. A template alone does not establish a hosted testing environment; inspect both live deployments and readiness before testing.
 

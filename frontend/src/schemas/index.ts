@@ -11,7 +11,10 @@ export const ProductSchema = z.object({
     .string()
     .regex(ethereumAddressRegex, 'Must be a valid Ethereum address'),
   description: z
-    .union([z.string().max(500, 'Description must be at most 500 characters'), z.literal('')])
+    .union([
+      z.string().max(500, 'Description must be at most 500 characters'),
+      z.literal(''),
+    ])
     .optional(),
   metadata_uri: z
     .union([z.string().url('Must be a valid URL'), z.literal('')])
@@ -19,6 +22,7 @@ export const ProductSchema = z.object({
 })
 
 export const ShipmentSchema = z.object({
+  expected_arrival_at: z.string().optional(),
   product_id: z.string().min(1, 'Product ID is required'),
   origin: z
     .string()
@@ -29,7 +33,10 @@ export const ShipmentSchema = z.object({
     .min(2, 'Destination must be at least 2 characters')
     .max(100, 'Destination must be at most 100 characters'),
   notes: z
-    .union([z.string().max(500, 'Notes must be at most 500 characters'), z.literal('')])
+    .union([
+      z.string().max(500, 'Notes must be at most 500 characters'),
+      z.literal(''),
+    ])
     .optional(),
 })
 

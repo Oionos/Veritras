@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from app.core.limiter import limiter
 from sqlalchemy.orm import Session, joinedload
@@ -19,6 +20,7 @@ from app.schemas.shipment import (
     ShipmentResponse,
     ShipmentUpdate,
 )
+from app.services.analytics import hydrate_lifecycle, utc
 from app.services.events import broadcaster
 from app.services.identity import resolve_product, require_current_scope
 
@@ -58,6 +60,7 @@ def get_all_shipments(
     col = SHIPMENT_SORT_COLUMNS.get(sort_by or "", Shipment.created_at)
     order = col.asc() if sort_order == "asc" else col.desc()
     items = query.order_by(order).offset(skip).limit(limit).all()
+    hydrate_lifecycle(db, items)
     return {"items": items, "total": total}
 
 
@@ -85,9 +88,21 @@ async def create_shipment(
         destination=shipment_in.destination,
         status=product.indexed_state.status if product.indexed_state else "0",
         notes=shipment_in.notes,
+        expected_arrival_at=shipment_in.expected_arrival_at,
+        expected_arrival_recorded_at=(
+            datetime.now(timezone.utc) if shipment_in.expected_arrival_at else None
+        ),
     )
     db.add(shipment)
     try:
+        db.flush()
+        hydrate_lifecycle(db, [shipment])
+        if shipment.expected_arrival_at and (
+            shipment.departed_at or shipment.delivered_at
+        ):
+            raise HTTPException(
+                409, "Expected arrival must be planned before indexed departure"
+            )
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -101,6 +116,7 @@ async def create_shipment(
         "shipment_created",
         {"shipment_id": shipment.shipment_id, "product_id": shipment.product_id},
     )
+    hydrate_lifecycle(db, [shipment])
     return shipment
 
 
@@ -131,11 +147,23 @@ def update_shipment(
 
     require_current_scope(product)
     update_data = shipment_in.model_dump(exclude_unset=True)
+    hydrate_lifecycle(db, [shipment])
+    if "expected_arrival_at" in update_data and (
+        shipment.departed_at or shipment.delivered_at
+    ):
+        raise HTTPException(409, "Expected arrival is locked after indexed departure")
+    if "expected_arrival_at" in update_data and utc(
+        update_data["expected_arrival_at"]
+    ) != utc(shipment.expected_arrival_at):
+        shipment.expected_arrival_recorded_at = (
+            datetime.now(timezone.utc) if update_data["expected_arrival_at"] else None
+        )
     for field, value in update_data.items():
         setattr(shipment, field, value)
 
     db.commit()
     db.refresh(shipment)
+    hydrate_lifecycle(db, [shipment])
     return shipment
 
 

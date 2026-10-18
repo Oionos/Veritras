@@ -18,7 +18,7 @@ Priority meanings: **P0 — release blocker** must be resolved before enabling p
 | Canonical product identity (increment 3) | **Done** | **P1 addressed** | Scoped identities, lifecycle timestamps, legacy aliases/reconciliation and one-shipment constraint; see [runbook](CANONICAL_PRODUCT_IDENTITY.md) |
 | Durable indexing (increment 4) | **Done** | **P0 addressed** | Transactional journal/cursor, ordered reversible projections, confirmation policy, single-writer lock, metadata events and resilient notifications; production enablement remains a separate gate |
 | Registration lifecycle and evidence (increment 5) | **Done** | **P1 addressed** | Persisted submissions, checked replacements/cancellations, reload recovery, typed receipt/journal evidence and signed metadata/history; see [runbook](REGISTRATION_LIFECYCLE.md) |
-| Analytics and exports (increment 6) | **Pending** | **P1 — remove misleading metrics soon** | Fixed dashboard totals/trends, sample route charts, assumed 72-hour SLA and export semantics still need correction |
+| Analytics and exports (increment 6) | **Done** | **P1 addressed** | Canonical shipment cohorts/lifecycle, optional locked SLA, real route/sample metrics, UTC filters and safe matching exports; see [runbook](ANALYTICS.md) |
 | Integration and release controls (increment 7) | **Partial** | P1 | Real local/browser/Sepolia journeys and CI delivered; failure/reorg coverage, enforced release gates and recovery runbook remain |
 | QR verification, shipment detail and guided demo (increment 8) | **Pending** | P2 | Public verification exists; direct product links, QR labels, unified detail and guided/mobile journey remain |
 | Shipment exceptions (increment 9) | **Pending** | P2 | Depends on trustworthy lifecycle timestamps, SLA definitions and synchronization |
@@ -29,7 +29,7 @@ Priority meanings: **P0 — release blocker** must be resolved before enabling p
 
 1. **Keep production `INDEXER_ENABLED=false`.** The new indexer has durable database progress and reorganization recovery. Production enablement still requires its reviewed deployment anchor, identity/history reconciliation and release checks; implementation alone does not authorize a backfill.
 2. **Registration lifecycle and evidence are delivered.** Preserve the checked transaction/journal evidence and reload recovery guarantees. Production backfill remains behind its separate enablement gate.
-3. **Remove or explicitly label illustrative metrics promptly.** `Dashboard.tsx` still contains `SUMMARY_MOCK` (1,247 shipments) and fixed KPI trends; `Analytics.tsx` has hard-coded route volumes/delays. The API also assumes a 72-hour delivery target without per-shipment SLA data. This presentation correction can ship before the full analytics increment.
+3. **Analytics and exports are implemented.** Preserve canonical evidence and explicit sample/exclusion counts. Historical SLA stays unknown; product creation is labelled separately. See [ANALYTICS.md](ANALYTICS.md) for definitions, UTC creation cohorts and CSV compatibility changes.
 4. **Finish release enforcement.** CI workflows exist and passed for the released changes. Required branch checks and hosting behavior when CI fails still need explicit verification/configuration; both production hosts currently auto-deploy from `main`.
 5. **Preserve testing isolation and free-tier limits.** Use the stable `testing` preview for full-stack checks. Production and testing Render services share the workspace's 750 free instance hours/month; avoid continuous keep-alive pings. See [HOSTED_TESTING.md](HOSTED_TESTING.md).
 
@@ -83,7 +83,7 @@ The numbers below are **plan increment IDs**, not actual GitHub pull request num
 | 3 | **Done / P1 addressed** | `codex/canonical-product-identity` | Maintain identity/reconciliation guarantees; release tracked in PR #19 | 2 |
 | 4 | **Done / P0 addressed** | `codex/durable-chain-indexing` | Maintain recovery guarantees; production enablement remains a separate gate | Scoped identity binding included; broader increment 3 remains |
 | 5 | **Done / P1 addressed** | `codex/registration-lifecycle-evidence` | Maintain durable transaction recovery, checked evidence and metadata history; release tracked in PR #21 | 2–4 |
-| 6 | Pending / P1 | `fix/live-analytics-and-reports` | Accurate metrics, SLA semantics and consistent safe exports | 4 for complete aggregates; mock removal can ship now |
+| 6 | **Done / P1 addressed** | `codex/truthful-analytics-and-exports` | Maintain canonical cohorts, SLA exclusions and safe matching exports; release tracked in PR #22 | 3–5 delivered |
 | 7 | Partial / P1 | `test/complete-provenance-flow` | Failure/reorg coverage, enforced gates and recovery runbook | 2–6 for final acceptance |
 | 8 | Pending / P2 | `feat/qr-verification-and-demo` | QR links, unified shipment detail, mobile and guided demo | 5 and 7 |
 | 9 | Pending / P2 | `feat/shipment-exceptions` | Expected arrival, overdue and dwell exception list | 6–8 |
@@ -221,9 +221,11 @@ Implemented in this increment: persistent transaction attempts and payload snaps
 
 ## PR 6 — Replace placeholder analytics and repair exports
 
-**Status: pending correction; existing analytics/export endpoints remain. Priority: P1.**
+**Status: complete implementation, local validation and hosted testing acceptance. Priority: P1 addressed.**
 
-Immediate slice: remove or label fixed dashboard summary/trends and illustrative route/delay charts; return unknown for on-time performance without a real SLA. This can proceed before increment 4. Full completion then requires canonical indexed data, lifecycle/SLA timestamps, consistent filters/sample definitions and exports. Current PDF reporting labels product counts as shipments; CSV formula-injection protection and full-day date semantics remain to be implemented.
+Delivered: canonical shipment lifecycle from the durable event journal; nullable timezone-aware expected arrival with owner-only pre-departure edits; completed transit/SLA/active elapsed and explicit exclusions; real normalized route aggregates and same-route anomaly sample thresholds; shared validated UTC creation/date/route filters; safe shipment/event CSV and shipment PDF with matching evidence/counts; recent-product pagination and removal of illustrative totals/trends/charts. Migration `c62a904df318` preserves historical unknown SLA. Definitions and compatibility changes: [ANALYTICS.md](ANALYTICS.md).
+
+Local release validation: **401 backend tests passed** (three intentional dialect skips), **240 frontend tests passed** with coverage thresholds satisfied, **29 Playwright regressions** and **40 contract tests passed**. The real isolated API/PostgreSQL/Hardhat journey, SLA/analytics/export assertions, canonical fork recovery and browser downloads are exercised by the integration workflow. The final additive migration was rehearsed on the isolated production copy without changing its one shipment or inventing SLA values. Hosted testing acceptance passed: 2 shipment records, 1 delivered/transit sample, no known SLA samples, and 6 canonical events. Filtered browser CSV/API counts matched; PDF and mobile checks passed without browser errors. Exact-head CI is required before main release.
 
 **Metric definitions**
 
@@ -231,7 +233,7 @@ Immediate slice: remove or label fixed dashboard summary/trends and illustrative
 | --- | --- |
 | Total / active / delivered | Counts of actual shipment records; delivered state derives from indexed delivery |
 | Transit duration | First departure to delivery for completed shipments with both timestamps; report incomplete samples separately |
-| On-time rate | Delivered shipments with a known expected arrival that arrived by that time, divided by delivered shipments with a known expected arrival |
+| On-time rate | Completed journeys with a known pre-departure expected arrival delivered by that instant, divided by completed journeys with a known expected arrival; incomplete and unknown-SLA samples are reported separately |
 | Active elapsed time | Time since departure for an undelivered shipment; kept separate from completed transit duration |
 | Dwell | Time between defined arrival/departure events at a normalized location; until those events exist, label checkpoint intervals as checkpoint intervals |
 | Trend | Change between equal explicit periods; return unavailable where the previous period has no valid comparison |
@@ -328,8 +330,8 @@ After the reliable demo is complete and a specific user workflow has been valida
 
 ## Next implementation session
 
-Prioritize **production indexing enablement validation**, **increment 6: truthful analytics/exports**, and **release-gate enforcement**. Increment 5 transaction lifecycle and verification UX is delivered. Production indexing/backfill still requires its reviewed deployment anchor, identity/history dry run and explicit enablement. Keep that gate separate from ordinary application releases.
+Prioritize **production indexing enablement validation** and **increment 7: release-gate enforcement and the recovery runbook**. Increments 5 (transaction lifecycle/evidence) and 6 (truthful analytics/exports) are delivered. Production indexing/backfill still requires its reviewed deployment anchor, identity/history dry run and explicit enablement. Keep that gate separate from ordinary application releases.
 
-The small analytics presentation correction and release-gate verification can be separate changes without waiting for the complete indexer redesign. Do not combine those independent fixes into the identity migration.
+Preserve analytics definitions and sample/exclusion counts during subsequent work. Keep production indexing enablement and release-gate configuration as explicit reviewed changes.
 
 For each implementation PR, record changed behavior, tested commit, validation results, migration/configuration requirements and remaining acceptance criteria. Update this status dashboard after release. Completing a subset of tasks does not close the increment until its remaining acceptance criteria pass.

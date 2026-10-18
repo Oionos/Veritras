@@ -1,9 +1,13 @@
+import { useState } from 'react'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
-import { useKPIData, useAnomalies, useBottlenecks, exportAnalytics } from '@/hooks/useApi'
-import { motion } from 'framer-motion'
+import {
+  useKPIData,
+  useAnomalies,
+  exportAnalytics,
+  type AnalyticsFilterInput,
+} from '@/hooks/useApi'
 import { toast } from 'sonner'
-import { Download, AlertTriangle, TrendingUp, Clock, Route, AlertCircle } from 'lucide-react'
 import {
   BarChart,
   Bar,
@@ -12,44 +16,36 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
 } from 'recharts'
-import type { Anomaly, BottleneckLocation } from '@/types'
+import type { Anomaly } from '@/types'
 
-// TODO: Replace with real route/daily volume data from backend when available
-const volumeData = [
-  { route: 'NA-EU', volume: 420, delay: 2.1 },
-  { route: 'AS-NA', volume: 380, delay: 3.2 },
-  { route: 'EU-AS', volume: 290, delay: 1.8 },
-  { route: 'NA-SA', volume: 240, delay: 1.5 },
-  { route: 'EU-AF', volume: 180, delay: 4.2 },
-  { route: 'AS-AU', volume: 150, delay: 2.8 },
-]
-
-const PIE_COLORS = ['#c8f060', '#60d0f0', '#f0a060', '#d060f0', '#888888', '#f06090', '#60f0a0']
+const inputClass = 'rounded-lg border border-white/10 bg-black/20 p-2 text-text'
+const panelClass = 'rounded-2xl border border-white/10 bg-white/[0.02] p-6'
 
 export default function Analytics() {
-  const { data: kpiData, isLoading: kpiLoading, error: kpiError } = useKPIData()
-  const { data: anomaliesData, isLoading: anomaliesLoading } = useAnomalies()
-  const { isLoading: bottlenecksLoading } = useBottlenecks()
-
-  const isLoading = kpiLoading || anomaliesLoading || bottlenecksLoading
-  const error = kpiError
-
+  const [draft, setDraft] = useState<AnalyticsFilterInput>({})
+  const [filters, setFilters] = useState<AnalyticsFilterInput>({})
+  const { data, isLoading, error } = useKPIData(filters)
+  const {
+    data: anomaliesData,
+    isLoading: anomaliesLoading,
+    error: anomaliesError,
+  } = useAnomalies(filters)
   const anomalies: Anomaly[] = anomaliesData ?? []
-
-  const bottleneckPieData: { name: string; value: number; color: string }[] =
-    (kpiData?.bottleneck_locations ?? []).map((b: BottleneckLocation, i: number) => ({
-      name: b.location,
-      value: b.incident_count,
-      color: PIE_COLORS[i % PIE_COLORS.length],
-    }))
-
-  const handleExport = async (format: 'csv' | 'pdf') => {
+  const routes = (data?.routes ?? []).map((r) => ({
+    ...r,
+    route: `${r.origin} → ${r.destination}`,
+  }))
+  const completedRoutes = routes.filter((r) => r.avg_transit_time_hours != null)
+  const invalidDates = Boolean(
+    draft.start_date && draft.end_date && draft.start_date > draft.end_date
+  )
+  const handleExport = async (
+    format: 'csv' | 'pdf',
+    report: 'shipments' | 'events' = 'shipments'
+  ) => {
     try {
-      await exportAnalytics(format)
+      await exportAnalytics(format, undefined, undefined, filters, report)
       toast.success(`Exported ${format.toUpperCase()} successfully`)
     } catch {
       toast.error('Export failed. Please try again.')
@@ -57,264 +53,253 @@ export default function Analytics() {
   }
 
   return (
-    <div className="animate-fade-in space-y-6 px-6 sm:px-12 lg:px-20">
-      {/* ─── Header ──────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-4 pt-28 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-3">
-          <div className="flex items-center gap-4">
-            <div className="h-px w-8 bg-accent/40" />
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-accent/60">
-              Insights
-            </span>
-          </div>
-          <h1 className="font-serif text-3xl leading-[1.1] tracking-tight text-text sm:text-4xl">
-            Analytics
-          </h1>
-          <p className="max-w-xl text-sm leading-relaxed text-muted">
-            Deep insights into shipment performance, transit patterns, and anomaly detection.
+    <div className="animate-fade-in space-y-6 px-6 pb-16 pt-28 sm:px-12 lg:px-20">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="font-serif text-4xl text-text">Analytics</h1>
+          <p className="mt-2 text-sm text-muted">
+            Shipment records and canonical indexed evidence. All dates and times
+            are UTC.
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => handleExport('csv')} className="gap-2">
-            <Download className="h-4 w-4" />
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
+            disabled={!data || !!error || isLoading}
+            onClick={() => handleExport('csv')}
+          >
             Export CSV
           </Button>
-          <Button variant="secondary" onClick={() => handleExport('pdf')} className="gap-2">
-            <Download className="h-4 w-4" />
+          <Button
+            variant="secondary"
+            disabled={!data || !!error || isLoading}
+            onClick={() => handleExport('pdf')}
+          >
             Export PDF
           </Button>
+          <Button
+            variant="secondary"
+            disabled={!data || !!error || isLoading}
+            onClick={() => handleExport('csv', 'events')}
+          >
+            Export Events CSV
+          </Button>
         </div>
-      </div>
-
-      {/* ─── Loading State ─────────────────────────────────────────── */}
+      </header>
+      <form
+        className={`${panelClass} flex flex-wrap items-end gap-4`}
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (!invalidDates) setFilters({ ...draft })
+        }}
+      >
+        {(['start_date', 'end_date', 'origin', 'destination'] as const).map(
+          (key) => (
+            <label key={key} className="flex flex-col gap-1 text-sm text-muted">
+              {
+                {
+                  start_date: 'Start date (UTC)',
+                  end_date: 'End date inclusive (UTC)',
+                  origin: 'Origin',
+                  destination: 'Destination',
+                }[key]
+              }
+              <input
+                className={inputClass}
+                type={key.includes('date') ? 'date' : 'text'}
+                maxLength={200}
+                value={draft[key] ?? ''}
+                onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
+              />
+            </label>
+          )
+        )}
+        <Button type="submit" disabled={invalidDates}>
+          Apply filters
+        </Button>
+        <p className="w-full text-xs text-muted">
+          Filters select shipments by creation date, including the entire end
+          day: [start, next day). Routes match exactly after trimming and
+          ignoring case. Charts and exports use the applied filters.
+        </p>
+        {invalidDates && (
+          <p role="alert" className="text-red-400">
+            Start date must be on or before end date.
+          </p>
+        )}
+      </form>
       {isLoading && (
-        <div
-          aria-label="Loading"
-          role="status"
-          className="grid grid-cols-1 gap-4 lg:grid-cols-2"
-        >
-          {[0, 1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-2xl"
-            >
-              <div className="mb-6 flex items-center justify-between">
-                <div className="space-y-2">
-                  <div className="h-5 w-32 animate-pulse rounded bg-white/[0.06]" />
-                  <div className="h-3 w-48 animate-pulse rounded bg-white/[0.04]" />
-                </div>
-              </div>
-              <div className="h-[300px] animate-pulse rounded-xl bg-white/[0.03]" />
-            </div>
-          ))}
-        </div>
+        <p role="status" aria-label="Loading">
+          Loading analytics…
+        </p>
       )}
-
-      {/* ─── Error State ───────────────────────────────────────────── */}
       {error && (
-        <div className="flex items-center gap-3 rounded-2xl border border-red-500/20 bg-red-500/[0.06] p-5 backdrop-blur-xl">
-          <AlertCircle className="h-5 w-5 shrink-0 text-red-400" />
-          <div>
-            <p className="font-medium text-red-400">Failed to load analytics data</p>
-            <p className="text-sm text-red-400/70">
-              {error instanceof Error ? error.message : 'Please try again later.'}
-            </p>
-          </div>
+        <div role="alert" className={panelClass}>
+          <p>Failed to load analytics data</p>
+          <p>{error.message}</p>
         </div>
       )}
-
-      {!isLoading && !error && (
+      {!isLoading && !error && data && (
         <>
-          {/* ─── Charts Grid ───────────────────────────────────────── */}
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {/* Shipment Volume by Route */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0, ease: [0.23, 1, 0.32, 1] }}
-            >
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-2xl transition-all duration-200 ease-out hover:border-white/[0.1]">
-                <div className="mb-6 flex items-center justify-between">
-                  <div>
-                    <h2 className="font-semibold text-text">Volume by Route</h2>
-                    <p className="text-sm text-muted/60">Shipment count per trade lane</p>
-                  </div>
-                  <Route className="h-5 w-5 text-muted/30" />
-                </div>
-                <div className="h-[300px]">
+          <section className={panelClass} aria-label="Shipment sample counts">
+            <p className="text-text">
+              Total shipments: {data.total_shipments} · Active:{' '}
+              {data.active_shipments} · Delivered: {data.delivered_shipments}
+            </p>
+            <p className="mt-2 text-sm text-muted">
+              Completed transit: {data.transit_sample_size} samples · Incomplete
+              transit: {data.incomplete_transit_shipments} · SLA:{' '}
+              {data.sla_sample_size} samples · Unknown SLA deliveries:{' '}
+              {data.unknown_sla_deliveries} · Late/unproven SLA deliveries: {data.late_sla_deliveries} · Incomplete SLA deliveries: {data.incomplete_sla_deliveries}
+            </p>
+            <p className="mt-2 text-sm text-muted">
+              Average transit:{' '}
+              {data.avg_transit_time_hours == null
+                ? 'N/A'
+                : `${data.avg_transit_time_hours.toFixed(1)} hours`}{' '}
+              · On-time rate:{' '}
+              {data.on_time_rate_percent == null
+                ? 'N/A'
+                : `${data.on_time_rate_percent.toFixed(1)}%`}
+            </p>
+            <p className="mt-2 text-sm text-muted">
+              Active elapsed:{' '}
+              {data.avg_active_elapsed_hours == null
+                ? 'N/A'
+                : `${data.avg_active_elapsed_hours.toFixed(1)} hours`}{' '}
+              ({data.active_elapsed_sample_size} departed shipments) · Awaiting
+              departure: {data.awaiting_departure_shipments}
+            </p>
+            <p className="mt-2 text-xs text-muted">
+              Incomplete journeys and deliveries without a planned SLA are
+              excluded from on-time performance. Active includes shipments
+              awaiting departure. SLA is locked after indexed departure.
+            </p>
+            <p className="mt-2 text-xs text-muted">
+              {data.trend
+                ? `Previous equal period: ${data.trend.previous_start} to ${data.trend.previous_end_exclusive} exclusive. ${data.trend.current_count} versus ${data.trend.previous_count} shipments. Change: ${data.trend.percent_change == null ? 'Unavailable (zero baseline)' : `${data.trend.percent_change.toFixed(1)}%`}.`
+                : 'Trend unavailable: select both dates to compare equal creation periods.'}
+            </p>
+            <p className="mt-2 break-words text-xs text-muted">
+              As of {data.as_of} · Checkpoints: {data.checkpoint_count} ·
+              Canonical events: {data.event_count}
+            </p>
+          </section>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <section className={panelClass}>
+              <h2 className="font-semibold text-text">Volume by Route</h2>
+              {routes.length ? (
+                <div className="mt-4 h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={volumeData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                      <XAxis dataKey="route" stroke="rgba(255,255,255,0.2)" fontSize={12} tickLine={false} axisLine={false} />
-                      <YAxis stroke="rgba(255,255,255,0.2)" fontSize={12} tickLine={false} axisLine={false} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'rgba(10,10,10,0.9)',
-                          border: '1px solid rgba(255,255,255,0.06)',
-                          borderRadius: '12px',
-                          fontSize: '12px',
-                          backdropFilter: 'blur(20px)',
-                        }}
-                        itemStyle={{ color: '#f0ece4' }}
+                    <BarChart data={routes}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="route" />
+                      <YAxis allowDecimals={false} />
+                      <Tooltip />
+                      <Bar
+                        dataKey="total_shipments"
+                        name="Shipment records"
+                        fill="#c8f060"
                       />
-                      <Bar dataKey="volume" fill="#c8f060" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-              </div>
-            </motion.div>
-
-            {/* Bottleneck Distribution */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1, ease: [0.23, 1, 0.32, 1] }}
-            >
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-2xl transition-all duration-200 ease-out hover:border-white/[0.1]">
-                <div className="mb-6 flex items-center justify-between">
-                  <div>
-                    <h2 className="font-semibold text-text">Bottleneck Locations</h2>
-                    <p className="text-sm text-muted/60">Incident count by location</p>
-                  </div>
-                  <Clock className="h-5 w-5 text-muted/30" />
-                </div>
-                <div className="flex h-[300px] items-center">
-                  {bottleneckPieData.length === 0 ? (
-                    <p className="w-full text-center text-sm text-muted">No bottleneck data available.</p>
-                  ) : (
-                    <>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={bottleneckPieData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={60}
-                            outerRadius={100}
-                            paddingAngle={4}
-                            dataKey="value"
-                          >
-                            {bottleneckPieData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip
-                            contentStyle={{
-                              backgroundColor: 'rgba(10,10,10,0.9)',
-                              border: '1px solid rgba(255,255,255,0.06)',
-                              borderRadius: '12px',
-                              fontSize: '12px',
-                              backdropFilter: 'blur(20px)',
-                            }}
-                            itemStyle={{ color: '#f0ece4' }}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                      <div className="space-y-2">
-                        {bottleneckPieData.map((item) => (
-                          <div key={item.name} className="flex items-center gap-2 text-xs">
-                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
-                            <span className="text-muted">{item.name}</span>
-                            <span className="font-mono text-text">{item.value}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Transit Time by Route */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2, ease: [0.23, 1, 0.32, 1] }}
-            >
-              <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-2xl transition-all duration-200 ease-out hover:border-white/[0.1]">
-                <div className="mb-6 flex items-center justify-between">
-                  <div>
-                    <h2 className="font-semibold text-text">Transit Time by Route</h2>
-                    <p className="text-sm text-muted/60">Average delay in days</p>
-                  </div>
-                  <TrendingUp className="h-5 w-5 text-muted/30" />
-                </div>
-                <div className="h-[300px]">
+              ) : (
+                <p className="mt-4 text-sm text-muted">
+                  No shipments in this cohort.
+                </p>
+              )}
+              <ul className="mt-4 text-sm text-muted">
+                {routes.map((r) => (
+                  <li key={r.route}>
+                    {r.route}: {r.total_shipments} shipments ·{' '}
+                    {r.transit_sample_size} completed transit samples ·{' '}
+                    {r.sla_sample_size} SLA samples
+                  </li>
+                ))}
+              </ul>
+            </section>
+            <section className={panelClass}>
+              <h2 className="font-semibold text-text">Transit Time by Route</h2>
+              <p className="text-xs text-muted">
+                First indexed departure to indexed delivery, in hours.
+              </p>
+              {completedRoutes.length ? (
+                <div className="mt-4 h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={volumeData} layout="vertical">
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" horizontal={false} />
-                      <XAxis type="number" stroke="rgba(255,255,255,0.2)" fontSize={12} tickLine={false} axisLine={false} />
-                      <YAxis dataKey="route" type="category" stroke="rgba(255,255,255,0.2)" fontSize={12} tickLine={false} axisLine={false} width={60} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'rgba(10,10,10,0.9)',
-                          border: '1px solid rgba(255,255,255,0.06)',
-                          borderRadius: '12px',
-                          fontSize: '12px',
-                          backdropFilter: 'blur(20px)',
-                        }}
-                        itemStyle={{ color: '#f0ece4' }}
-                        formatter={(value) => [`${value ?? 0} days`, 'Avg Delay']}
+                    <BarChart data={completedRoutes}>
+                      <XAxis dataKey="route" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar
+                        dataKey="avg_transit_time_hours"
+                        name="Completed transit (hours)"
+                        fill="#60d0f0"
                       />
-                      <Bar dataKey="delay" fill="#60d0f0" radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-              </div>
-            </motion.div>
-
-            {/* Anomaly Table */}
-            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 backdrop-blur-2xl">
-              <div className="mb-6 flex items-center justify-between">
-                <div>
-                  <h2 className="font-semibold text-text">Flagged Shipments</h2>
-                  <p className="text-sm text-muted/60">Detected anomalies requiring attention</p>
-                </div>
-                <AlertTriangle className="h-5 w-5 text-accent3" />
-              </div>
-              <div className="overflow-x-auto">
-                {anomalies.length === 0 ? (
-                  <p className="text-sm text-muted">No anomalies detected.</p>
-                ) : (
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-white/[0.06] text-xs uppercase tracking-wider text-muted/60">
-                        <th className="pb-3 font-medium">Product ID</th>
-                        <th className="pb-3 font-medium">Severity</th>
-                        <th className="pb-3 font-medium">Transit (hrs)</th>
-                        <th className="pb-3 font-medium">Z-Score</th>
-                        <th className="pb-3 font-medium">Flagged At</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-white/[0.04]">
-                      {anomalies.map((item) => (
-                        <tr key={`${item.product_id}-${item.flagged_at}`} className="transition-colors hover:bg-white/[0.02]">
-                          <td className="py-3 font-mono text-text">{item.product_id}</td>
-                          <td className="py-3">
-                            <Badge
-                              variant={
-                                item.severity === 'high'
-                                  ? 'error'
-                                  : item.severity === 'medium'
-                                  ? 'warning'
-                                  : 'default'
-                              }
-                            >
-                              {item.severity}
-                            </Badge>
-                          </td>
-                          <td className="py-3 text-muted">{item.transit_time_hours.toFixed(1)}</td>
-                          <td className="py-3 text-muted">{item.z_score.toFixed(2)}</td>
-                          <td className="py-3 text-muted">
-                            {new Date(item.flagged_at).toLocaleString()}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
+              ) : (
+                <p className="mt-4 text-sm text-muted">
+                  No completed transit samples available.
+                </p>
+              )}
+            </section>
+            <section className={panelClass}>
+              <h2 className="font-semibold text-text">Checkpoint Intervals</h2>
+              <p className="text-xs text-muted">
+                Consecutive canonical checkpoints, grouped by the earlier
+                location. Averages above 24 hours are shown. These intervals
+                include travel and are not dwell time.
+              </p>
+              {(data.bottleneck_locations ?? []).length ? (
+                <ul className="mt-4 space-y-2 text-sm text-muted">
+                  {data.bottleneck_locations.map((b) => (
+                    <li key={b.location}>
+                      {b.location}: {b.avg_interval_hours.toFixed(1)} hours (
+                      {b.incident_count} intervals)
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-4 text-sm text-muted">
+                  No checkpoint intervals above the threshold.
+                </p>
+              )}
+            </section>
+            <section className={panelClass}>
+              <h2 className="font-semibold text-text">Flagged Shipments</h2>
+              <p className="text-xs text-muted">{data.anomaly_rule}</p>
+              {anomaliesLoading ? (
+                <p role="status">Loading anomaly analysis…</p>
+              ) : anomaliesError ? (
+                <p role="alert">Anomaly analysis unavailable.</p>
+              ) : anomalies.length ? (
+                <ul className="mt-4 space-y-4">
+                  {anomalies.map((a) => (
+                    <li key={a.product_id} className="text-sm text-muted">
+                      <span>{a.product_id}</span>{' '}
+                      <Badge
+                        variant={a.severity === 'high' ? 'error' : 'warning'}
+                      >
+                        {a.severity}
+                      </Badge>
+                      <p>
+                        {a.origin} → {a.destination} ·{' '}
+                        {a.transit_time_hours.toFixed(1)} hours · Z-score{' '}
+                        {a.z_score.toFixed(2)} · {a.sample_size} samples
+                      </p>
+                      <time>{a.flagged_at} UTC</time>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-4 text-sm text-muted">
+                  No qualifying outliers. Routes with fewer than 10 completed
+                  samples cannot support this analysis.
+                </p>
+              )}
+            </section>
           </div>
         </>
       )}
