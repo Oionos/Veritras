@@ -403,3 +403,9 @@ def test_stop_tolerates_a_thread_that_failed_before_start():
 def test_all_health_responses_prevent_stale_http_caching(client_fixture):
     for path in ("/health", "/health/live", "/health/ready", "/health/indexer"):
         assert client_fixture.get(path).headers["cache-control"] == "no-store"
+
+
+def test_liveness_does_not_wait_for_the_blocking_request_thread_pool():
+    import inspect
+
+    assert inspect.iscoroutinefunction(api.health_live)
