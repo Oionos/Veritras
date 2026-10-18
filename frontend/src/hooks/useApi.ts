@@ -6,7 +6,7 @@ import { getAuthToken, clearAuthToken } from './useAuth'
 
 const API_URL = appEnvironment.apiUrl
 
-async function fetchApi(endpoint: string, options?: RequestInit) {
+export async function fetchApi(endpoint: string, options?: RequestInit) {
   const token = getAuthToken()
   const headers: Record<string, string> = {
     ...(options?.headers as Record<string, string> || {}),
@@ -103,8 +103,10 @@ export function useDailyVolume() {
 export function useVerifyProduct(id: string) {
   return useQuery({
     queryKey: ['verify', id],
-    queryFn: () => fetchApi(`/products/${id}/verify`),
+    queryFn: () => fetchApi(`/products/${id}/verify`) as Promise<components['schemas']['VerificationResponse']>,
     enabled: !!id,
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
   })
 }
 
@@ -202,8 +204,12 @@ export function useUpdateProduct() {
         body: JSON.stringify(data),
       })
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] })
+    onSuccess: async (_data, variables) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['products'] }),
+        queryClient.invalidateQueries({ queryKey: ['product', variables.product_id] }),
+        queryClient.invalidateQueries({ queryKey: ['verify', variables.product_id] }),
+      ])
     },
   })
 }

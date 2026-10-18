@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session, selectinload
 from sqlalchemy.exc import IntegrityError
 from web3 import Web3
 from app.core.auth import get_current_user
-from app.core.permissions import require_editable_draft
+from app.core.permissions import require_product_owner, require_editable_draft
 from typing import List, Optional
 
 from app.core.database import get_db
@@ -21,7 +21,20 @@ from app.schemas.product import (
 )
 from app.schemas.shipment import CheckpointResponse, CustodyTransferResponse
 from app.services.events import broadcaster
-from app.services.verification import verify_registration
+from app.services.registration import (
+    evidence,
+    reconcile,
+    observe,
+    confirmed_replacement,
+)
+from app.models.registration import RegistrationAttempt
+from app.models.chain import ChainEvent
+from app.schemas.product import (
+    RegistrationSubmission,
+    RegistrationAttemptResponse,
+    RegistrationLifecycleResponse,
+    MetadataHistoryResponse,
+)
 from app.services.identity import (
     resolve_product,
     scope_values,
@@ -153,6 +166,17 @@ def update_product(
 
     require_editable_draft(product, current_user)
     require_current_scope(product)
+    if (
+        db.query(RegistrationAttempt)
+        .filter(
+            RegistrationAttempt.product_id == product.product_id,
+            RegistrationAttempt.status.in_(["submitted", "confirming", "indexing"]),
+        )
+        .first()
+    ):
+        raise HTTPException(
+            409, "Resolve the pending registration before editing the draft"
+        )
     update_data = product_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(product, field, value)
@@ -208,20 +232,22 @@ def verify_product(product_id: str, db: Session = Depends(get_db)):
         is not None
     )
 
-    try:
-        registered = verify_registration(product)
-    except Exception:
-        raise HTTPException(
-            status_code=503, detail="Registration evidence is temporarily unavailable"
-        )
+    from app.main import indexer_state
+
+    sync_health = indexer_state()
+    registration_evidence = evidence(db, product)
     binding = product.indexed_state
     cursor = db.get(IndexerCursor, binding.scope) if binding else None
     return {
         "product_id": product_id,
-        "is_registered": registered,
+        "is_registered": registration_evidence["status"] == "verified",
+        "evidence": registration_evidence,
         "is_delivered": is_delivered,
         "checkpoint_count": checkpoint_count,
         "synchronization": {
+            "status": sync_health.status,
+            "reason": sync_health.reason,
+            "lag_blocks": sync_health.lag_blocks,
             "confirmation_policy": "depth",
             "confirmations": settings.indexer_confirmations,
             "cursor_storage": "database",
@@ -229,4 +255,240 @@ def verify_product(product_id: str, db: Session = Depends(get_db)):
             "indexed_block": cursor.last_processed_block if cursor else None,
             "last_successful_sync": cursor.updated_at if cursor else None,
         },
+    }
+
+
+@router.post("/{product_id}/registration", response_model=RegistrationAttemptResponse)
+@limiter.limit("30/minute")
+def submit_registration(
+    request: Request,
+    product_id: str,
+    submission: RegistrationSubmission,
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    product = resolve_product(db, product_id, lock=True)
+    if not product:
+        raise HTTPException(404, "Product not found")
+    require_product_owner(product, current_user)
+    require_current_scope(product)
+    tx_hash = submission.tx_hash.lower()
+    existing = (
+        db.query(RegistrationAttempt)
+        .filter_by(chain_id=product.chain_id, tx_hash=tx_hash)
+        .first()
+    )
+    if existing:
+        if (
+            existing.product_id != product.product_id
+            or existing.operation != submission.operation
+            or existing.metadata_uri != submission.metadata_uri
+        ):
+            raise HTTPException(
+                409, "Transaction is already associated with another submission"
+            )
+        return existing
+    if (
+        submission.operation == "registration"
+        and product.registration_status not in {"draft", "unregistered"}
+        and not (
+            product.registration_status == "indexed"
+            and product.tx_hash.lower() == tx_hash
+        )
+    ):
+        raise HTTPException(
+            409, "Product is already indexed or requires identity reconciliation"
+        )
+    if submission.operation == "metadata" and (
+        product.registration_status != "indexed" or submission.metadata_uri is None
+    ):
+        raise HTTPException(
+            409, "Metadata updates require an indexed product and the requested URI"
+        )
+    if (
+        db.query(RegistrationAttempt).filter_by(product_id=product.product_id).count()
+        >= 100
+    ):
+        raise HTTPException(
+            409, "Submission history limit reached; operator review required"
+        )
+    payload_snapshot = {
+        "name": product.name,
+        "description": product.description or "",
+        "metadataURI": product.metadata_uri or "",
+    }
+    if product.registration_status == "indexed" and product.indexed_state:
+        original = (
+            db.query(ChainEvent)
+            .filter_by(
+                scope=product.indexed_state.scope,
+                product_key=product.on_chain_product_id,
+                canonical=True,
+                event_type="ProductRegistered",
+            )
+            .first()
+        )
+        if original:
+            payload_snapshot = dict(
+                name=original.payload["name"], **original.payload["_registration"]
+            )
+    attempt = RegistrationAttempt(
+        product_id=product.product_id,
+        chain_id=product.chain_id,
+        registry_address=product.registry_address,
+        submitted_by=current_user,
+        tx_hash=tx_hash,
+        registration_payload=payload_snapshot,
+        operation=submission.operation,
+        metadata_uri=submission.metadata_uri,
+        status="submitted",
+        reason="awaiting_receipt",
+        created_at=datetime.now(timezone.utc),
+    )
+    if submission.replaces_tx_hash:
+        old = (
+            db.query(RegistrationAttempt)
+            .filter_by(
+                product_id=product.product_id,
+                chain_id=product.chain_id,
+                tx_hash=submission.replaces_tx_hash.lower(),
+            )
+            .first()
+        )
+        if (
+            not old
+            or old.replaced_by
+            or old.operation != submission.operation
+            or old.status == "indexed"
+            or old.tx_hash == tx_hash
+        ):
+            raise HTTPException(409, "Invalid replacement reference")
+        attempt.replaces_tx_hash = old.tx_hash
+        try:
+            previous = observe(product, old)
+            replacement = observe(product, attempt)
+        except Exception:
+            raise HTTPException(
+                503, "Replacement evidence is temporarily unavailable"
+            ) from None
+        if previous["nonce"] is None and old.nonce is not None:
+            previous["nonce"] = old.nonce
+        if (
+            previous["nonce"] is None
+            or previous["nonce"] != replacement["nonce"]
+            or (
+                replacement["status"] == "failed"
+                and replacement["reason"]
+                not in {"transaction_cancelled", "transaction_reverted"}
+            )
+        ):
+            raise HTTPException(
+                409,
+                "Replacement must match the original sender, nonce and product operation",
+            )
+        attempt.replaces_tx_hash = old.tx_hash
+        old.nonce = previous["nonce"]
+        attempt.nonce = replacement["nonce"]
+        if confirmed_replacement(replacement):
+            old.replaced_by, old.status, old.reason = (
+                tx_hash,
+                "replaced",
+                "transaction_replaced",
+            )
+    db.add(attempt)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            409, "Concurrent submission; refresh registration history"
+        ) from None
+    db.refresh(attempt)
+    return attempt
+
+
+@router.get("/{product_id}/registration", response_model=RegistrationLifecycleResponse)
+def registration_history(product_id: str, db: Session = Depends(get_db)):
+    product = resolve_product(db, product_id)
+    if not product:
+        raise HTTPException(404, "Product not found")
+    return {
+        "product_id": product.product_id,
+        "attempts": db.query(RegistrationAttempt)
+        .filter_by(product_id=product.product_id)
+        .order_by(RegistrationAttempt.id.desc())
+        .limit(100)
+        .all(),
+    }
+
+
+@router.post(
+    "/{product_id}/registration/reconcile", response_model=RegistrationAttemptResponse
+)
+@limiter.limit("10/minute")
+def reconcile_registration(
+    request: Request,
+    product_id: str,
+    tx_hash: str = Query(pattern=r"^0x[0-9a-fA-F]{64}$"),
+    db: Session = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    product = resolve_product(db, product_id, lock=True)
+    if not product:
+        raise HTTPException(404, "Product not found")
+    require_product_owner(product, current_user)
+    require_current_scope(product)
+    attempt = (
+        db.query(RegistrationAttempt)
+        .filter_by(product_id=product.product_id, tx_hash=tx_hash.lower())
+        .first()
+    )
+    if not attempt:
+        raise HTTPException(404, "Submission not found")
+    reconcile(db, product, attempt)
+    db.commit()
+    db.refresh(attempt)
+    return attempt
+
+
+@router.get("/{product_id}/metadata-history", response_model=MetadataHistoryResponse)
+def metadata_history(product_id: str, db: Session = Depends(get_db)):
+    product = resolve_product(db, product_id)
+    if not product:
+        raise HTTPException(404, "Product not found")
+    binding = product.indexed_state
+    rows = (
+        []
+        if not binding
+        else db.query(ChainEvent)
+        .filter(
+            ChainEvent.scope == binding.scope,
+            ChainEvent.product_key == product.on_chain_product_id,
+            ChainEvent.event_type.in_(["ProductRegistered", "ProductMetadataUpdated"]),
+        )
+        .order_by(
+            ChainEvent.block_number.desc(),
+            ChainEvent.transaction_index.desc(),
+            ChainEvent.log_index.desc(),
+        )
+        .limit(100)
+        .all()
+    )
+    return {
+        "product_id": product.product_id,
+        "items": [
+            dict(
+                transaction_hash=row.transaction_hash,
+                block_number=row.block_number,
+                block_hash=row.block_hash,
+                log_index=row.log_index,
+                metadata_uri=(
+                    row.payload.get("_registration", {}).get("metadataURI")
+                    if row.event_type == "ProductRegistered"
+                    else row.payload.get("metadataURI")
+                ),
+                canonical=row.canonical,
+            )
+            for row in rows
+        ],
     }

@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.services import verification
+from app.services import verification, registration
 
 
 @pytest.fixture
@@ -45,12 +45,14 @@ def evidence(monkeypatch):
         event
     ]
     provider = MagicMock(return_value=w3)
-    monkeypatch.setattr(verification, "Web3", provider)
+    provider.to_checksum_address.side_effect = lambda value: value
+    provider.to_hex.side_effect = lambda value: "0x" + bytes(value).hex()
+    monkeypatch.setattr(registration, "Web3", provider)
     monkeypatch.setattr(
-        verification.settings, "sepolia_rpc_url", "https://testing.invalid"
+        registration.settings, "sepolia_rpc_url", "https://testing.invalid"
     )
-    monkeypatch.setattr(verification.settings, "product_registry_contract", registry)
-    monkeypatch.setattr(verification.settings, "chain_id", 11155111)
+    monkeypatch.setattr(registration.settings, "product_registry_contract", registry)
+    monkeypatch.setattr(registration.settings, "chain_id", 11155111)
     return product, receipt, event, w3, provider
 
 

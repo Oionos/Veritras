@@ -46,7 +46,7 @@ export function useChainEvents() {
   const queryClient = useQueryClient()
   useAnalyticsEvents(() => {
     for (const key of ['products', 'product', 'product-history', 'product-transfers',
-      'shipments', 'verify', 'kpis', 'anomalies', 'bottlenecks', 'daily-volume']) {
+      'shipments', 'verify', 'registration', 'metadata-history', 'kpis', 'anomalies', 'bottlenecks', 'daily-volume']) {
       void queryClient.invalidateQueries({ queryKey: [key] })
     }
   })

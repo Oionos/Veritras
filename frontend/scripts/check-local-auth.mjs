@@ -114,6 +114,36 @@ try {
   await page.getByRole('button', { name: 'Save Changes', exact: true }).click()
   assert.equal((await updated).status(), 200)
 
+  // Register the saved draft, reload, and inspect the persisted attempt/evidence.
+  const lookup = page.getByPlaceholder('Enter product ID (e.g., PROD-8842)')
+  await lookup.fill(draft.product_id)
+  await lookup.press('Enter')
+  const registrationSaved = page.waitForResponse(response => response.url().endsWith(`/products/${draft.product_id}/registration`) && response.request().method() === 'POST')
+  await page.getByRole('button', { name: 'Register existing draft on blockchain', exact: true }).click()
+  assert.equal((await registrationSaved).status(), 200)
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.getByPlaceholder('Enter product ID (e.g., PROD-8842)').fill(draft.product_id)
+  await page.getByPlaceholder('Enter product ID (e.g., PROD-8842)').press('Enter')
+  const lifecycle = page.getByRole('region', { name: 'Registration lifecycle' })
+  await lifecycle.waitFor()
+  await page.waitForFunction(async ({ api, productId }) => {
+    const response = await fetch(`${api}/products/${productId}/verify`)
+    return (await response.json()).evidence?.status === 'verified'
+  }, { api, productId: draft.product_id })
+  await lifecycle.getByRole('button', { name: 'Refresh transaction evidence' }).first().click()
+  await lifecycle.getByText('registration · indexed · matching confirmed event', { exact: true }).waitFor()
+  await lifecycle.getByLabel('New metadata URI').fill('ipfs://browser-confirmed-version')
+  const metadataSaved = page.waitForResponse(response => response.url().endsWith(`/products/${draft.product_id}/registration`) && response.request().method() === 'POST')
+  await lifecycle.getByRole('button', { name: 'Sign metadata update' }).click()
+  assert.equal((await metadataSaved).status(), 200)
+  await page.waitForFunction(async ({ api, productId }) => (await (await fetch(`${api}/products/${productId}`)).json()).product.metadata_uri === 'ipfs://browser-confirmed-version', { api, productId: draft.product_id })
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.getByPlaceholder('Enter product ID (e.g., PROD-8842)').fill(draft.product_id)
+  await page.getByPlaceholder('Enter product ID (e.g., PROD-8842)').press('Enter')
+  const restoredLifecycle = page.getByRole('region', { name: 'Registration lifecycle' })
+  await restoredLifecycle.getByText('Metadata version history').click()
+  await restoredLifecycle.locator('details p').filter({ hasText: 'ipfs://browser-confirmed-version' }).waitFor()
+
   await page.getByRole('link', { name: /shipments/i }).first().click()
   await page.getByRole('button', { name: 'Add Shipment', exact: true }).click()
   await page.getByPlaceholder('e.g., PROD-8842').fill(draft.product_id)
@@ -143,9 +173,10 @@ try {
   assert.deepEqual(errors, [])
   mkdirSync('../.testing', { recursive: true })
   await page.screenshot({ path: '../.testing/auth-browser.png', fullPage: true })
-  console.log('PASS: real browser wallet sign-in, owned draft/shipment writes, wallet-switch logout, cross-wallet denial, and anonymous public reads')
+  console.log('PASS: real browser registration/reload recovery, metadata update/history, wallet sign-in, owned draft/shipment writes, wallet-switch logout, cross-wallet denial, and anonymous public reads')
 } catch (error) {
-  console.error({ buttons: page ? await page.locator('button').allTextContents() : [] })
+  if (page) await page.screenshot({ path: '../.testing/registration-browser-failure.png', fullPage: true })
+  console.error({ buttons: page ? await page.locator('button').allTextContents() : [], lifecycle: page ? await page.getByRole('region', { name: 'Registration lifecycle' }).allTextContents() : [] })
   throw error
 } finally {
   await browser.close()

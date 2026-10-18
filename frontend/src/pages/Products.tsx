@@ -4,6 +4,7 @@ import { useAccount } from 'wagmi'
 import { useAuth } from '@/hooks/useAuth'
 import { ownsRecord, hasCurrentIdentity } from '@/utils/permissions'
 import Card from '@/components/ui/Card'
+import RegistrationPanel from '@/components/RegistrationPanel'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
@@ -119,6 +120,7 @@ export default function Products() {
   // ── Blockchain hooks ──────────────────────────────────────────────────────
   const {
     register: registerOnChain,
+    reset: resetRegistration,
     hash: registerHash,
     isPending: registerPending,
     isConfirming: registerConfirming,
@@ -276,6 +278,10 @@ export default function Products() {
         },
       )
     }
+    if (createdProduct) {
+      setSubmittedId(createdProduct.product_id)
+      setSearchId(createdProduct.product_id)
+    }
     setModalOpen(false)
     setEditingProduct(null)
     setModalStep('form')
@@ -302,6 +308,7 @@ export default function Products() {
   }, [registerSuccess, modalStep, closeModal])
 
   const openAddModal = () => {
+    resetRegistration?.()
     if (!auth.isAuthenticated) return
     setEditingProduct(null)
     setModalStep('form')
@@ -391,6 +398,7 @@ export default function Products() {
       createdProduct.name,
       createdProduct.description ?? '',
       createdProduct.metadata_uri ?? '',
+      createdProduct.product_id,
     )
   }
 
@@ -727,7 +735,7 @@ export default function Products() {
             <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
               <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                  <h2 className="font-mono text-xl font-semibold text-text">
+                  <h2 className="break-all font-mono text-xl font-semibold text-text">
                     {product.product_id}
                   </h2>
                   <Badge variant={isDelivered ? 'success' : 'blue'}>
@@ -766,6 +774,8 @@ export default function Products() {
               </div>
             </div>
           </Card>
+
+          <RegistrationPanel key={product.product_id} product={product} />
 
           {/* ─── Blockchain Actions ─────────────────────────────────── */}
           <p className="text-sm text-muted">
@@ -1269,7 +1279,7 @@ export default function Products() {
                       : registerConfirming
                         ? 'Confirming...'
                         : registerSuccess
-                          ? 'Registered!'
+                          ? 'Receipt received — awaiting indexing'
                           : 'Register on Blockchain'}
                   </Button>
                 </div>

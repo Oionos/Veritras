@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import Card from '@/components/ui/Card'
+import TransactionLink from '@/components/TransactionLink'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
@@ -38,6 +39,11 @@ export default function Verify() {
     (verifyResult && !verifyResult.is_registered) || isNotFound
 
   const isVerified = verifyResult?.is_registered === true
+  const evidenceStatus = verifyResult?.evidence?.status
+  const evidenceHeading = evidenceStatus === 'pending' ? 'Registration Pending'
+    : evidenceStatus === 'unavailable' ? 'Evidence Unavailable'
+    : evidenceStatus === 'mismatched' ? 'Registration Evidence Mismatch'
+    : evidenceStatus === 'failed' ? 'Registration Failed' : 'Registration Not Confirmed'
 
   return (
     <div className="animate-fade-in space-y-6 px-6 sm:px-12 lg:px-20">
@@ -100,7 +106,7 @@ export default function Verify() {
         >
           <XCircle className="h-5 w-5 shrink-0 text-red-400" />
           <div>
-            <p className="font-medium text-red-400">Registration Not Confirmed</p>
+            <p className="font-medium text-red-400">{evidenceHeading}</p>
             <p className="text-sm text-red-400/70">
               No confirmed registration evidence is available for this ID. The item may be a draft or still awaiting synchronization.
             </p>
@@ -125,6 +131,22 @@ export default function Verify() {
           </div>
         </motion.div>
       )}
+
+      {verifyResult?.evidence && <Card>
+        <div className="space-y-2 text-sm" aria-label="Registration evidence">
+          <p role="status">{verifyResult.evidence.status} · {verifyResult.evidence.reason.replace(/_/g, ' ')}</p>
+          <p>Transaction state: {verifyResult.evidence.registration_status}</p>
+          <p className="break-all">Chain: {verifyResult.evidence.chain_id ?? 'Unknown'} · Registry: {verifyResult.evidence.registry_address ?? 'Unknown'}</p>
+          <p className="break-all">Canonical product: {verifyResult.evidence.on_chain_product_id ?? 'Unknown'}</p>
+          <p className="break-all">Manufacturer: {verifyResult.evidence.manufacturer_address}</p>
+          {verifyResult.evidence.transaction_hash && <TransactionLink hash={verifyResult.evidence.transaction_hash} />}
+          {verifyResult.evidence.block_number != null && <p className="break-all">Block {verifyResult.evidence.block_number} · {verifyResult.evidence.block_hash}</p>}
+          <p>Confirmation depth: {verifyResult.evidence.observed_confirmations ?? 'Unknown'} / {verifyResult.evidence.required_confirmations}</p>
+          <p>Synchronization: {verifyResult.synchronization.status} · {verifyResult.synchronization.reason?.replace(/_/g, ' ')}</p>
+          <p>Last successful synchronization: {verifyResult.synchronization.last_successful_sync ?? 'Unavailable'}</p>
+          <p>Registration evidence does not authenticate a physical item.</p>
+        </div>
+      </Card>}
 
       {/* ─── Verification Result ──────────────────────────────────── */}
       {isVerified && verifyResult && (
@@ -192,7 +214,7 @@ export default function Verify() {
                   <h3 className="font-semibold text-text">Product Details</h3>
                   <div>
                     <p className="text-sm text-muted">Product ID</p>
-                    <p className="font-mono text-lg text-text">{productDetail.product.product_id}</p>
+                    <p className="break-all font-mono text-lg text-text">{productDetail.product.product_id}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted">Name</p>
@@ -233,13 +255,12 @@ export default function Verify() {
             <div className="mx-auto mb-4 rounded-2xl bg-white/[0.02] p-4">
               <ShieldCheck className="mx-auto h-10 w-10 text-muted/30" />
             </div>
-            <p className="text-sm font-medium text-text">Verify Product Authenticity</p>
+            <p className="text-sm font-medium text-text">Check Blockchain Registration</p>
             <p className="mt-2 text-xs leading-relaxed text-muted">
-              Enter a product ID to verify its authenticity
+              Enter a product ID to inspect its registration evidence
             </p>
             <p className="mt-1 text-xs leading-relaxed text-muted/60">
-              Check blockchain-verified provenance, view checkpoint history,
-              and confirm integrity.
+              Inspect recorded provenance and checkpoint history. Physical authenticity requires separate evidence.
             </p>
             <div className="mt-6 flex flex-col items-center gap-2">
               <div className="flex items-center gap-2 text-xs text-muted/60">
