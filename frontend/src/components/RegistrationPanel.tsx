@@ -359,7 +359,7 @@ export default function RegistrationPanel({ product }: { product: Product }) {
               key={`${version.block_hash}:${version.log_index}`}
               className="mt-2"
             >
-              <p>
+              <p className="break-all">
                 Block {version.block_number} ·{" "}
                 {version.canonical ? "Canonical" : "Orphaned"} ·{" "}
                 {version.metadata_uri || "(empty URI)"}

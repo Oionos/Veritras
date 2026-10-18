@@ -136,11 +136,11 @@ export default function Verify() {
         <div className="space-y-2 text-sm" aria-label="Registration evidence">
           <p role="status">{verifyResult.evidence.status} · {verifyResult.evidence.reason.replace(/_/g, ' ')}</p>
           <p>Transaction state: {verifyResult.evidence.registration_status}</p>
-          <p>Chain: {verifyResult.evidence.chain_id ?? 'Unknown'} · Registry: {verifyResult.evidence.registry_address ?? 'Unknown'}</p>
+          <p className="break-all">Chain: {verifyResult.evidence.chain_id ?? 'Unknown'} · Registry: {verifyResult.evidence.registry_address ?? 'Unknown'}</p>
           <p className="break-all">Canonical product: {verifyResult.evidence.on_chain_product_id ?? 'Unknown'}</p>
           <p className="break-all">Manufacturer: {verifyResult.evidence.manufacturer_address}</p>
           {verifyResult.evidence.transaction_hash && <TransactionLink hash={verifyResult.evidence.transaction_hash} />}
-          {verifyResult.evidence.block_number != null && <p>Block {verifyResult.evidence.block_number} · {verifyResult.evidence.block_hash}</p>}
+          {verifyResult.evidence.block_number != null && <p className="break-all">Block {verifyResult.evidence.block_number} · {verifyResult.evidence.block_hash}</p>}
           <p>Confirmation depth: {verifyResult.evidence.observed_confirmations ?? 'Unknown'} / {verifyResult.evidence.required_confirmations}</p>
           <p>Synchronization: {verifyResult.synchronization.status} · {verifyResult.synchronization.reason?.replace(/_/g, ' ')}</p>
           <p>Last successful synchronization: {verifyResult.synchronization.last_successful_sync ?? 'Unavailable'}</p>
@@ -214,7 +214,7 @@ export default function Verify() {
                   <h3 className="font-semibold text-text">Product Details</h3>
                   <div>
                     <p className="text-sm text-muted">Product ID</p>
-                    <p className="font-mono text-lg text-text">{productDetail.product.product_id}</p>
+                    <p className="break-all font-mono text-lg text-text">{productDetail.product.product_id}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted">Name</p>
