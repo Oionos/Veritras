@@ -69,3 +69,13 @@ After a successful batch commit, the indexer publishes `chain_updated`. `/analyt
 - GitHub CI runs both real journeys, both database regression variants, generated OpenAPI/type checks and existing browser/build/contract checks.
 
 Application rollback must retain this additive schema. Disable indexing before rolling back to a writer that uses the old file cursor. Do not run a schema downgrade or delete the journal as an application rollback.
+
+## Acceptance recorded October 18, 2026
+
+- 236 backend tests passed across SQLite/PostgreSQL; two intentional skips are PostgreSQL-only cases in the SQLite variant. 192 frontend tests, 23 Playwright regressions, 40 contract tests, build and type checks passed locally.
+- Real local API/PostgreSQL/Hardhat journey, actual chain fork/recovery, browser wallet/security journey and API restart checks passed.
+- Hosted testing migration `f04d9c21a873` and backfill preserved two products, six unique checkpoints, two unique transfers and the delivered shipment; the journal contains 12 canonical events and two product bindings.
+- Same-code Render redeploy `dep-dba32obrjlhs738na0g0` preserved all those counts and resumed from database progress (cursor 11938155 before, 11938172 after). Readiness was current with zero lag against the 12-block target.
+- The protected testing Vercel preview displayed receipt-backed delivered verification for `PROD-31CBA002`, three checkpoints, no browser errors and no production API requests.
+- Neon rehearsal `br-orange-mud-aoo70fzu` preserved the production copy's product/shipment with zero ownership bindings; it expires October 19. Pre-release checkpoint `br-small-bar-aobxzb8h` has no compute and expires October 25.
+- Delivery is tracked in [PR #18](https://github.com/Oionos/Veritras/pull/18). Production indexing remains disabled pending its separate identity/history reconciliation and enablement checks.
