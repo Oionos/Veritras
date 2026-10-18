@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import Optional
+from typing import Optional, Literal
 from datetime import datetime
 
 
@@ -46,3 +46,20 @@ class ProductResponse(ProductBase):
 class ProductListResponse(BaseModel):
     items: list[ProductResponse]
     total: int
+
+
+class SynchronizationResponse(BaseModel):
+    confirmation_policy: Literal['depth'] = 'depth'
+    confirmations: int
+    cursor_storage: Literal['database'] = 'database'
+    indexer_enabled: bool
+    indexed_block: Optional[int] = None
+    last_successful_sync: Optional[datetime] = None
+
+
+class VerificationResponse(BaseModel):
+    product_id: str
+    is_registered: bool
+    is_delivered: bool
+    checkpoint_count: int
+    synchronization: SynchronizationResponse

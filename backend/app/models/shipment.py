@@ -60,3 +60,8 @@ class Shipment(Base):
     @property
     def ownership_source(self):
         return self.product.ownership_source if self.product else None
+
+    @property
+    def current_handler(self):
+        state = self.product.indexed_state if self.product else None
+        return state.current_handler if state else None

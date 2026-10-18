@@ -12,11 +12,13 @@ def evidence(monkeypatch):
     manufacturer = "0x" + "2" * 40
     product = SimpleNamespace(product_id="PROD-TEST", name="Widget", manufacturer_address=manufacturer,
                               block_number=10, tx_hash="0x" + "a" * 64)
-    receipt = {"status": 1, "to": registry, "blockNumber": 10}
+    receipt = {"status": 1, "to": registry, "blockNumber": 10, "blockHash": bytes.fromhex("bb" * 32)}
     event = {"address": registry, "args": {"productId": b"PROD-TEST".ljust(32, b"\x00"),
                                              "manufacturer": manufacturer, "name": "Widget"}}
     w3 = MagicMock()
     w3.eth.chain_id = 11155111
+    w3.eth.block_number = 30
+    w3.eth.get_block.return_value = {"hash": bytes.fromhex("bb" * 32)}
     w3.to_checksum_address.return_value = registry
     w3.eth.get_transaction_receipt.return_value = receipt
     w3.eth.contract.return_value.events.ProductRegistered.return_value.process_receipt.return_value = [event]
@@ -59,3 +61,15 @@ def test_wrong_rpc_chain_is_unavailable(evidence):
     w3.eth.chain_id = 1
     with pytest.raises(ConnectionError):
         verification.verify_registration(product)
+
+
+def test_insufficient_confirmations_do_not_verify(evidence):
+    product, _, _, w3, _ = evidence
+    w3.eth.block_number = 11
+    assert verification.verify_registration(product) is False
+
+
+def test_orphaned_receipt_does_not_verify(evidence):
+    product, _, _, w3, _ = evidence
+    w3.eth.get_block.return_value = {"hash": bytes.fromhex("cc" * 32)}
+    assert verification.verify_registration(product) is False

@@ -44,7 +44,10 @@ def test_indexer_retries_startup_without_exposing_rpc_secret(monkeypatch, tmp_pa
         indexer.shipment_tracker = MagicMock()
 
     monkeypatch.setattr(indexer, "_connect", connect)
-    monkeypatch.setattr(module, "INDEXER_STATE_FILE", tmp_path / "state.json")
+    def poll():
+        indexer.chain_head = indexer.target_head = indexer.last_processed_block = 0
+        return None
+    monkeypatch.setattr(indexer, "poll_once", poll)
     monkeypatch.setattr(settings, "indexer_start_block", 0)
 
     def wait(_):

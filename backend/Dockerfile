@@ -3,7 +3,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Hosted deployments must opt in after durable cursor/replay support is ready.
+# Hosted deployments must explicitly opt in after migration/reconciliation checks.
 # The isolated Compose stack explicitly enables its disposable local indexer.
 ENV INDEXER_ENABLED=false
 

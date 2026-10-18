@@ -64,6 +64,7 @@ class ShipmentUpdate(BaseModel):
 
 
 class ShipmentResponse(ShipmentBase):
+    current_handler: Optional[str] = None
     id: int
     shipment_id: str = Field(..., max_length=100)
     owner_address: Optional[str] = None
