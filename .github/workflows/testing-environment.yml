@@ -26,6 +26,10 @@ jobs:
         run: make testing-check
       - name: Recover a real chain reorganization
         run: make testing-indexer-check
+      - name: Recover interrupted database writes across real API restarts
+        run: make testing-recovery-check
+      - name: Rehearse isolated backup restore, schema admission and backfill review
+        run: make testing-release-rehearsal
       - uses: actions/setup-node@v4
         with:
           node-version: 22

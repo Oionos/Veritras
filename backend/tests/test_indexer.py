@@ -622,3 +622,51 @@ def test_archiveless_rpc_uses_only_matching_canonical_registration_calldata(
             worker._registration_details(contract, event)["description"]
             == "From calldata"
         )
+
+
+def test_postgres_killed_uncommitted_writer_preserves_journal_and_cursor(stack):
+    """Kill an actual writer after SQL mutations, not merely a mocked flush."""
+    if stack.engine.dialect.name != "postgresql":
+        pytest.skip("Postgres interrupted transaction regression")
+    import subprocess
+    import sys
+
+    worker = stack.new()
+    worker.poll_once()
+    before = counts(stack)
+    child = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            """
+import os,sys
+from sqlalchemy import create_engine,text
+engine=create_engine(os.environ['INDEXER_TEST_DATABASE_URL'])
+with engine.begin() as db:
+    db.execute(text("SELECT pg_advisory_xact_lock(864382025)"))
+    db.execute(text("UPDATE products SET name='Uncommitted corruption'"))
+    db.execute(text("UPDATE indexer_cursors SET last_processed_block=999"))
+    db.execute(text("INSERT INTO chain_events (occurrence_id,scope,event_id,chain_id,contract_address,transaction_hash,log_index,transaction_index,block_number,block_hash,event_type,product_key,payload,canonical,processed_at) SELECT 'uncommitted-occurrence',scope,'uncommitted-event',chain_id,contract_address,transaction_hash,99,transaction_index,999,block_hash,event_type,product_key,payload,true,processed_at FROM chain_events LIMIT 1"))
+    print('mutated',flush=True)
+    sys.stdin.readline()
+""",
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+    )
+    try:
+        assert child.stdout.readline().strip() == "mutated"
+        with pytest.raises(IndexerBusy):
+            stack.new().poll_once()
+    finally:
+        child.kill()
+        child.wait(timeout=5)
+    assert counts(stack) == before
+    with stack.sessions() as db:
+        assert db.get(IndexerCursor, worker.scope).last_processed_block == 5
+        assert db.query(Product).one().name != "Uncommitted corruption"
+        assert db.query(ChainEvent).filter_by(event_id="uncommitted-event").count() == 0
+    stack.new().poll_once()
+    assert counts(stack) == before

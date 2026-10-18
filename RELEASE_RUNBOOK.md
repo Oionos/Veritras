@@ -1,0 +1,58 @@
+# Release, backfill and recovery
+
+This runbook accompanies [release controls](RELEASE_CONTROLS.md), [durable indexing](DURABLE_INDEXING.md), [canonical identity](CANONICAL_PRODUCT_IDENTITY.md), [health](INDEXER_HEALTH.md) and [analytics](ANALYTICS.md). Increment 7 adds no database migration: the current head is `c62a904df318`. **Ordinary releases keep production `INDEXER_ENABLED=false`.** Enabling or reconstructing production indexing requires the separate reviewed procedure below.
+
+## Release order and evidence
+
+1. Start from current main on a feature branch. Keep API/schema changes additive and compatible with the running frontend. Generate OpenAPI from the actual application and regenerate `frontend/src/types/api.ts`; the drift check must pass. Never copy production secrets into CI or preview configuration.
+2. Run the serial local acceptance sequence below, then stage the feature into the persistent `testing` branch with an ordinary merge. Use the stable testing Vercel alias so CORS and SIWE origins match. Verify the deployed testing commit, schema, separate database, chain 11155111, registry/tracker and deployment anchor against [HOSTED_TESTING.md](HOSTED_TESTING.md). Testing uses its own Sepolia contracts and wallets, with 12 confirmations; local Hardhat uses chain 31337 and zero confirmations. Sepolia ETH comes from a free faucet.
+3. Record a restorable database checkpoint before any future migration. Rehearse that migration on an isolated copy and compare business/journal counts and identities. Review generated SQL and ownership changes. Run `python manage_schema.py` read-only first, then `python manage_schema.py --apply` only against the explicitly selected database. The deployment entrypoint rejects an outdated schema; it never migrates production automatically. Stop for identity/history conflicts. Increment 7 needs no schema change.
+4. Open an up-to-date PR targeting protected main. All eight named GitHub Actions checks in [RELEASE_CONTROLS.md](RELEASE_CONTROLS.md) must succeed. Record the feature SHA, testing deployment SHA, check run URLs and environment. Skipped, cancelled, neutral and missing jobs do not meet production admission. Do not bypass the rule or weaken a failing check.
+5. Squash merge the green PR. The new main SHA gets its own push CI and integration runs. Render starts a candidate on commit but `start_api.py` waits for those exact main-push runs before checking schema and binding the port. Its platform health path is `/health/live`. The previous running service remains available during replacement. Production readiness requires its database and the disabled-indexer policy. Inspect `/health/live` and `/health/ready`, including `release_commit`, environment and chain.
+6. Vercel's production build waits for the same exact main-push checks and then a ready compatible production API before building. For a frontend-only release, the API may use the latest backend-changing ancestor commit. `/release.json` records the frontend SHA, checked workflow IDs/attempts and observed backend SHA; it contains no credentials. Inspect that attestation and the real frontend's API origin after publication.
+7. Verify public product detail/verification, dashboard/analytics, filtered CSV/PDF exports, and a narrow viewport. Confirm production counts did not change from testing activity and production indexing remains disabled. Keep the final main SHA, provider deployment IDs and results in the PR/release record. Avoid continuous keep-alive polling on free Render services.
+
+Hosted readiness is an observer after successful CI, not an admission prerequisite. Keep Render's native setting **On Commit** when using these entrypoint gates: **After CI Checks Pass** waits for the readiness observer too and can deadlock. CI admission has bounded waiting and fails closed on public GitHub API errors/rate limits or a long queue. If a deployment times out, wait for the real main checks and retry that same SHA; never synthesize successful checks or turn off the gate.
+
+## Reproducible local rehearsal
+
+```sh
+make testing-up
+make testing-check
+make testing-indexer-check
+make testing-recovery-check
+make testing-release-rehearsal
+cd frontend
+node scripts/check-local-auth.mjs
+```
+
+Use `TESTING_COMPOSE_PROJECT=<existing-isolated-project>` for an existing named stack. Run these operations serially; they share one local chain. The browser command needs Playwright Chromium installed (or `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` pointing to an installed Chromium). Unit, migration, build, contract and browser presentation suites remain required in addition to these real integration checks.
+
+The full journey uses actual wallet signatures, transactions, PostgreSQL and API calls: draft registration, custody A to B, checkpoints, delivery, verification and matching analytics/exports. Unauthorized contract writes and duplicate registration must revert. The reorganization drill replaces a mined branch and checks restored metadata, history, custody and shipment projections. The write-failure drill makes PostgreSQL reject a checkpoint in a batch that also updates metadata; journal, cursor and projections must all remain at the preceding commit across an API restart. Removing the fault replays the batch once; a second restart cannot duplicate it. A separate PostgreSQL regression kills a real writer process with uncommitted SQL and verifies lock release and complete rollback.
+
+The backup rehearsal validates the local chain/database before DDL, holds the indexer writer lock, uses `pg_dump`, creates a fresh clone and restores with `pg_restore --exit-on-error`. It checks schema head and runs the identity/history reconciliation functions read-only against the actual chain. Before/after fingerprints cover products, shipments, checkpoints, transfers, canonical/noncanonical journal, anchors, cursor, baselines, aliases, registration attempts and schema version. Source, backup and restored fingerprints must match exactly. The source is never reset. An error releases the writer lock on connection close. Private backups and named clones are retained for inspection; remove only a specifically identified disposable rehearsal artifact when finished, after checking it is not needed.
+
+## Separate production indexing/backfill gate
+
+This section is a future operator procedure, not authorization to enable production indexing during increment 7.
+
+1. Record the approved code SHA, schema revision, chain ID, contract addresses, earliest deployment block and confirmation policy from verified deployment evidence. `INDEXER_START_BLOCK` is the block immediately **before** the earliest deployment. A changed scope/anchor cannot reuse an unrelated cursor. Verify the tracker references the intended registry and both addresses have code on the configured chain.
+2. Pause every old projection writer; verify there is only one intended indexing owner. Take a restorable database checkpoint and restore an isolated copy. Protect that copy as production data. Rehearse migrations and the complete reconciliation/backfill there with separately reviewed RPC access and no public preview writes.
+3. With indexing disabled, run `python manage_identity.py` and `python manage_indexer.py` against the selected scope in read-only mode. Inspect complete confirmed canonical logs, duplicate identities, aliases and unmatched legacy rows. Names, old manufacturer fields and placeholder hashes cannot establish identity or ownership. Any ambiguity/conflict stops the procedure. The tools' `--apply` variants require explicit review of the dry-run changes and exact target database; history attribution must match one authoritative event.
+4. On the isolated copy, apply the reviewed additive migration/reconciliation, then enable the durable writer with the reviewed anchor and 12-confirmation policy. Replay bounded ranges. Compare canonical event identities, registration receipts, checkpoint/custody history, shipment lifecycle and analytics exclusions. Verify actual write-failure/restart/replay and reorganization behavior without mutating the live chain or database. Record the result and restore procedure before proceeding to production.
+5. Only after explicit production enablement approval, apply the same reviewed changes while old writers remain paused. Start the durable writer; do not import the obsolete JSON cursor. Let the transactional cursor advance. Require `/health/ready` HTTP 200, state `current`, zero confirmed-target lag, fresh successful polls and progress, matching scope/anchor, and no reconciliation errors. Use `backend/check_health.py` with the exact release SHA and `--expect-indexer enabled`; the health probe also checks confirmation policy and bounded freshness. `/health/live` alone is insufficient.
+6. Compare business counts and journal identities, then restart the same code and confirm unchanged counts and resumed durable progress. Keep confirmation depth, history attribution and readiness evidence with the enablement change. Leave the writer disabled if any acceptance condition fails.
+
+## Recovery decisions and rollback
+
+| Symptom | Action and acceptance |
+| --- | --- |
+| CI or hosting admission fails | Keep the previous serving release. Fix the failed check or provider availability, then retry a checked SHA. Inspect the exact workflow attempt; an old successful attempt cannot hide a later failure. |
+| Schema admission fails | Inspect `manage_schema.py` output against the selected database. Rehearse/apply the intended additive migration explicitly. Do not mark an unknown schema current. |
+| Write/commit/process failure | Remove the underlying database or provider fault. The previous committed journal/projections/cursor must agree; restart the same compatible code and check replay produces no duplicate canonical events. Do not manually advance the cursor. |
+| Reorganization within retained ancestry | Allow transactional rewind/replay, then verify canonical receipts/history and zero lag. Orphan journal occurrences remain recorded as noncanonical. |
+| Missing ancestor, deeper fork, scope mismatch or legacy conflict | Pause indexing, retain the journal/cursor, inspect canonical RPC evidence, and rehearse reconstruction on an isolated restore. Do not clear progress, raise the start block, erase unattributed rows, or widen the reorg window to hide a conflict. |
+| Application regression | Prefer a corrective PR through the same gates. Restore a previously checked compatible API/frontend pair only after verifying schema, configuration and indexer compatibility. An artifact predating increment 7 lacks the new admission gate; audit its successful historical CI explicitly before provider rollback. Disable indexing before using any writer with obsolete file-based progress. |
+| Database restore required | Pause writers and writes; preserve a fresh snapshot of the failing state. Restore the rehearsed backup into a new isolated target first, verify schema and fingerprints, reconcile confirmed chain events since the backup, and review counts/identity before a separately approved connection switch. Restoring a database does not undo mined transactions. |
+
+Application rollback retains the additive schema, aliases, registration attempts and event journal. Never run a destructive schema downgrade or delete canonical history as a deployment rollback. Recheck API readiness and frontend configuration/attestation after recovery. A healthy old frontend can remain on a compatible API while a corrective backend release is prepared.

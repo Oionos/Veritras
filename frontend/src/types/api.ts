@@ -842,6 +842,14 @@ export interface components {
             /** Manufacturer Address */
             manufacturer_address?: string | null;
         };
+        /** ProductDetailResponse */
+        ProductDetailResponse: {
+            product: components["schemas"]["ProductResponse"];
+            /** History */
+            history: components["schemas"]["CheckpointResponse"][];
+            /** Transfers */
+            transfers: components["schemas"]["CustodyTransferResponse"][];
+        };
         /** ProductListResponse */
         ProductListResponse: {
             /** Items */
@@ -1438,9 +1446,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ProductDetailResponse"];
                 };
             };
             /** @description Validation Error */

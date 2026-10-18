@@ -59,6 +59,8 @@ async function main() {
   await registration.wait();
   const edit = { ...json({ name: 'Cannot change a registered name' }), method: 'PUT' };
   assert.equal((await fetch(`${base}/products/${draft.product_id}`, edit)).status, 409);
+  await assert.rejects(tracker.connect(handler).recordCheckpoint(id, 'Forbidden checkpoint', 0, 'Unauthorized', { gasLimit: 600000 }));
+  await assert.rejects(registry.registerProduct(id, draft.name, '', '', { gasLimit: 600000 }));
   await (await tracker.recordCheckpoint(id, 'Test factory', 0, 'Created')).wait();
   await (await tracker.recordCheckpoint(id, 'Test route', 1, 'Departed')).wait();
   await (await tracker.transferCustody(id, handler.address)).wait();

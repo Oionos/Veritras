@@ -342,9 +342,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Get Product Products  Product Id  Get"
+                  "$ref": "#/components/schemas/ProductDetailResponse"
                 }
               }
             }
@@ -2667,6 +2665,34 @@
           "name"
         ],
         "title": "ProductCreate"
+      },
+      "ProductDetailResponse": {
+        "properties": {
+          "product": {
+            "$ref": "#/components/schemas/ProductResponse"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/CheckpointResponse"
+            },
+            "type": "array",
+            "title": "History"
+          },
+          "transfers": {
+            "items": {
+              "$ref": "#/components/schemas/CustodyTransferResponse"
+            },
+            "type": "array",
+            "title": "Transfers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "product",
+          "history",
+          "transfers"
+        ],
+        "title": "ProductDetailResponse"
       },
       "ProductListResponse": {
         "properties": {

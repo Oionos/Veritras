@@ -1,6 +1,6 @@
 # Veritras implementation plan
 
-Originally prepared October 17, 2026 from [PROJECT_REVIEW.md](PROJECT_REVIEW.md). **Status updated October 18, 2026 from released `main` at `664e929` and the validated registration lifecycle increment in PR #21.** This update includes durable indexing, canonical product identity, indexer startup and health, local and hosted acceptance checks, and independently verified Render HTTP health settings.
+Originally prepared October 17, 2026 from [PROJECT_REVIEW.md](PROJECT_REVIEW.md). **Status updated October 19, 2026 for increment 7, following analytics release PR #22 (`ff88bcc`).** Integration recovery checks, typed contracts, protected-main merge controls and production admission gates are implemented. Final CI/deployment evidence is recorded in the increment 7 pull request; see [release controls](RELEASE_CONTROLS.md) and the [release/recovery runbook](RELEASE_RUNBOOK.md).
 
 ## Status at a glance
 
@@ -19,7 +19,7 @@ Priority meanings: **P0 — release blocker** must be resolved before enabling p
 | Durable indexing (increment 4) | **Done** | **P0 addressed** | Transactional journal/cursor, ordered reversible projections, confirmation policy, single-writer lock, metadata events and resilient notifications; production enablement remains a separate gate |
 | Registration lifecycle and evidence (increment 5) | **Done** | **P1 addressed** | Persisted submissions, checked replacements/cancellations, reload recovery, typed receipt/journal evidence and signed metadata/history; see [runbook](REGISTRATION_LIFECYCLE.md) |
 | Analytics and exports (increment 6) | **Done** | **P1 addressed** | Canonical shipment cohorts/lifecycle, optional locked SLA, real route/sample metrics, UTC filters and safe matching exports; see [runbook](ANALYTICS.md) |
-| Integration and release controls (increment 7) | **Partial** | P1 | Real local/browser/Sepolia journeys and CI delivered; failure/reorg coverage, enforced release gates and recovery runbook remain |
+| Integration and release controls (increment 7) | **Done** | **P1 addressed** | Real write-failure/restart, process-loss, reorg and backup/restore rehearsals; typed detail/verification; protected main and exact-commit production admission; see [runbook](RELEASE_RUNBOOK.md) |
 | QR verification, shipment detail and guided demo (increment 8) | **Pending** | P2 | Public verification exists; direct product links, QR labels, unified detail and guided/mobile journey remain |
 | Shipment exceptions (increment 9) | **Pending** | P2 | Depends on trustworthy lifecycle timestamps, SLA definitions and synchronization |
 | Performance and operations (increment 10) | **Pending** | P2 | Existing lazy routes/Lighthouse checks provide a baseline; measured optimization and operational completion remain |
@@ -30,7 +30,7 @@ Priority meanings: **P0 — release blocker** must be resolved before enabling p
 1. **Keep production `INDEXER_ENABLED=false`.** The new indexer has durable database progress and reorganization recovery. Production enablement still requires its reviewed deployment anchor, identity/history reconciliation and release checks; implementation alone does not authorize a backfill.
 2. **Registration lifecycle and evidence are delivered.** Preserve the checked transaction/journal evidence and reload recovery guarantees. Production backfill remains behind its separate enablement gate.
 3. **Analytics and exports are implemented.** Preserve canonical evidence and explicit sample/exclusion counts. Historical SLA stays unknown; product creation is labelled separately. See [ANALYTICS.md](ANALYTICS.md) for definitions, UTC creation cohorts and CSV compatibility changes.
-4. **Finish release enforcement.** CI workflows exist and passed for the released changes. Required branch checks and hosting behavior when CI fails still need explicit verification/configuration; both production hosts currently auto-deploy from `main`.
+4. **Maintain release enforcement.** Main reports protected and the owner confirmed all eight required checks, up-to-date PRs and no bypasses/force pushes/deletions. Production API startup and frontend build require successful exact-main-commit CI; frontend also waits for a compatible ready API. API rule-detail readback remains forbidden to this integration. See [RELEASE_CONTROLS.md](RELEASE_CONTROLS.md).
 5. **Preserve testing isolation and free-tier limits.** Use the stable `testing` preview for full-stack checks. Production and testing Render services share the workspace's 750 free instance hours/month; avoid continuous keep-alive pings. See [HOSTED_TESTING.md](HOSTED_TESTING.md).
 
 ### Completed releases and evidence
@@ -41,9 +41,9 @@ Priority meanings: **P0 — release blocker** must be resolved before enabling p
 | [PR #16](https://github.com/Oionos/Veritras/pull/16) | `e493afb` | Wallet authentication, ownership enforcement, shared sessions and guarded schema adoption/migration; released to Vercel and Render |
 | [PR #17](https://github.com/Oionos/Veritras/pull/17) | `33c4745` | Hosted testing resources, Preview repair, unique source-event identities and replay regressions; released to Vercel and Render |
 
-Latest durable-indexing validation: **236 backend tests, 192 frontend tests, 23 Playwright regressions and 40 contract tests passed**, plus builds, generated-type checks, Lighthouse and real local integration/browser journeys. Hosted Sepolia registration → checkpoints → custody → delivery passed; a same-code testing redeploy preserved event counts. The backend matrix covers SQLite and PostgreSQL, with two intentional skips for PostgreSQL-only checks in the SQLite variant. A real local chain fork/recovery and hosted same-code redeploy also passed.
+Historical increment 4 validation: **236 backend tests, 192 frontend tests, 23 Playwright regressions and 40 contract tests passed**, plus builds, generated-type checks, Lighthouse and real local integration/browser journeys. Hosted Sepolia registration → checkpoints → custody → delivery passed; a same-code testing redeploy preserved event counts. The backend matrix covers SQLite and PostgreSQL, with two intentional skips for PostgreSQL-only checks in the SQLite variant. A real local chain fork/recovery and hosted same-code redeploy also passed.
 
-Released schema before this increment: `c72b53d91e04`. The durable-indexing migration is `f04d9c21a873`, applied in hosted testing and rehearsed on an isolated production copy without changing business counts or granting ownership. Production code/schema rollout is tracked by [PR #18](https://github.com/Oionos/Veritras/pull/18); production indexing remains explicitly disabled. Testing uses a dedicated Neon project/database (`Veritras Testing` / `veritras_preview`), a separate Render API and distinct Sepolia contracts. Setup and resource details: [TESTING.md](TESTING.md), [HOSTED_TESTING.md](HOSTED_TESTING.md), [AUTHENTICATION.md](AUTHENTICATION.md).
+Current released schema is `c62a904df318`; increment 7 adds no migration. Historical durable-indexing rollout is tracked by [PR #18](https://github.com/Oionos/Veritras/pull/18); analytics was released in [PR #22](https://github.com/Oionos/Veritras/pull/22). Production indexing remains explicitly disabled. Increment 7 adds real PostgreSQL failure/process-loss and restart checks, local reorganization recovery, a locked backup/restore and read-only reconciliation rehearsal, and production gate rejection regressions. Test counts and final commit/deployment evidence are recorded in its pull request. Testing uses a dedicated Neon project/database (`Veritras Testing` / `veritras_preview`), a separate Render API and distinct Sepolia contracts. Setup and resource details: [TESTING.md](TESTING.md), [HOSTED_TESTING.md](HOSTED_TESTING.md), [AUTHENTICATION.md](AUTHENTICATION.md).
 
 ## Goal and completion criteria
 
@@ -56,7 +56,7 @@ The first release is complete when:
 - [x] Receipt-backed checks prevent database-only drafts and placeholder transaction fields from receiving verified registration.
 - [x] Confirmed events reconcile into one product and one shipment lifecycle under explicit canonical identities and database constraints.
 - [x] Journal, projections and cursor commit atomically; restart/replay and reorganization recovery are implemented and validated against SQLite, PostgreSQL and the real local chain. Conflicting legacy data stops for review.
-- [ ] Shipment status and analytics reflect indexed events, with no unlabeled example metrics.
+- [x] Shipment status and analytics reflect indexed events, with no unlabeled example metrics.
 - [x] A complete journey passes through the browser, API, database, and local contracts, followed by a Sepolia check in testing.
 - [ ] Production indexing/backfill passes identity reconciliation, durable recovery and release-control acceptance checks before enablement.
 
@@ -77,14 +77,14 @@ The numbers below are **plan increment IDs**, not actual GitHub pull request num
 
 | Increment | Status / priority | Suggested branch | Remaining deliverable | Depends on |
 | --- | --- | --- | --- | --- |
-| 0 | Partial / P1 | Follow-up release controls | Testing setup done; verify/enforce CI and deployment gates | None |
+| 0 | **Done** | Released testing setup; controls in 7 | Maintain isolation and protected-main/provider admission policies | None |
 | 1 | **Done / P1 addressed** | Released in #20 | Maintain startup, recovery and health guarantees; both Render HTTP paths verified; see [health runbook](INDEXER_HEALTH.md) | Finality policy from 4 |
 | 2 | **Done** | Released in #16 | Maintain authentication and authorization | 0 environment setup |
 | 3 | **Done / P1 addressed** | `codex/canonical-product-identity` | Maintain identity/reconciliation guarantees; release tracked in PR #19 | 2 |
 | 4 | **Done / P0 addressed** | `codex/durable-chain-indexing` | Maintain recovery guarantees; production enablement remains a separate gate | Scoped identity binding included; broader increment 3 remains |
 | 5 | **Done / P1 addressed** | `codex/registration-lifecycle-evidence` | Maintain durable transaction recovery, checked evidence and metadata history; release tracked in PR #21 | 2–4 |
 | 6 | **Done / P1 addressed** | `codex/truthful-analytics-and-exports` | Maintain canonical cohorts, SLA exclusions and safe matching exports; release tracked in PR #22 | 3–5 delivered |
-| 7 | Partial / P1 | `test/complete-provenance-flow` | Failure/reorg coverage, enforced gates and recovery runbook | 2–6 for final acceptance |
+| 7 | **Done / P1 addressed** | `codex/integration-release-controls` | Maintain real recovery drills, protected-main checks and production admission; see [runbook](RELEASE_RUNBOOK.md) | 2–6 delivered |
 | 8 | Pending / P2 | `feat/qr-verification-and-demo` | QR links, unified shipment detail, mobile and guided demo | 5 and 7 |
 | 9 | Pending / P2 | `feat/shipment-exceptions` | Expected arrival, overdue and dwell exception list | 6–8 |
 | 10 | Pending / P2 | `perf/frontend-and-operations` | Measured loading improvements and operational cleanup | Stable reliable-demo milestone |
@@ -93,9 +93,9 @@ Tests and migration checks belong in each implementation PR. PR 7 assembles the 
 
 ## PR 0 — Establish isolated testing
 
-**Status: testing environment done; release controls partial. Priority: P1 for remaining controls.**
+**Status: done, including release controls completed in increment 7. Priority: P1 addressed.**
 
-Delivered: local Compose isolation; a dedicated hosted Neon project/database and Render testing API; separate Sepolia contracts and manifest; scoped Vercel Preview configuration; exact CORS/SIWE origins; protected preview access; documented `feature → testing → main` workflow. Real hosted writes and chain actions were checked without changing production business data. Remaining: verify/enforce required merge checks and deployment release gates. Production auto-deploy is enabled; successful historical CI alone does not establish enforcement.
+Delivered: local Compose isolation; a dedicated hosted Neon project/database and Render testing API; separate Sepolia contracts and manifest; scoped Vercel Preview configuration; exact CORS/SIWE origins; protected preview access; documented `feature → testing → main` workflow. Real hosted writes and chain actions were checked without changing production business data. Increment 7 completes protected-main merge controls and exact-commit CI admission in both production hosting entrypoints. GitHub reports main protected; the owner confirmed the complete rule settings. See [RELEASE_CONTROLS.md](RELEASE_CONTROLS.md) for the rule-detail API limitation and bounded provider gates.
 
 **Tasks**
 
@@ -251,11 +251,11 @@ Local release validation: **401 backend tests passed** (three intentional dialec
 
 ## PR 7 — Complete integration coverage and release controls
 
-**Status: partial; substantial validation already delivered. Priority: P1, alongside every remaining increment.**
+**Status: done. Priority: P1 addressed.**
 
-Delivered: reproducible PostgreSQL/Hardhat/API/frontend stack; real registration/checkpoint/custody/delivery integration; real Chromium authentication/ownership checks; challenge persistence after restart; replay/deduplication regressions; backend/frontend/contract/browser/build CI, generated-type checks and a Python-application-to-OpenAPI drift check; migration rehearsals; dedicated-wallet hosted Sepolia journey. Latest recorded suite counts are listed above.
+Delivered: reproducible PostgreSQL/Hardhat/API/frontend stack; real registration/checkpoint/custody/delivery integration; real Chromium authentication/ownership checks; challenge persistence after restart; replay/deduplication regressions; backend/frontend/contract/browser/build CI, generated-type checks and a Python-application-to-OpenAPI drift check; migration rehearsals; dedicated-wallet hosted Sepolia journey. Typed product detail and verification responses are generated from OpenAPI.
 
-Remaining: database-write interruption and reorganization recovery acceptance tests after increment 4; verify/enforce required merge/deployment gates; document and rehearse the full release/backfill/recovery runbook. Do not count the existing complete happy-path journey as completion of these recovery criteria.
+Completed in increment 7: actual PostgreSQL checkpoint failure after a metadata write in the same batch; restart with the fault still present, repair/replay and a second restart without duplicates; process termination with uncommitted PostgreSQL mutations and lock recovery; actual Hardhat reorganization recovery; real unauthorized/duplicate transaction reverts; locked database backup/restore with exact data fingerprints and read-only identity/history reconciliation; typed product detail and verification with drift rejection. Main is protected (GitHub flag plus owner confirmation of all reviewed settings; detailed rule API remains 403). Render API startup and Vercel production build fail closed unless all eight required jobs succeed on the exact main-push commit; the frontend additionally waits for its compatible production API. Readiness observes CI after completion to avoid a dependency cycle. [RELEASE_RUNBOOK.md](RELEASE_RUNBOOK.md) documents release order, migration, backfill review and rollback. Production indexing enablement remains a separate pending gate.
 
 **Tasks**
 
@@ -296,7 +296,7 @@ Remaining: database-write interruption and reorganization recovery acceptance te
 
 ### PR 10: Performance and operations
 
-**Status: pending completion. Priority: P2.** Existing lazy routes, error reporting configuration and Lighthouse CI are a baseline. Measured optimization, environment-aware observability, readiness alerts and rehearsed backup/restore remain.
+**Status: pending completion. Priority: P2.** Existing lazy routes, error reporting configuration and Lighthouse CI are a baseline. Measured optimization, environment-aware observability and readiness alerts remain. Increment 7 supplies the local backup/restore rehearsal and recovery runbook; hosted restore acceptance belongs to the separate production enablement gate.
 
 - Measure mobile loading and interaction before changing bundles; investigate wallet/provider startup, chart imports, and unnecessary SDK loading.
 - Defer optional wallet/chart code where measurements justify it. Compare before/after Lighthouse and field metrics using the same scenario.
@@ -330,8 +330,8 @@ After the reliable demo is complete and a specific user workflow has been valida
 
 ## Next implementation session
 
-Prioritize **production indexing enablement validation** and **increment 7: release-gate enforcement and the recovery runbook**. Increments 5 (transaction lifecycle/evidence) and 6 (truthful analytics/exports) are delivered. Production indexing/backfill still requires its reviewed deployment anchor, identity/history dry run and explicit enablement. Keep that gate separate from ordinary application releases.
+The next product increment is **8: QR verification, unified shipment detail and guided/mobile demo**. Increments 5–7 are implemented, including truthful analytics and enforced release controls. **Production indexing enablement validation remains important and pending:** review the deployment anchor, rehearse identity/history reconciliation and hosted restore, then obtain explicit enablement before backfill. Keep that gate separate from ordinary application releases.
 
-Preserve analytics definitions and sample/exclusion counts during subsequent work. Keep production indexing enablement and release-gate configuration as explicit reviewed changes.
+Preserve analytics definitions and sample/exclusion counts during subsequent work. Keep production indexing enablement and any change to release-gate configuration as explicit reviewed changes.
 
 For each implementation PR, record changed behavior, tested commit, validation results, migration/configuration requirements and remaining acceptance criteria. Update this status dashboard after release. Completing a subset of tasks does not close the increment until its remaining acceptance criteria pass.

@@ -128,6 +128,8 @@ def test_get_products_returns_paginated_list_with_items_and_total(client_fixture
 
 
 def test_get_product_detail(client_fixture, seeded_products):
+    from app.schemas.product_detail import ProductDetailResponse
+
     response = client_fixture.get("/products/0x" + "a" * 64)
     assert response.status_code == 200
     data = response.json()
@@ -135,6 +137,21 @@ def test_get_product_detail(client_fixture, seeded_products):
     assert data["product"]["name"] == "Test Product"
     assert "history" in data
     assert "transfers" in data
+    assert ProductDetailResponse.model_validate(data).product.name == "Test Product"
+
+
+def test_product_detail_and_verification_have_generated_response_contracts():
+    from app.main import app
+
+    schema = app.openapi()
+    for route, name in (
+        ("/products/{product_id}", "ProductDetailResponse"),
+        ("/products/{product_id}/verify", "VerificationResponse"),
+    ):
+        response = schema["paths"][route]["get"]["responses"]["200"]
+        assert response["content"]["application/json"]["schema"] == {
+            "$ref": "#/components/schemas/" + name
+        }
 
 
 def test_get_product_verify(client_fixture, seeded_products):
