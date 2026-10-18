@@ -1,3 +1,5 @@
+import { appEnvironment } from '@/config/runtime'
+import { toProductBytes32 } from '@/utils/productId'
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ token: 'test-token', address: '0x1234567890123456789012345678901234567890', isAuthenticated: true, isLoggingIn: false, loginError: null, login: vi.fn(), logout: vi.fn() }),
   getAuthToken: () => null,
@@ -72,7 +74,7 @@ vi.mock('@/hooks/useApi', () => ({
 }))
 
 const mockProducts = [
-  { id: 1, product_id: 'PROD-001', owner_address: '0x1234567890123456789012345678901234567890', ownership_source: 'signed_draft', block_number: 0, tx_hash: '0x', name: 'Widget A', manufacturer_address: '0x1234567890123456789012345678901234567890', registered_at: '2024-01-15T10:00:00Z' },
+  { id: 1, product_id: 'PROD-001', on_chain_product_id: toProductBytes32('PROD-001'), chain_id: appEnvironment.chainId, registry_address: appEnvironment.productRegistry, tracker_address: appEnvironment.shipmentTracker, owner_address: '0x1234567890123456789012345678901234567890', ownership_source: 'signed_draft', block_number: 0, tx_hash: '0x', name: 'Widget A', manufacturer_address: '0x1234567890123456789012345678901234567890', registered_at: '2024-01-15T10:00:00Z' },
   { id: 2, product_id: 'PROD-002', name: 'Gadget B', manufacturer_address: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd', registered_at: '2024-02-20T12:00:00Z' },
 ]
 

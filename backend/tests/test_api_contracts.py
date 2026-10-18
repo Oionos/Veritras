@@ -1,6 +1,7 @@
 import pytest
 from datetime import datetime, timezone
 
+from app.services.identity import scope_values
 from app.models.product import Product
 from app.models.shipment import Checkpoint, CustodyTransfer, Shipment
 from app.schemas.product import ProductListResponse, ProductResponse
@@ -23,6 +24,9 @@ def seeded_product(db_session):
         manufacturer_address="0x1234567890123456789012345678901234567890",
         owner_address="0x1234567890123456789012345678901234567890",
         ownership_source="signed_draft",
+        **scope_values("0x" + "c" * 64),
+        registration_status="draft",
+        created_at=datetime.now(timezone.utc),
         registered_at=datetime.now(timezone.utc),
         block_number=0,
         tx_hash="0x",

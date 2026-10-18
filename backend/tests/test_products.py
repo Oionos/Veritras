@@ -1,5 +1,6 @@
 import pytest
 
+from app.services.identity import scope_values
 from app.models.product import Product
 from app.schemas.product import ProductListResponse, ProductResponse
 from app.schemas.shipment import CheckpointResponse, CustodyTransferResponse
@@ -16,6 +17,9 @@ def seeded_products(db_session):
         manufacturer_address="0x1234567890123456789012345678901234567890",
         owner_address="0x1234567890123456789012345678901234567890",
         ownership_source="signed_draft",
+        **scope_values("0x" + "a" * 64),
+        registration_status="draft",
+        created_at=datetime.now(timezone.utc),
         registered_at=datetime.now(timezone.utc),
         block_number=0,
         tx_hash="0x",
@@ -56,7 +60,8 @@ def test_post_product_returns_created_product_with_generated_id(client_fixture, 
     assert data["product_id"].startswith("PROD-")
     assert len(data["product_id"]) == len("PROD-") + 8
     assert data["id"] is not None
-    assert data["registered_at"] is not None
+    assert data["registered_at"] is None
+    assert data["created_at"] is not None
 
 
 def test_post_product_response_validates_against_schema(client_fixture, seeded_products):
@@ -70,8 +75,9 @@ def test_post_product_response_validates_against_schema(client_fixture, seeded_p
     data = response.json()
     validated = ProductResponse.model_validate(data)
     assert validated.name == payload["name"]
-    assert validated.registered_at is not None
-    assert "created_at" not in data
+    assert validated.registered_at is None
+    assert validated.created_at is not None
+    assert "created_at" in data
 
 
 def test_put_product_updates_existing_product(client_fixture, seeded_products):
@@ -99,8 +105,9 @@ def test_put_product_response_validates_against_schema(client_fixture, seeded_pr
     validated = ProductResponse.model_validate(data)
     assert validated.name == update_payload["name"]
     assert validated.description == update_payload["description"]
-    assert validated.registered_at is not None
-    assert "created_at" not in data
+    assert validated.registered_at is None
+    assert validated.created_at is not None
+    assert "created_at" in data
 
 
 def test_put_product_returns_404_for_nonexistent_product(client_fixture, seeded_products):

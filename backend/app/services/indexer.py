@@ -13,13 +13,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Optional
 
-from sqlalchemy import text, or_, func
+from sqlalchemy import text, or_
 from web3 import Web3
 
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.chain import ChainBlock, ChainEvent, IndexedProduct, IndexerCursor
 from app.models.product import Product
+from app.services.identity import find_canonical_product, assign_identity, scope_values
 from app.models.shipment import Checkpoint, CustodyTransfer, Shipment
 
 logger = logging.getLogger(__name__)
@@ -54,30 +55,17 @@ def load_abi(contract_name: str) -> list:
 
 
 def find_product(db, value):
-    hex_id = bytes32_to_hex(value)
-    candidates = [hex_id]
+    # Compatibility wrapper for read-only tooling; the writer passes its own
+    # configured scope explicitly below.
     try:
-        display_id = bytes(value).rstrip(b"\x00").decode("utf-8")
-        if display_id:
-            candidates.append(display_id)
-    except UnicodeDecodeError:
-        pass
-    matches = (
-        db.query(Product)
-        .filter(
-            or_(
-                Product.product_id.in_(candidates),
-                func.lower(Product.product_id) == hex_id,
-            )
+        return find_canonical_product(
+            db,
+            bytes32_to_hex(value),
+            settings.chain_id,
+            settings.product_registry_contract,
         )
-        .with_for_update()
-        .all()
-    )
-    if len(matches) > 1:
-        raise ReconciliationRequired(
-            "Conflicting product identities require reconciliation"
-        )
-    return matches[0] if matches else None
+    except ValueError as error:
+        raise ReconciliationRequired(str(error)) from None
 
 
 def _hex(value):
@@ -105,6 +93,8 @@ PRODUCT_FIELDS = (
     "owner_address",
     "ownership_source",
     "registered_at",
+    "chain_registered_at",
+    "registration_status",
     "block_number",
     "tx_hash",
 )
@@ -525,16 +515,22 @@ class EventIndexer:
     def _binding(self, db, row):
         binding = db.get(IndexedProduct, (self.scope, row.product_key))
         if binding is not None:
-            return (
-                binding,
+            product = (
                 db.query(Product)
                 .filter_by(product_id=binding.product_id)
                 .with_for_update()
-                .one(),
+                .one()
             )
+            self._assign_scope(product, row.product_key)
+            return binding, product
         if row.event_type != "ProductRegistered":
             raise ReconciliationRequired("Registration missing before product history")
-        product = find_product(db, bytes.fromhex(row.product_key[2:]))
+        try:
+            product = find_canonical_product(
+                db, row.product_key, settings.chain_id, self.product_registry_address
+            )
+        except ValueError as error:
+            raise ReconciliationRequired(str(error)) from None
         if product is not None:
             if (
                 db.query(IndexedProduct)
@@ -562,7 +558,10 @@ class EventIndexer:
                     "Legacy registration conflicts with canonical log"
                 )
             baseline = {field: getattr(product, field) for field in PRODUCT_FIELDS}
-            baseline["registered_at"] = baseline["registered_at"].isoformat()
+            for field in ("registered_at", "chain_registered_at"):
+                baseline[field] = (
+                    baseline[field].isoformat() if baseline[field] else None
+                )
             if product.block_number > 0:
                 # An old projection is not the pre-registration state. On orphan
                 # recovery preserve its URL but revoke unsupported evidence/rights.
@@ -573,6 +572,8 @@ class EventIndexer:
                     ownership_source=None,
                     description=None,
                     metadata_uri=None,
+                    chain_registered_at=None,
+                    registration_status="legacy_unreconciled",
                 )
         else:
             baseline = dict(
@@ -587,16 +588,21 @@ class EventIndexer:
                 ).isoformat(),
                 block_number=0,
                 tx_hash="0x",
+                chain_registered_at=None,
+                registration_status="unregistered",
             )
             product = Product(
                 product_id=row.product_key,
+                created_at=datetime.now(timezone.utc),
                 **dict(
                     baseline,
                     registered_at=datetime.fromisoformat(baseline["registered_at"]),
                 ),
             )
+            self._assign_scope(product, row.product_key)
             db.add(product)
             db.flush()
+        self._assign_scope(product, row.product_key)
         binding = IndexedProduct(
             scope=self.scope,
             product_key=row.product_key,
@@ -607,6 +613,20 @@ class EventIndexer:
         db.add(binding)
         db.flush()
         return binding, product
+
+    def _assign_scope(self, product, key):
+        try:
+            assign_identity(
+                product,
+                scope_values(
+                    key,
+                    chain_id=settings.chain_id,
+                    registry=self.product_registry_address,
+                    tracker=self.shipment_tracker_address,
+                ),
+            )
+        except ValueError as error:
+            raise ReconciliationRequired(str(error)) from None
 
     def _project(self, db, row):
         args = row.payload
@@ -621,6 +641,8 @@ class EventIndexer:
                 "chain_event",
             )
             product.registered_at = timestamp_to_datetime(args["timestamp"])
+            product.chain_registered_at = product.registered_at
+            product.registration_status = "indexed"
             product.block_number, product.tx_hash = (
                 row.block_number,
                 row.transaction_hash,
@@ -759,7 +781,8 @@ class EventIndexer:
                     field,
                     (
                         datetime.fromisoformat(value)
-                        if field == "registered_at"
+                        if field in ("registered_at", "chain_registered_at")
+                        and value is not None
                         else value
                     ),
                 )

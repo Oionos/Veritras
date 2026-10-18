@@ -1,5 +1,6 @@
 import pytest
 
+from app.services.identity import scope_values
 from app.models.product import Product
 from app.models.shipment import Checkpoint, CustodyTransfer, Shipment
 from app.schemas.shipment import (
@@ -21,11 +22,15 @@ def seeded_db(db_session):
         manufacturer_address="0x1234567890123456789012345678901234567890",
         owner_address="0x1234567890123456789012345678901234567890",
         ownership_source="chain_event",
+        **scope_values("0x" + "b" * 64),
+        registration_status="draft",
+        created_at=datetime.now(timezone.utc),
         registered_at=datetime.now(timezone.utc),
         block_number=200,
         tx_hash="0xshipmenttx",
     )
     db_session.add(product)
+    db_session.add(Product(product_id="0x"+"c"*64, name="Second item", manufacturer_address=product.manufacturer_address, owner_address=product.owner_address, ownership_source=product.ownership_source, registered_at=product.registered_at, block_number=0, tx_hash="0x", **scope_values("0x"+"c"*64)))
     db_session.commit()
 
     cp1 = Checkpoint(
@@ -192,7 +197,7 @@ def test_put_shipment_returns_404_for_nonexistent_shipment(client_fixture, seede
 def test_get_shipments_returns_paginated_list_with_items_and_total(client_fixture, seeded_db):
     for i in range(2):
         client_fixture.post("/shipments", json={
-            "product_id": "0x" + "b" * 64,
+            "product_id": "0x" + ("b" if i == 0 else "c") * 64,
             "origin": f"Origin {i}",
             "destination": f"Destination {i}",
             "status": "0",
@@ -216,7 +221,7 @@ def test_get_shipments_filters_by_status_correctly(client_fixture, seeded_db):
         "status": "0",
     })
     client_fixture.post("/shipments", json={
-        "product_id": "0x" + "b" * 64,
+        "product_id": "0x" + "c" * 64,
         "origin": "Warehouse C",
         "destination": "Store D",
         "status": "0",
@@ -271,7 +276,7 @@ def test_get_shipments_response_validates_against_schema(client_fixture, seeded_
     """GET /shipments response must conform to ShipmentListResponse schema."""
     for i in range(2):
         client_fixture.post("/shipments", json={
-            "product_id": "0x" + "b" * 64,
+            "product_id": "0x" + ("b" if i == 0 else "c") * 64,
             "origin": f"Origin {i}",
             "destination": f"Destination {i}",
             "status": "0",
@@ -330,7 +335,7 @@ def test_get_shipments_filters_by_search_origin(client_fixture, seeded_db):
         "status": "0",
     })
     client_fixture.post("/shipments", json={
-        "product_id": "0x" + "b" * 64,
+        "product_id": "0x" + "c" * 64,
         "origin": "Gamma Port",
         "destination": "Delta Hub",
         "status": "0",
@@ -351,7 +356,7 @@ def test_get_shipments_filters_by_search_destination(client_fixture, seeded_db):
         "status": "0",
     })
     client_fixture.post("/shipments", json={
-        "product_id": "0x" + "b" * 64,
+        "product_id": "0x" + "c" * 64,
         "origin": "Gamma Port",
         "destination": "Delta Hub",
         "status": "0",

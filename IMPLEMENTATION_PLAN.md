@@ -4,7 +4,7 @@ Originally prepared October 17, 2026 from [PROJECT_REVIEW.md](PROJECT_REVIEW.md)
 
 ## Status at a glance
 
-**The testing environment and wallet security are delivered. The complete reliable-demo milestone is still open.** Durable indexing is complete with local and hosted recovery/persistence coverage; canonical product identity is the next implementation priority. Hosted rollout evidence is recorded in [DURABLE_INDEXING.md](DURABLE_INDEXING.md).
+**The testing environment and wallet security are delivered. The complete reliable-demo milestone is still open.** Durable indexing is complete with local and hosted recovery/persistence coverage; canonical product identity is implemented and in release validation. Hosted rollout evidence is recorded in [DURABLE_INDEXING.md](DURABLE_INDEXING.md).
 
 Status meanings: **Done** = implemented and validated for the stated scope; **Partial** = some work delivered with remaining acceptance criteria; **Pending** = planned work remains; **Deferred** = after the reliable-demo milestone. Partial work is not currently being implemented simply because it is listed here.
 
@@ -15,7 +15,7 @@ Priority meanings: **P0 — release blocker** must be resolved before enabling p
 | Isolated local and hosted testing | **Done** | Maintain | Separate database, API, Sepolia contracts, protected Vercel Preview, exact sign-in origins; full journey checked |
 | Wallet sign-in and write permissions | **Done** | Maintain | Persistent SIWE challenges, scoped tokens, owner-only API writes, browser session handling |
 | Indexer startup and health | **Partial** | P1 | Startup/retry/readiness fixes delivered; finality-aware health, hosted HTTP checks and monitoring remain |
-| Canonical product identity (increment 3) | **Partial** | **P1 — next implementation** | Conversion and draft matching exist; explicit identity columns, constraints and legacy reconciliation remain |
+| Canonical product identity (increment 3) | **Implemented; validating release** | **P1 addressed in code** | Scoped identities, lifecycle timestamps, legacy aliases/reconciliation and one-shipment constraint; see [runbook](CANONICAL_PRODUCT_IDENTITY.md) |
 | Durable indexing (increment 4) | **Done** | **P0 addressed** | Transactional journal/cursor, ordered reversible projections, confirmation policy, single-writer lock, metadata events and resilient notifications; production enablement remains a separate gate |
 | Registration lifecycle and evidence (increment 5) | **Partial** | P1 | Receipt-backed registration checks delivered; persisted submissions, replacement handling and richer evidence states remain |
 | Analytics and exports (increment 6) | **Pending** | **P1 — remove misleading metrics soon** | Fixed dashboard totals/trends, sample route charts, assumed 72-hour SLA and export semantics still need correction |
@@ -28,7 +28,7 @@ Priority meanings: **P0 — release blocker** must be resolved before enabling p
 ### Urgent safeguards and next actions
 
 1. **Keep production `INDEXER_ENABLED=false`.** The new indexer has durable database progress and reorganization recovery. Production enablement still requires its reviewed deployment anchor, identity/history reconciliation and release checks; implementation alone does not authorize a backfill.
-2. **Implement increment 3 next**; increment 4 now establishes scoped projection bindings and stops on identity/history conflicts. Preserve existing display IDs/URLs, inspect conflicts, and reconcile legacy rows against chain evidence before granting ownership or rebuilding projections.
+2. **Finish increment 3 release validation** using the [canonical identity runbook](CANONICAL_PRODUCT_IDENTITY.md). Preserve unknown legacy records and keep production backfill behind its separate enablement gate.
 3. **Remove or explicitly label illustrative metrics promptly.** `Dashboard.tsx` still contains `SUMMARY_MOCK` (1,247 shipments) and fixed KPI trends; `Analytics.tsx` has hard-coded route volumes/delays. The API also assumes a 72-hour delivery target without per-shipment SLA data. This presentation correction can ship before the full analytics increment.
 4. **Finish release enforcement.** CI workflows exist and passed for the released changes. Required branch checks and hosting behavior when CI fails still need explicit verification/configuration; both production hosts currently auto-deploy from `main`.
 5. **Preserve testing isolation and free-tier limits.** Use the stable `testing` preview for full-stack checks. Production and testing Render services share the workspace's 750 free instance hours/month; avoid continuous keep-alive pings. See [HOSTED_TESTING.md](HOSTED_TESTING.md).
@@ -80,7 +80,7 @@ The numbers below are **plan increment IDs**, not actual GitHub pull request num
 | 0 | Partial / P1 | Follow-up release controls | Testing setup done; verify/enforce CI and deployment gates | None |
 | 1 | Partial / P1 | Follow-up health operations | Finality-aware progress, hosted HTTP checks and monitoring | Finality policy from 4 |
 | 2 | **Done** | Released in #16 | Maintain authentication and authorization | 0 environment setup |
-| 3 | Partial / **P1 next** | `feat/canonical-product-identity` | Identity schema, reconciliation and one-shipment constraint | 2 |
+| 3 | Implemented / **release validation** | `codex/canonical-product-identity` | Rehearse migration, verify hosted testing, then release to main | 2 |
 | 4 | **Done / P0 addressed** | `codex/durable-chain-indexing` | Maintain recovery guarantees; production enablement remains a separate gate | Scoped identity binding included; broader increment 3 remains |
 | 5 | Partial / P1 | `feat/evidence-based-verification` | Persistent transaction lifecycle and rich evidence responses | 2–4 |
 | 6 | Pending / P1 | `fix/live-analytics-and-reports` | Accurate metrics, SLA semantics and consistent safe exports | 4 for complete aggregates; mock removal can ship now |
@@ -154,11 +154,11 @@ All tasks below are implemented: persistent single-use scoped SIWE challenges an
 
 ## PR 3 — Introduce canonical identity and migration discipline
 
-**Status: partial. Priority: P1 — next implementation.**
+**Status: implemented; local acceptance passed, hosted release validation in progress. Priority: P1 addressed in code.**
 
 Delivered ahead of this increment: frontend/backend bytes32 conversion helpers, display/hex draft lookup with conflict detection, explicit ownership provenance, packaged Alembic migrations, guarded baseline inspection/adoption, startup migrations and disabled hosted `create_all`. Production adoption and additive migrations were rehearsed before release.
 
-Remaining: persisted canonical chain/contract/product identity and uniqueness; shared conversion fixtures; idempotent dry-run/apply legacy reconciliation; one-shipment-per-item constraint after conflict inspection; explicit registration lifecycle/timestamps; and a separately controlled migration/release stage. Current migrations run through the guarded Docker startup entrypoint, rather than an independent release job.
+Delivered in this increment: persisted chain/registry/tracker/bytes32 identity, scoped uniqueness and collision retries; shared conversion fixtures; atomic dry-run/apply reconciliation with retained duplicate archives and public URL aliases; one-shipment-per-item database enforcement; separate creation/registration timestamps and lifecycle states; stored-identity contract actions; and an explicit schema release stage with read-only API startup checks. Local PostgreSQL/SQLite regressions, real chain round trip, reorganization recovery and browser ownership checks passed. Migration rehearsal on a production Neon copy passed. Hosted testing and main rollout evidence are recorded in [CANONICAL_PRODUCT_IDENTITY.md](CANONICAL_PRODUCT_IDENTITY.md).
 
 **Schema and behavior**
 
@@ -328,7 +328,7 @@ After the reliable demo is complete and a specific user workflow has been valida
 
 ## Next implementation session
 
-Start **increment 3: canonical product identity** from current `main`. Inspect existing display/hex identities and shipment relationships, design additive schema changes, and build the reconciliation dry-run before applying changes. Rehearse migrations and the real journey in isolation, then use `testing` for matching hosted frontend/backend checks. Use the delivered increment 4 recovery machinery only after reviewing identity/history reconciliation before enabling production catchup.
+Complete the canonical identity release checks, then prioritize **increment 5: transaction lifecycle and verification UX**. Production indexing/backfill still requires its reviewed deployment anchor, identity/history dry run and explicit enablement. Keep that gate separate from ordinary application releases.
 
 The small analytics presentation correction and release-gate verification can be separate changes without waiting for the complete indexer redesign. Do not combine those independent fixes into the identity migration.
 
