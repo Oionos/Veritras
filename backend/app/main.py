@@ -1,4 +1,6 @@
 import logging
+import os
+import re
 import logging.config
 import time
 from contextlib import asynccontextmanager
@@ -20,14 +22,34 @@ from app.core.logging import LOGGING_CONFIG
 from app.core.security import SecurityHeadersMiddleware
 from app.api.routes import auth, products, shipments, analytics
 from app.services.indexer import EventIndexer
+from app.services.health import DatabaseProbe
+from app.schemas.health import (
+    IndexerHealthResponse,
+    LivenessResponse,
+    ReadinessResponse,
+)
 
 logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger("veritras.api")
 
 w3: Optional[Web3] = None
 indexer: Optional[EventIndexer] = None
-if settings.sepolia_rpc_url:
-    w3 = Web3(Web3.HTTPProvider(settings.sepolia_rpc_url))
+_indexer_startup_error = None
+
+
+def release_commit():
+    value = os.environ.get("RENDER_GIT_COMMIT", "")
+    return value if re.fullmatch(r"[0-9a-f]{40}", value) else None
+
+
+def _probe_database():
+    with engine.begin() as conn:
+        if conn.dialect.name == "postgresql":
+            conn.exec_driver_sql("SET LOCAL statement_timeout = '1000ms'")
+        conn.execute(text("SELECT 1"))
+
+
+_database_probe = DatabaseProbe(_probe_database)
 
 
 @asynccontextmanager
@@ -35,22 +57,29 @@ async def lifespan(app: FastAPI):
     if not settings.is_hosted:
         Base.metadata.create_all(bind=engine)
 
-    global indexer
-    if settings.indexer_enabled and settings.sepolia_rpc_url and settings.product_registry_contract and settings.shipment_tracker_contract:
+    global indexer, _indexer_startup_error
+    indexer = None
+    owned_indexer = None
+    _indexer_startup_error = None
+    if settings.indexer_enabled:
         try:
-            indexer = EventIndexer()
-            indexer.start()
-            logger.info("Blockchain indexer started")
-        except Exception as e:
-            logger.error(f"Failed to start blockchain indexer: {e}")
+            owned_indexer = EventIndexer()
+            owned_indexer.start()
+            indexer = owned_indexer
+            logger.info("Blockchain indexer startup scheduled")
+        except Exception as error:
+            _indexer_startup_error = type(error).__name__
+            # Exception messages may include authenticated RPC endpoints.
+            logger.error("Indexer thread startup failed: %s", _indexer_startup_error)
     else:
-        logger.info("Blockchain indexer skipped — missing RPC URL or contract addresses")
-
-    yield
-
-    if indexer:
-        indexer.stop()
-        logger.info("Blockchain indexer stopped")
+        logger.info("Blockchain indexing explicitly disabled")
+    try:
+        yield
+    finally:
+        if owned_indexer is not None:
+            owned_indexer.stop()
+            logger.info("Blockchain indexer shutdown requested")
+        indexer = None
 
 
 app = FastAPI(title="Veritras API", version="0.1.0", lifespan=lifespan)
@@ -59,10 +88,17 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
+
 def parse_cors_origins(cors_origins: str) -> list[str]:
-    origins = [origin.strip().rstrip("/") for origin in cors_origins.split(",") if origin.strip()]
+    origins = [
+        origin.strip().rstrip("/")
+        for origin in cors_origins.split(",")
+        if origin.strip()
+    ]
     if "*" in origins and len(origins) > 1:
-        logger.warning("Wildcard '*' mixed with explicit origins; treating as allow-all")
+        logger.warning(
+            "Wildcard '*' mixed with explicit origins; treating as allow-all"
+        )
     logger.info("Parsed CORS origins: %s", origins)
     return origins
 
@@ -82,7 +118,9 @@ if settings.is_hosted and (not origins or has_wildcard):
 allow_credentials = not has_wildcard
 
 if allow_credentials and has_wildcard:
-    logger.warning("CORS allow_credentials=True is used with wildcard origin '*'. This is a security risk.")
+    logger.warning(
+        "CORS allow_credentials=True is used with wildcard origin '*'. This is a security risk."
+    )
 
 app.add_middleware(
     CORSMiddleware,
@@ -100,6 +138,8 @@ app.add_middleware(SecurityHeadersMiddleware)
 async def log_requests(request: Request, call_next):
     start_time = time.time()
     response = await call_next(request)
+    if request.url.path == "/health" or request.url.path.startswith("/health/"):
+        response.headers["Cache-Control"] = "no-store"
     duration_ms = (time.time() - start_time) * 1000
     logger.info(
         "request",
@@ -120,68 +160,105 @@ app.include_router(shipments.router, prefix="/shipments", tags=["shipments"])
 app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
 
 
-@app.get("/health/indexer")
-def health_indexer():
-    """Expose blockchain indexer status and last processed block."""
-    if indexer is None:
-        return JSONResponse(
-            status_code=503,
-            content={
-                "status": "not_started",
-                "reason": "Missing SEPOLIA_RPC_URL or contract address env vars",
-            },
-        )
+def indexer_state():
+    if settings.indexer_enabled and indexer is not None:
+        return IndexerHealthResponse.model_validate(indexer.health())
+    return IndexerHealthResponse(
+        status="not_started" if settings.indexer_enabled else "disabled",
+        enabled=settings.indexer_enabled,
+        reason=(
+            "thread_start_failed"
+            if _indexer_startup_error
+            else (
+                "worker_not_started"
+                if settings.indexer_enabled
+                else "indexing_disabled"
+            )
+        ),
+        initialization_error=(
+            _indexer_startup_error if settings.indexer_enabled else None
+        ),
+        last_error=_indexer_startup_error if settings.indexer_enabled else None,
+        chain_id=settings.chain_id,
+        confirmations=settings.indexer_confirmations,
+        poll_interval_seconds=settings.indexer_poll_interval,
+        startup_timeout_seconds=settings.indexer_startup_timeout,
+        stale_after_seconds=max(
+            settings.indexer_stale_after, settings.indexer_poll_interval * 3
+        ),
+        head_stale_after_seconds=(
+            settings.indexer_head_stale_after if settings.chain_id != 31337 else 0
+        ),
+        max_lag_blocks=settings.indexer_max_lag_blocks,
+    )
 
-    health = indexer.health()
-    return JSONResponse(status_code=200 if health["status"] in {"current", "catching_up"} else 503, content=health)
+
+@app.get(
+    "/health/indexer",
+    response_model=IndexerHealthResponse,
+    responses={503: {"model": IndexerHealthResponse}},
+)
+async def health_indexer():
+    """Cached worker health; a progressing backfill is healthy but not ready."""
+    state = indexer_state()
+    healthy = state.status in {"current", "catching_up", "disabled"}
+    return JSONResponse(status_code=200 if healthy else 503, content=state.model_dump())
 
 
-@app.get("/health/live")
-def health_live():
-    return {"status": "alive", "environment": settings.environment, "chain_id": settings.chain_id}
+@app.get("/health/live", response_model=LivenessResponse)
+async def health_live():
+    # No database/RPC work: backfill and dependency outages must not restart APIs.
+    return LivenessResponse(
+        environment=settings.environment,
+        chain_id=settings.chain_id,
+        release_commit=release_commit(),
+    )
 
 
-@app.get("/health/ready")
+def readiness_state():
+    database = _database_probe.status(settings.health_database_timeout)
+    state = indexer_state()
+    ready = database == "connected" and (not settings.indexer_enabled or state.ready)
+    return ReadinessResponse(
+        status="ready" if ready else "not_ready",
+        database=database,
+        environment=settings.environment,
+        chain_id=settings.chain_id,
+        release_commit=release_commit(),
+        indexer=state,
+    )
+
+
+@app.get(
+    "/health/ready",
+    response_model=ReadinessResponse,
+    responses={503: {"model": ReadinessResponse}},
+)
 def health_ready():
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        database = "connected"
-    except Exception:
-        database = "disconnected"
-    state = indexer.health() if indexer else {"status": "not_started" if settings.indexer_enabled else "disabled"}
-    ready = database == "connected" and (not settings.indexer_enabled or state["status"] == "current")
-    return JSONResponse(status_code=200 if ready else 503, content={
-        "status": "ready" if ready else "not_ready", "database": database,
-        "environment": settings.environment, "chain_id": settings.chain_id, "indexer": state,
-    })
+    state = readiness_state()
+    return JSONResponse(
+        status_code=200 if state.status == "ready" else 503, content=state.model_dump()
+    )
 
 
 @app.get("/health")
 def health_check():
-    db_status = "disconnected"
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        db_status = "connected"
-    except Exception:
-        db_status = "disconnected"
-
-    web3_status = "disconnected"
-    if w3 is not None:
-        try:
-            if w3.is_connected():
-                web3_status = "connected"
-        except Exception:
-            web3_status = "disconnected"
-
-    indexer_required = settings.indexer_enabled and bool(settings.sepolia_rpc_url)
-    indexer_ok = not indexer_required or (indexer is not None and indexer.health()["status"] == "current")
-    status = "ok" if db_status == "connected" and web3_status == "connected" and indexer_ok else "degraded"
-    status_code = 200 if status == "ok" else 503
+    """Compatibility summary of readiness. Does not make a separate RPC call."""
+    state = readiness_state()
+    ready = state.status == "ready"
     return JSONResponse(
-        status_code=status_code,
-        content={"status": status, "database": db_status, "web3": web3_status},
+        status_code=200 if ready else 503,
+        content={
+            "status": "ok" if ready else "degraded",
+            "database": state.database,
+            "web3": (
+                "not_required"
+                if not settings.indexer_enabled
+                else (
+                    "connected" if state.indexer.status == "current" else "disconnected"
+                )
+            ),
+        },
     )
 
 

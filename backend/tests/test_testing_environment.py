@@ -68,7 +68,9 @@ def test_indexer_retries_startup_without_exposing_rpc_secret(monkeypatch, tmp_pa
 def test_readiness_reports_stopped_indexer(client_fixture, monkeypatch):
     import app.main as module
     stopped = MagicMock()
-    stopped.health.return_value = {"status": "stopped", "last_error": "ConnectionError"}
+    state = module.indexer_state().model_dump()
+    state.update(status="stopped", enabled=True, ready=False, last_error="ConnectionError")
+    stopped.health.return_value = state
     monkeypatch.setattr(module, "indexer", stopped)
     monkeypatch.setattr(settings, "indexer_enabled", True)
     response = client_fixture.get("/health/ready")

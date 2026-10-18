@@ -16,12 +16,17 @@ class Settings(BaseSettings):
     sepolia_rpc_url: str = Field(default="", repr=False)
     product_registry_contract: str = Field(default="")
     shipment_tracker_contract: str = Field(default="")
-    indexer_poll_interval: int = Field(default=15)
-    indexer_start_block: int = Field(default=0)
-    chain_id: int = Field(default=11155111)
+    indexer_poll_interval: int = Field(default=15, ge=1, le=3600)
+    indexer_start_block: int = Field(default=0, ge=0)
+    chain_id: int = Field(default=11155111, ge=1)
     indexer_enabled: bool = Field(default=True)
-    indexer_rpc_timeout: int = Field(default=10, ge=1)
-    indexer_retry_interval: int = Field(default=5, ge=1)
+    indexer_rpc_timeout: int = Field(default=10, ge=1, le=20)
+    indexer_retry_interval: int = Field(default=5, ge=1, le=300)
+    indexer_retry_max_interval: int = Field(default=60, ge=1, le=3600)
+    indexer_startup_timeout: int = Field(default=120, ge=1, le=3600)
+    indexer_head_stale_after: int = Field(default=300, ge=0, le=86400)
+    indexer_max_lag_blocks: int = Field(default=0, ge=0, le=10000)
+    health_database_timeout: float = Field(default=2, gt=0, le=4)
     indexer_batch_size: int = Field(default=1000, ge=1, le=10000)
     indexer_stale_after: int = Field(default=120, ge=1)
     indexer_state_path: str = Field(default="")  # Deprecated: file cursors are never trusted.
@@ -62,6 +67,8 @@ class Settings(BaseSettings):
             live = {"0x1f76018532d619194f6628adc186e3c86fcb5aaa", "0x95b09c0aed53f6b63c072f4ecac18861fcbbfb30"}
             if self.product_registry_contract.lower() in live or self.shipment_tracker_contract.lower() in live:
                 raise ValueError("Testing must use separate contract addresses")
+        if self.indexer_retry_max_interval < self.indexer_retry_interval:
+            raise ValueError("INDEXER_RETRY_MAX_INTERVAL must be at least INDEXER_RETRY_INTERVAL")
         self.allowed_siwe_origins
         return self
 

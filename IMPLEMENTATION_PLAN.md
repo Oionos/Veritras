@@ -14,7 +14,7 @@ Priority meanings: **P0 — release blocker** must be resolved before enabling p
 | --- | --- | --- | --- |
 | Isolated local and hosted testing | **Done** | Maintain | Separate database, API, Sepolia contracts, protected Vercel Preview, exact sign-in origins; full journey checked |
 | Wallet sign-in and write permissions | **Done** | Maintain | Persistent SIWE challenges, scoped tokens, owner-only API writes, browser session handling |
-| Indexer startup and health | **Partial** | P1 | Startup/retry/readiness fixes delivered; finality-aware health, hosted HTTP checks and monitoring remain |
+| Indexer startup and health | **Implemented; platform setting pending** | P1 | Bounded startup/retries/shutdown, confirmed-progress health, app notices and release probes; actual Render HTTP paths need the service setting change |
 | Canonical product identity (increment 3) | **Done** | **P1 addressed** | Scoped identities, lifecycle timestamps, legacy aliases/reconciliation and one-shipment constraint; see [runbook](CANONICAL_PRODUCT_IDENTITY.md) |
 | Durable indexing (increment 4) | **Done** | **P0 addressed** | Transactional journal/cursor, ordered reversible projections, confirmation policy, single-writer lock, metadata events and resilient notifications; production enablement remains a separate gate |
 | Registration lifecycle and evidence (increment 5) | **Partial** | P1 | Receipt-backed registration checks delivered; persisted submissions, replacement handling and richer evidence states remain |
@@ -78,7 +78,7 @@ The numbers below are **plan increment IDs**, not actual GitHub pull request num
 | Increment | Status / priority | Suggested branch | Remaining deliverable | Depends on |
 | --- | --- | --- | --- | --- |
 | 0 | Partial / P1 | Follow-up release controls | Testing setup done; verify/enforce CI and deployment gates | None |
-| 1 | Partial / P1 | Follow-up health operations | Finality-aware progress, hosted HTTP checks and monitoring | Finality policy from 4 |
+| 1 | Implemented / P1 platform follow-up | `codex/indexer-startup-and-health` | Confirm `/health/live` on both existing Render services; see [health runbook](INDEXER_HEALTH.md) | Finality policy from 4 |
 | 2 | **Done** | Released in #16 | Maintain authentication and authorization | 0 environment setup |
 | 3 | **Done / P1 addressed** | `codex/canonical-product-identity` | Maintain identity/reconciliation guarantees; release tracked in PR #19 | 2 |
 | 4 | **Done / P0 addressed** | `codex/durable-chain-indexing` | Maintain recovery guarantees; production enablement remains a separate gate | Scoped identity binding included; broader increment 3 remains |
@@ -113,9 +113,9 @@ Delivered: local Compose isolation; a dedicated hosted Neon project/database and
 
 ## PR 1 — Restore indexer startup and truthful health reporting
 
-**Status: partial; core repairs released in #15. Priority: P1 for remaining operations.**
+**Status: implementation and local/hosted acceptance complete; actual Render HTTP setting pending. Priority: P1 for platform completion.**
 
-Delivered: bundled ABI loading, compatible locked dependencies, enablement/configuration guards, bounded polling/timeouts, startup retries, interruptible shutdown, liveness/readiness/progress reporting, and conservative receipt-backed registration verification. Remaining: a confirmed/finalized target and lag policy with increment 4, explicit hosted HTTP health-check configuration and readiness alerting. Both existing Render services currently use default TCP platform checks; the YAML templates specify `/health/live`, but are not attached to those services. Production backfill remains disabled.
+Delivered: bundled ABI loading and locked dependencies; validated chain/contract startup; capped exponential retries without hidden provider retries; cancellation and transactional shutdown rollback; typed cached confirmed-target health; startup, poll, cursor-progress and head freshness checks; bounded database probing; consistent disabled/failed states; app synchronization notices; structured transition logs; and bounded deployment/manual readiness workflows. Real local startup/runtime RPC failures recovered against Hardhat and PostgreSQL. The actual Render HTTP health paths still require Dashboard/API access because the available connector cannot edit existing service settings. Templates already specify `/health/live`; this does not establish the live setting. Continuous runtime alerting remains opt-in under the free-tier constraints. See [INDEXER_HEALTH.md](INDEXER_HEALTH.md). Production backfill remains disabled.
 
 **Tasks**
 

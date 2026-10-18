@@ -20,10 +20,11 @@ from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models.chain import ChainBlock, ChainEvent, IndexedProduct, IndexerCursor
 from app.models.product import Product
+from app.services.indexer_health import IndexerHealth, utc_now
 from app.services.identity import find_canonical_product, assign_identity, scope_values
 from app.models.shipment import Checkpoint, CustodyTransfer, Shipment
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("veritras.indexer")
 BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
 # A transaction-level lock works through transaction pooling and is released on
 # commit, rollback, connection loss or process termination. All scopes share it:
@@ -100,7 +101,15 @@ PRODUCT_FIELDS = (
 )
 
 
-class EventIndexer:
+class IndexerConfigurationError(ValueError):
+    """Internal constant error codes; never a provider exception message."""
+
+
+class IndexerStopping(RuntimeError):
+    pass
+
+
+class EventIndexer(IndexerHealth):
     def __init__(
         self,
         rpc_url: Optional[str] = None,
@@ -115,15 +124,16 @@ class EventIndexer:
         self.shipment_tracker_address = (
             shipment_tracker_address or settings.shipment_tracker_contract
         )
-        self.poll_interval = poll_interval or settings.indexer_poll_interval
+        self.poll_interval = (
+            settings.indexer_poll_interval if poll_interval is None else poll_interval
+        )
+        if not 1 <= self.poll_interval <= 3600:
+            raise ValueError("Poll interval must be between 1 and 3600 seconds")
         self.w3 = self.product_registry = self.shipment_tracker = None
         self.running = False
         self._thread = None
         self._stop_event = threading.Event()
-        self.last_error = self.last_success_at = self._last_success_monotonic = None
-        self.last_processed_block = self.chain_head = self.target_head = None
-        self.last_reorg_ancestor = None
-        self.recovery_reason = None
+        self._init_health()
         self._batch_size = settings.indexer_batch_size
 
     @property
@@ -131,118 +141,176 @@ class EventIndexer:
         value = f"{settings.chain_id}:{self.product_registry_address.lower()}:{self.shipment_tracker_address.lower()}"
         return hashlib.sha256(value.encode()).hexdigest()
 
+    def _check_stopping(self):
+        if self._stop_event.is_set():
+            raise IndexerStopping()
+
     def _connect(self):
+        from urllib.parse import urlsplit
+
+        self._check_stopping()
+        if not self.rpc_url:
+            raise IndexerConfigurationError("rpc_not_configured")
+        try:
+            parsed = urlsplit(self.rpc_url)
+            if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+                raise ValueError()
+        except ValueError:
+            raise IndexerConfigurationError("invalid_rpc_url") from None
         if (
-            not self.rpc_url
-            or not Web3.is_address(self.product_registry_address)
+            not Web3.is_address(self.product_registry_address)
             or not Web3.is_address(self.shipment_tracker_address)
+            or int(self.product_registry_address, 16) == 0
+            or int(self.shipment_tracker_address, 16) == 0
         ):
-            raise ValueError("RPC and valid contract addresses are required")
-        self.w3 = Web3(
+            raise IndexerConfigurationError("invalid_contract_address")
+        w3 = Web3(
             Web3.HTTPProvider(
-                self.rpc_url, request_kwargs={"timeout": settings.indexer_rpc_timeout}
+                self.rpc_url,
+                request_kwargs={"timeout": settings.indexer_rpc_timeout},
+                exception_retry_configuration=None,
             )
         )
-        if not self.w3.is_connected() or self.w3.eth.chain_id != settings.chain_id:
-            raise ConnectionError("RPC chain is unavailable or mismatched")
-        self.product_registry = self.w3.eth.contract(
-            address=Web3.to_checksum_address(self.product_registry_address),
-            abi=load_abi("ProductRegistry"),
+        if not w3.is_connected():
+            raise ConnectionError("RPC is unavailable")
+        self._check_stopping()
+        if w3.eth.chain_id != settings.chain_id:
+            raise IndexerConfigurationError("chain_mismatch")
+        self._check_stopping()
+        registry = Web3.to_checksum_address(self.product_registry_address)
+        tracker = Web3.to_checksum_address(self.shipment_tracker_address)
+        for address in (registry, tracker):
+            if not w3.eth.get_code(address):
+                raise IndexerConfigurationError("contract_not_deployed")
+            self._check_stopping()
+        product_registry = w3.eth.contract(
+            address=registry, abi=load_abi("ProductRegistry")
         )
-        self.shipment_tracker = self.w3.eth.contract(
-            address=Web3.to_checksum_address(self.shipment_tracker_address),
-            abi=load_abi("ShipmentTracker"),
+        shipment_tracker = w3.eth.contract(
+            address=tracker, abi=load_abi("ShipmentTracker")
         )
         if (
-            self.shipment_tracker.functions.productRegistry().call().lower()
-            != self.product_registry_address.lower()
+            shipment_tracker.functions.productRegistry().call().lower()
+            != registry.lower()
         ):
-            raise ValueError("Tracker is not linked to the configured registry")
+            raise IndexerConfigurationError("tracker_registry_mismatch")
+        self._check_stopping()
+        # Publish only a completely validated connection, never a partial setup.
+        self.w3, self.product_registry, self.shipment_tracker = (
+            w3,
+            product_registry,
+            shipment_tracker,
+        )
 
     def start(self):
-        if self.running:
-            return
-        self.running = True
-        self._stop_event.clear()
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
+        with self._health_lock:
+            if self._thread is not None and self._thread.is_alive():
+                if self._stop_event.is_set():
+                    raise RuntimeError("Previous indexer thread is still stopping")
+                return
+            self.running = True
+            self._stop_event.clear()
+            self._started_monotonic = time.monotonic()
+            self.started_at = utc_now()
+            self._last_success_monotonic = self._last_progress_monotonic = None
+            self.last_error = self.initialization_error = self.recovery_reason = None
+            self.consecutive_failures = 0
+            self.phase = "initializing"
+            self._thread = threading.Thread(
+                target=self._run, name="chain-indexer", daemon=True
+            )
+            try:
+                self._thread.start()
+            except Exception:
+                self.running = False
+                raise
 
     def stop(self):
-        self.running = False
         self._stop_event.set()
-        if self._thread:
+        if self._thread is not None and self._thread.is_alive():
             self._thread.join(timeout=settings.indexer_rpc_timeout + 2)
-
-    def health(self) -> Dict:
-        age = (
-            None
-            if self._last_success_monotonic is None
-            else time.monotonic() - self._last_success_monotonic
-        )
-        lag = (
-            None
-            if self.target_head is None or self.last_processed_block is None
-            else max(0, self.target_head - self.last_processed_block)
-        )
-        if not self.running or (
-            self._thread is not None and not self._thread.is_alive()
-        ):
-            status = "stopped"
-        elif self.last_error or (
-            age is not None
-            and age > max(settings.indexer_stale_after, self.poll_interval * 3)
-        ):
-            status = "degraded"
-        elif age is None:
-            status = "starting"
-        else:
-            status = "catching_up" if lag else "current"
-        return dict(
-            status=status,
-            last_processed_block=self.last_processed_block,
-            chain_head=self.chain_head,
-            target_head=self.target_head,
-            lag_blocks=lag,
-            last_success_at=self.last_success_at,
-            last_error=self.last_error,
-            poll_interval_seconds=self.poll_interval,
-            chain_id=settings.chain_id,
-            confirmation_policy="depth",
-            confirmations=settings.indexer_confirmations,
-            cursor_storage="database",
-            last_reorg_ancestor=self.last_reorg_ancestor,
-            recovery_reason=self.recovery_reason,
-        )
+            if self._thread.is_alive():
+                logger.warning("Indexer shutdown is waiting for an in-flight operation")
+                return False
+        self.running = False
+        return True
 
     def _run(self):
-        while not self._stop_event.is_set():
-            try:
-                if self.product_registry is None:
-                    self._connect()
-                changed = self.poll_once()
-                self.last_success_at = datetime.now(timezone.utc).isoformat()
-                self._last_success_monotonic = time.monotonic()
-                self.last_error = None
-                self.recovery_reason = None
-                if changed:
-                    from app.services.events import broadcaster
+        try:
+            while not self._stop_event.is_set():
+                initializing = self.product_registry is None
+                try:
+                    with self._health_lock:
+                        self.phase = "initializing" if initializing else "polling"
+                    if initializing:
+                        self._connect()
+                        initializing = False
+                        with self._health_lock:
+                            self.initialization_error = None
+                            self.phase = "polling"
+                    self._check_stopping()
+                    previous = self.last_processed_block
+                    changed = self.poll_once()
+                    self._record_success(previous)
+                    self._log_health_transition()
+                    if changed:
+                        from app.services.events import broadcaster
 
-                    broadcaster.publish_from_thread("chain_updated", changed)
-                if self.last_processed_block >= self.target_head:
-                    self._stop_event.wait(self.poll_interval)
-            except Exception as error:
-                # Never emit provider exceptions: they can contain credentialed URLs.
-                self.last_error = type(error).__name__
-                self.recovery_reason = (
-                    str(error)
-                    if isinstance(error, (IndexerBusy, ReconciliationRequired))
-                    else None
-                )
-                logger.error("Indexer startup/poll failed: %s", self.last_error)
-                if not isinstance(error, (IndexerBusy, ReconciliationRequired)):
-                    self.product_registry = self.shipment_tracker = None
-                self._stop_event.wait(settings.indexer_retry_interval)
-        self.running = False
+                        try:
+                            broadcaster.publish_from_thread("chain_updated", changed)
+                        except Exception as error:
+                            logger.warning(
+                                "Indexer notification failed: %s", type(error).__name__
+                            )
+                    if self.last_processed_block >= self.target_head:
+                        self._stop_event.wait(self.poll_interval)
+                except IndexerStopping:
+                    break
+                except Exception as error:
+                    with self._health_lock:
+                        self.last_error = type(error).__name__
+                        if initializing:
+                            self.initialization_error = self.last_error
+                        self.last_poll_at = utc_now()
+                        self._last_poll_monotonic = time.monotonic()
+                        self.recovery_reason = (
+                            "writer_busy"
+                            if isinstance(error, IndexerBusy)
+                            else (
+                                "reconciliation_required"
+                                if isinstance(error, ReconciliationRequired)
+                                else (
+                                    "initialization_failed"
+                                    if initializing
+                                    else "poll_failed"
+                                )
+                            )
+                        )
+                        if isinstance(error, IndexerConfigurationError) and str(
+                            error
+                        ) in {
+                            "rpc_not_configured",
+                            "invalid_rpc_url",
+                            "invalid_contract_address",
+                            "chain_mismatch",
+                            "contract_not_deployed",
+                            "tracker_registry_mismatch",
+                        }:
+                            self.recovery_reason = str(error)
+                        self.consecutive_failures += 1
+                        self.retry_delay_seconds = min(
+                            settings.indexer_retry_max_interval,
+                            settings.indexer_retry_interval
+                            * 2 ** min(self.consecutive_failures - 1, 16),
+                        )
+                        self.phase = "retrying"
+                    self._log_health_transition()
+                    if not isinstance(error, (IndexerBusy, ReconciliationRequired)):
+                        self.w3 = self.product_registry = self.shipment_tracker = None
+                    self._stop_event.wait(self.retry_delay_seconds)
+        finally:
+            self.running = False
+            self.phase = "stopped"
 
     def _lock(self, db):
         dialect = db.get_bind().dialect.name
@@ -258,6 +326,7 @@ class EventIndexer:
             raise RuntimeError("Unsupported indexer database")
 
     def _header(self, number):
+        self._check_stopping()
         block = self.w3.eth.get_block(number)
         if block["number"] != number:
             raise ValueError("RPC block number mismatch")
@@ -265,8 +334,8 @@ class EventIndexer:
 
     def poll_once(self):
         """One atomic batch. Exposed for deterministic integration/recovery checks."""
-        self.chain_head = self.w3.eth.block_number
-        self.target_head = max(0, self.chain_head - settings.indexer_confirmations)
+        self._check_stopping()
+        self._observe_head(self.w3.eth.block_number)
         changed = None
         with SessionLocal() as db:
             try:
@@ -351,12 +420,14 @@ class EventIndexer:
                     changed = dict(changed or {}, scope=self.scope, indexed_block=end)
                 cursor.updated_at = datetime.now(timezone.utc)
                 processed = cursor.last_processed_block
+                self._check_stopping()
                 db.commit()
             except Exception:
                 db.rollback()
                 raise
         # Only published after a successful commit. Reconnecting clients refetch.
-        self.last_processed_block = processed
+        with self._health_lock:
+            self.last_processed_block = processed
         if changed and "reorg_ancestor" in changed:
             self.last_reorg_ancestor = changed["reorg_ancestor"]
         self._batch_size = min(settings.indexer_batch_size, self._batch_size * 2)
@@ -374,6 +445,7 @@ class EventIndexer:
         try:
             for contract, names in sources:
                 for name in names:
+                    self._check_stopping()
                     for log in getattr(contract.events, name)().get_logs(
                         from_block=start, to_block=end
                     ):
@@ -401,12 +473,14 @@ class EventIndexer:
         )
 
     def _registration_details(self, contract, event):
+        self._check_stopping()
         args = event["args"]
         try:
             info = contract.functions.getProduct(args["productId"]).call(
                 block_identifier=event["blockNumber"]
             )
         except Exception:
+            self._check_stopping()
             # Some public RPCs retain transactions but not old account state.
             # Direct registerProduct calldata contains the immutable description
             # and initial URI. Validate its exact canonical inclusion and scope.
@@ -462,6 +536,7 @@ class EventIndexer:
             raise RuntimeError("Incomplete delivery event pair")
 
     def _journal(self, db, event):
+        self._check_stopping()
         name, address = event["event"], event["address"].lower()
         expected = (
             self.product_registry_address

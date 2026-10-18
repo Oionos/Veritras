@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react'
 import LoadingSpinner from './ui/LoadingSpinner'
 import ConnectAndAuth from './ConnectAndAuth'
 import BrandLogo from './BrandLogo'
+import IndexerStatusNotice from './IndexerStatusNotice'
 import { appEnvironment } from '@/config/runtime'
 import { useChainEvents } from '@/hooks/useSSE'
 
@@ -133,6 +134,7 @@ export default function Layout() {
 
       {/* Main Content */}
       <main className="relative z-10">
+        <IndexerStatusNotice />
         <Suspense
           fallback={
             <div className="flex h-[calc(100vh-5rem)] items-center justify-center">
