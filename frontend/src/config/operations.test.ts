@@ -12,6 +12,9 @@ afterEach(() => {
 describe("private diagnostics", () => {
   it("uses route templates and drops identifiers, credentials, query and fragment", () => {
     expect(routeLabel("/shipments/SECRET")).toBe("shipment_detail");
+    expect(safeAnalyticsUrl("javascript:SECRET")).toBe(
+      `${window.location.origin}/not-found`,
+    );
     expect(
       safeAnalyticsUrl(
         "https://user:SECRET@private.example/verify/SECRET?signature=SECRET#SECRET",

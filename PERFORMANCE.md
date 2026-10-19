@@ -1,6 +1,6 @@
 # Performance measurements
 
-Increment 10 measured the anonymous dashboard before changing loading boundaries. The measured final frontend source is feature commit `25819f84866787e741ab4dcd039313ac094b451a`; subsequent monitoring/test/documentation changes do not alter that runtime. The baseline is main `7adb990863aa399d2dd323d80e1bfa090794716f`. Results and individual sample values are retained in [performance/increment10.json](performance/increment10.json).
+Increment 10 measured the anonymous dashboard before changing loading boundaries. The measured frontend source is feature commit `25819f84866787e741ab4dcd039313ac094b451a`; subsequent changes harden URL allowlisting and monitoring without changing loading boundaries. The baseline is main `7adb990863aa399d2dd323d80e1bfa090794716f`. Results and individual sample values are retained in [performance/increment10.json](performance/increment10.json).
 
 ## Controlled mobile comparison
 
