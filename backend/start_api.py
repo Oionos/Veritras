@@ -3,10 +3,10 @@
 import os
 
 from manage_schema import require_current_schema
-from release_gate import admit_production
+from release_gate import verify_production_build
 
 if __name__ == "__main__":
-    admit_production(os.environ)
+    verify_production_build(os.environ)
     require_current_schema()
     os.execvp(
         "uvicorn",

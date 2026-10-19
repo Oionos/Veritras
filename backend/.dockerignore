@@ -1,4 +1,6 @@
 .env*
+github-release-token
+.release-admission.json
 .venv
 .venv-*
 __pycache__

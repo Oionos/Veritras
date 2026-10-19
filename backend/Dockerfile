@@ -15,6 +15,16 @@ RUN --mount=type=secret,id=proxy_ca \
 
 COPY . .
 
+# Only non-secret release metadata may enter build arguments. Render supplies
+# these values automatically. Local/testing builds skip production admission.
+ARG ENVIRONMENT
+ARG RENDER_GIT_BRANCH
+ARG RENDER_GIT_COMMIT
+RUN --mount=type=secret,id=github-release-token,dst=/etc/secrets/github-release-token \
+    --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then export SSL_CERT_FILE=/run/secrets/proxy_ca; fi; \
+    python build_release.py
+
 EXPOSE 8000
 
 CMD ["python", "start_api.py"]
