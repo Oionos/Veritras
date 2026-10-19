@@ -1,3 +1,4 @@
+import { captureClientError } from '@/config/sentry'
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 
 interface Props {
@@ -18,8 +19,8 @@ export default class ErrorBoundary extends Component<Props, State> {
     return { hasError: true }
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo)
+  componentDidCatch(error: Error, _errorInfo: ErrorInfo) {
+    captureClientError(error)
   }
 
   render() {

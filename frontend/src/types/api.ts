@@ -455,6 +455,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/telemetry/browser": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Browser Metric */
+        post: operations["browser_metric_telemetry_browser_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/indexer": {
         parameters: {
             query?: never;
@@ -501,6 +518,26 @@ export interface paths {
         };
         /** Health Ready */
         get: operations["health_ready_health_ready_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/health/operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Health Operations
+         * @description Bounded diagnostics; public aggregates contain no user input or identities.
+         */
+        get: operations["health_operations_health_operations_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -600,6 +637,39 @@ export interface components {
              * @default 0
              */
             sample_size: number;
+        };
+        /** BrowserAggregate */
+        BrowserAggregate: {
+            /** Metric */
+            metric: string;
+            /** Route */
+            route: string;
+            /** Count */
+            count: number;
+            /** Mean */
+            mean: number;
+        };
+        /** BrowserMetric */
+        BrowserMetric: {
+            /**
+             * Metric
+             * @enum {string}
+             */
+            metric: "LCP" | "CLS" | "interaction_max_ms" | "client_error" | "api_error" | "stream_disconnected" | "stream_recovered";
+            /**
+             * Route
+             * @enum {string}
+             */
+            route: "dashboard" | "products" | "shipments" | "shipment_detail" | "analytics" | "exceptions" | "verify" | "demo" | "privacy" | "terms" | "not_found";
+            /** Value */
+            value: number;
+            /** Release */
+            release?: string | null;
+            /**
+             * Environment
+             * @enum {string}
+             */
+            environment: "development" | "testing" | "production";
         };
         /** ChallengeRequest */
         ChallengeRequest: {
@@ -988,6 +1058,43 @@ export interface components {
              * Format: date-time
              */
             expires_at: string;
+        };
+        /** OperationalCounters */
+        OperationalCounters: {
+            /** Window Seconds */
+            window_seconds: number;
+            /** Uptime Seconds */
+            uptime_seconds: number;
+            /** Requests */
+            requests: number;
+            /** Api Requests */
+            api_requests: number;
+            /** Api 5Xx */
+            api_5xx: number;
+            /** Mean Duration Ms */
+            mean_duration_ms: number | null;
+            /** Duration Buckets */
+            duration_buckets: {
+                [key: string]: number;
+            };
+            /** Streams */
+            streams: {
+                [key: string]: number;
+            };
+            /** Browser Metrics */
+            browser_metrics: components["schemas"]["BrowserAggregate"][];
+            /**
+             * Storage
+             * @constant
+             */
+            storage: "process_memory";
+            /** Reset On Restart */
+            reset_on_restart: boolean;
+        };
+        /** OperationsResponse */
+        OperationsResponse: {
+            health: components["schemas"]["ReadinessResponse"];
+            counters: components["schemas"]["OperationalCounters"];
         };
         /** PolicyResponse */
         PolicyResponse: {
@@ -2484,6 +2591,37 @@ export interface operations {
             };
         };
     };
+    browser_metric_telemetry_browser_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrowserMetric"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     health_indexer_health_indexer_get: {
         parameters: {
             query?: never;
@@ -2558,6 +2696,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReadinessResponse"];
+                };
+            };
+        };
+    };
+    health_operations_health_operations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationsResponse"];
                 };
             };
         };

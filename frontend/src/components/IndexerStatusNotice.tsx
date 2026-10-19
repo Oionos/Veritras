@@ -1,6 +1,8 @@
+import { useStreamHealth } from '@/hooks/streamHealth'
 import { useIndexerHealth } from '@/hooks/useIndexerHealth'
 
 export default function IndexerStatusNotice() {
+  const stream = useStreamHealth()
   const { data, isError } = useIndexerHealth()
   let message: string | undefined
   if (isError)
@@ -20,6 +22,7 @@ export default function IndexerStatusNotice() {
   else if (data && data.indexer.status !== 'current')
     message =
       'Blockchain updates are delayed. Some recent activity may be missing.'
+  if (!message && (stream === 'reconnecting' || stream === 'stale')) message = 'Live updates are disconnected. Showing previously fetched data while the connection retries.'
   if (!message) return null
   return (
     <div

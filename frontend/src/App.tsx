@@ -5,10 +5,9 @@ import '@rainbow-me/rainbowkit/styles.css'
 import { WagmiProvider } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { Analytics } from '@vercel/analytics/react'
-import { SpeedInsights } from '@vercel/speed-insights/react'
+import Diagnostics from './components/Diagnostics'
 import { Toaster } from 'sonner'
-import { rainbowKitConfig } from './config/wagmi'
+import { rainbowKitConfig, hasStoredWalletConnection } from './config/wagmi'
 import EtherealBackground from './components/EtherealBackground'
 import ErrorBoundary from './components/ErrorBoundary'
 import Layout from './components/Layout'
@@ -47,13 +46,12 @@ function App() {
   )
 
   return (
-    <WagmiProvider config={rainbowKitConfig}>
+    <WagmiProvider config={rainbowKitConfig} reconnectOnMount={hasStoredWalletConnection}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider theme={rainbowTheme}>
           <MotionConfig reducedMotion="user"><BrowserRouter>
             <EtherealBackground />
-            <Analytics />
-            <SpeedInsights />
+            <Diagnostics />
             <Toaster position="top-right" richColors />
             <ErrorBoundary>
               <Routes>

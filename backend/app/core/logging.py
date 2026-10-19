@@ -2,21 +2,14 @@ import json
 import logging
 import os
 import sys
-
-# Fields present on every LogRecord by default — skip when merging extras.
-_RESERVED = frozenset({
-    "name", "msg", "args", "levelname", "levelno", "pathname", "filename",
-    "module", "exc_info", "exc_text", "stack_info", "lineno", "funcName",
-    "created", "msecs", "relativeCreated", "thread", "threadName",
-    "processName", "process", "message", "taskName",
-})
+import re
 
 
 class JsonFormatter(logging.Formatter):
     """Emit one JSON object per log record to stdout.
 
-    Any key passed via extra={} lands as a top-level JSON field, making log
-    lines queryable by key in Render, Datadog, Loki, etc.
+    Only operational fields from an explicit allowlist become JSON fields.
+    Exception messages and arbitrary extras are excluded.
     """
 
     def format(self, record: logging.LogRecord) -> str:
@@ -27,14 +20,36 @@ class JsonFormatter(logging.Formatter):
             "level": record.levelname,
             "logger": record.name,
             "message": record.message,
+            "environment": os.environ.get("ENVIRONMENT", "development"),
+            "release": (
+                os.environ.get("RENDER_GIT_COMMIT")
+                if re.fullmatch(
+                    r"[0-9a-f]{40}", os.environ.get("RENDER_GIT_COMMIT", "")
+                )
+                else None
+            ),
         }
 
         for key, val in record.__dict__.items():
-            if key not in _RESERVED and not key.startswith("_"):
+            if key in {
+                "method",
+                "path",
+                "status",
+                "duration_ms",
+                "request_id",
+                "error_type",
+                "reason",
+                "last_processed_block",
+                "target_head",
+                "lag_blocks",
+                "last_error",
+            }:
                 log_obj[key] = val
 
         if record.exc_info:
-            log_obj["exc_info"] = self.formatException(record.exc_info)
+            log_obj["exc_info"] = (
+                type(record.exc_info[1]).__name__ + " (details omitted)"
+            )
 
         return json.dumps(log_obj, default=str)
 

@@ -1,0 +1,39 @@
+name: Operations Monitor
+on:
+  schedule:
+    # Four checks a day; avoid keeping free services continuously awake.
+    - cron: '15 */6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: operations-monitor
+  cancel-in-progress: false
+jobs:
+  observe:
+    name: Observe ${{ matrix.environment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - environment: production
+            api: https://chainlens-4qvy.onrender.com
+            indexer: disabled
+          - environment: testing
+            api: https://veritras-api-testing.onrender.com
+            indexer: enabled
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check sustained readiness, API errors and SSE heartbeat
+        env:
+          API: ${{ matrix.api }}
+          ENVIRONMENT: ${{ matrix.environment }}
+          INDEXER: ${{ matrix.indexer }}
+        run: python backend/monitor_operations.py --url "$API" --environment "$ENVIRONMENT" --expect-indexer "$INDEXER"
