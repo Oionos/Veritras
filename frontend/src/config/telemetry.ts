@@ -31,14 +31,7 @@ export function safeAnalyticsUrl(value: string) {
     verify: "/verify/:productId",
     not_found: "/not-found",
   };
-  url.pathname = paths[route] ?? `/${route}`;
-  url.search = "";
-  url.hash = "";
-  url.protocol = window.location.protocol;
-  url.host = window.location.host;
-  url.username = "";
-  url.password = "";
-  return url.toString();
+  return new URL(paths[route] ?? `/${route}`, window.location.origin).toString();
 }
 export type Metric =
   | "LCP"
