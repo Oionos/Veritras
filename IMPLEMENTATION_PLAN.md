@@ -1,6 +1,6 @@
 # Veritras implementation plan
 
-Originally prepared October 17, 2026 from [PROJECT_REVIEW.md](PROJECT_REVIEW.md). **Status updated October 19, 2026 for increment 9.** Integration recovery checks, typed contracts, protected-main merge controls and production admission gates are implemented. Final CI/deployment evidence is recorded in the increment 7 pull request; see [release controls](RELEASE_CONTROLS.md) and the [release/recovery runbook](RELEASE_RUNBOOK.md).
+Originally prepared October 17, 2026 from [PROJECT_REVIEW.md](PROJECT_REVIEW.md). **Status updated October 20, 2026 for increment 10.** Integration recovery checks, typed contracts, protected-main merge controls and production admission gates are implemented. Final CI/deployment evidence is recorded in the increment 7 pull request; see [release controls](RELEASE_CONTROLS.md) and the [release/recovery runbook](RELEASE_RUNBOOK.md).
 
 ## Status at a glance
 
@@ -22,7 +22,7 @@ Priority meanings: **P0 — release blocker** must be resolved before enabling p
 | Integration and release controls (increment 7) | **Done** | **P1 addressed** | Real write-failure/restart, process-loss, reorg and backup/restore rehearsals; typed detail/verification; protected main and exact-commit production admission; see [runbook](RELEASE_RUNBOOK.md) |
 | QR verification, shipment detail and guided demo (increment 8) | **Done** | **P2 addressed** | Direct public links and SVG QR labels, canonical paginated timeline, shipment detail with contract-checked transitions, isolated guided demo, mobile wallet/keyboard access and route metadata; see [guide](PRODUCT_JOURNEY.md) |
 | Shipment exceptions (increment 9) | **Done** | **P2 addressed** | Configurable owner policy, canonical arrival/checkpoint/custody rules, durable deduplicated occurrences, acknowledgement/history, synchronized evaluation and public mobile list; see [guide](SHIPMENT_EXCEPTIONS.md) |
-| Performance and operations (increment 10) | **Pending** | P2 | Existing lazy routes/Lighthouse checks provide a baseline; measured optimization and operational completion remain |
+| Performance and operations (increment 10) | **In progress: acceptance** | P2 | Measured mobile LCP 11.33→5.22 s, deferred SDK/chart loading, private diagnostics, stream recovery, scheduled operations checks and migration-window safeguards; release acceptance in progress |
 | Business pilot integrations | **Deferred** | Later | Organizations, evidence files, imports, standards integrations and repeated journeys |
 
 ### Urgent safeguards and next actions
@@ -296,7 +296,7 @@ Completed in increment 7: actual PostgreSQL checkpoint failure after a metadata 
 
 ### PR 10: Performance and operations
 
-**Status: pending completion. Priority: P2.** Existing lazy routes, error reporting configuration and Lighthouse CI are a baseline. Measured optimization, environment-aware observability and readiness alerts remain. Increment 7 supplies the local backup/restore rehearsal and recovery runbook; hosted restore acceptance belongs to the separate production enablement gate.
+**Status: implemented; release acceptance in progress. Priority: P2.** Three controlled mobile samples per build show median LCP 11.33→5.22 seconds, transfer −60%, initial gzip JavaScript −69%, with unchanged CLS. See [performance evidence](PERFORMANCE.md) and [operations](OPERATIONS.md). Private error/route telemetry, replay disabled, API/SSE counters, heartbeat recovery, scheduled cold-start-aware monitoring and coordinated migration preflight are implemented. Valid production field percentiles require real traffic; no historical field comparison is claimed. Local backup/restore is rehearsed; hosted production restore acceptance remains in the separate enablement gate.
 
 - Measure mobile loading and interaction before changing bundles; investigate wallet/provider startup, chart imports, and unnecessary SDK loading.
 - Defer optional wallet/chart code where measurements justify it. Compare before/after Lighthouse and field metrics using the same scenario.
@@ -308,7 +308,7 @@ Completed in increment 7: actual PostgreSQL checkpoint failure after a metadata 
 ## Migration, backfill, and release procedure
 
 1. Inspect production deployment/schema state and record a restorable database checkpoint. Rehearse on an isolated database copy first.
-2. Apply additive migrations and deploy compatible backend code. Keep any old cursor/projection writer paused while reconciling identities or rebuilding event projections.
+2. After protected merge, exact-main CI and candidate image admission, confirm the prior API is already awake/ready and run the short-lived migration-window preflight. Coordinate additive DDL with immediate compatible runtime rollout; never apply production DDL while CI is pending. See [operations](OPERATIONS.md#coordinated-migration-window). Keep any old cursor/projection writer paused while reconciling identities or rebuilding event projections.
 3. Run reconciliation in dry-run mode, inspect conflicts, then apply validated changes. Add uniqueness/non-null constraints only after conflicting data is resolved.
 4. Load/replay confirmed canonical logs in bounded ranges from each configured deployment block, validating receipt identities and projection counts. Persist progress transactionally.
 5. Confirm readiness, indexing progress, permissions, verification results, and analytics. Deploy the compatible frontend against the intended environment.
@@ -330,7 +330,7 @@ After the reliable demo is complete and a specific user workflow has been valida
 
 ## Next implementation session
 
-The next product increment is **9: shipment exception list**. Increments 5–8 are implemented, including truthful analytics, enforced release controls, public QR verification and the guided/mobile journey. **Production indexing enablement validation remains important and pending:** review the deployment anchor, rehearse identity/history reconciliation and hosted restore, then obtain explicit enablement before backfill. Keep that gate separate from ordinary application releases.
+Increment **10: performance and operations** is undergoing release acceptance. Increments 5–9 are delivered. After increment 10, prioritize field observation and a defined business pilot; there is no automatically authorized production backfill. **Production indexing enablement validation remains important and pending:** review the deployment anchor, rehearse identity/history reconciliation and hosted restore, then obtain explicit enablement before backfill. Keep that gate separate from ordinary application releases.
 
 Preserve analytics definitions and sample/exclusion counts during subsequent work. Keep production indexing enablement and any change to release-gate configuration as explicit reviewed changes.
 

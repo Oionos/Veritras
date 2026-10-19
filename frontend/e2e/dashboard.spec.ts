@@ -22,7 +22,7 @@ test('KPI cards render with mocked values', async ({ page }) => {
 
 test('Shipment Volume chart section renders', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByText('Shipment Volume')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Shipment Volume', exact: true })).toBeVisible()
 })
 
 test('Recent Products section renders', async ({ page }) => {

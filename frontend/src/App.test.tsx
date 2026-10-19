@@ -34,6 +34,7 @@ vi.mock('@vercel/speed-insights/react', () => ({
 
 vi.mock('./config/wagmi', () => ({
   rainbowKitConfig: {},
+  hasStoredWalletConnection: false,
 }))
 
 vi.mock('./components/EtherealBackground', () => ({

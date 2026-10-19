@@ -22,7 +22,7 @@ export function useExceptions(
   if (shipmentId) query.set("shipment_id", shipmentId);
   return useQuery<ExceptionList>({
     queryKey: ["exceptions", state, page, shipmentId],
-    queryFn: () => fetchApi(`/exceptions?${query}`),
+    queryFn: ({ signal }) => fetchApi(`/exceptions?${query}`, { signal }),
     refetchInterval: 30_000,
     refetchIntervalInBackground: false,
   });
@@ -31,8 +31,8 @@ export function useExceptions(
 export function useExceptionPolicy(shipmentId: string) {
   return useQuery<Policy>({
     queryKey: ["exception-policy", shipmentId],
-    queryFn: () =>
-      fetchApi(`/exceptions/policies/${encodeURIComponent(shipmentId)}`),
+    queryFn: ({ signal }) =>
+      fetchApi(`/exceptions/policies/${encodeURIComponent(shipmentId)}`, { signal }),
     enabled: !!shipmentId,
   });
 }

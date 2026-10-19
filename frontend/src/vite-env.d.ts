@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  readonly VITE_RELEASE_COMMIT: string
   readonly VITE_APP_ENV: string
   readonly VITE_CHAIN_ID: string
   readonly VITE_RPC_URL: string

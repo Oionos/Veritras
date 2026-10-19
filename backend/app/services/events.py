@@ -3,6 +3,7 @@
 import asyncio
 import json
 import threading
+from app.services.operations import operations
 
 
 class EventBroadcaster:
@@ -14,17 +15,22 @@ class EventBroadcaster:
         queue = asyncio.Queue(maxsize=64)
         with self._lock:
             self._queues[queue] = asyncio.get_running_loop()
+        operations.stream("opened")
         return queue
 
     def unsubscribe(self, queue):
         with self._lock:
-            self._queues.pop(queue, None)
+            removed = self._queues.pop(queue, None)
+        if removed is not None:
+            operations.stream("closed")
 
     @staticmethod
     def _put(queue, message):
         if queue.full():
+            operations.stream("overflows")
             queue.get_nowait()
             message = "event: resync\ndata: {}\n\n"
+            operations.stream("resyncs")
         queue.put_nowait(message)
 
     def publish_from_thread(self, event_type, data):

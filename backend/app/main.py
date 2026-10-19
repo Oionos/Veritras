@@ -3,6 +3,7 @@ import os
 import re
 import logging.config
 import time
+import uuid
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -20,7 +21,9 @@ from app.core.database import engine, Base
 from app.core.limiter import limiter
 from app.core.logging import LOGGING_CONFIG
 from app.core.security import SecurityHeadersMiddleware
-from app.api.routes import auth, products, shipments, analytics, exceptions
+from app.api.routes import auth, products, shipments, analytics, exceptions, telemetry
+from app.schemas.operations import OperationsResponse
+from app.services.operations import operations
 from app.services.exceptions import ExceptionWorker
 from app.services.indexer import EventIndexer
 from app.services.health import DatabaseProbe
@@ -143,21 +146,43 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    start_time = time.time()
-    response = await call_next(request)
+    start_time = time.monotonic()
+    request_id = uuid.uuid4().hex
+    response = None
+    error_type = None
+    try:
+        response = await call_next(request)
+    except Exception as error:
+        error_type = type(error).__name__
+        raise
+    finally:
+        duration_ms = (time.monotonic() - start_time) * 1000
+        route = getattr(request.scope.get("route"), "path", "unmatched")
+        status = response.status_code if response is not None else 500
+        operations.request(
+            status=status,
+            duration_ms=duration_ms,
+            business=not route.startswith(("/health", "/telemetry")),
+        )
+        logger.log(
+            (
+                logging.ERROR
+                if status >= 500 and not route.startswith("/health")
+                else logging.INFO
+            ),
+            "request",
+            extra={
+                "method": request.method,
+                "path": route,
+                "status": status,
+                "duration_ms": round(duration_ms, 2),
+                "request_id": request_id,
+                "error_type": error_type,
+            },
+        )
+    response.headers["X-Request-ID"] = request_id
     if request.url.path == "/health" or request.url.path.startswith("/health/"):
         response.headers["Cache-Control"] = "no-store"
-    duration_ms = (time.time() - start_time) * 1000
-    logger.info(
-        "request",
-        extra={
-            "method": request.method,
-            "path": request.url.path,
-            "status": response.status_code,
-            "duration_ms": round(duration_ms, 2),
-            "client_ip": request.client.host if request.client else None,
-        },
-    )
     return response
 
 
@@ -166,6 +191,7 @@ app.include_router(products.router, prefix="/products", tags=["products"])
 app.include_router(shipments.router, prefix="/shipments", tags=["shipments"])
 app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
 app.include_router(exceptions.router, prefix="/exceptions", tags=["exceptions"])
+app.include_router(telemetry.router, prefix="/telemetry", tags=["telemetry"])
 
 
 def indexer_state():
@@ -247,6 +273,12 @@ def health_ready():
     return JSONResponse(
         status_code=200 if state.status == "ready" else 503, content=state.model_dump()
     )
+
+
+@app.get("/health/operations", response_model=OperationsResponse)
+def health_operations():
+    """Bounded diagnostics; public aggregates contain no user input or identities."""
+    return {"health": readiness_state(), "counters": operations.snapshot()}
 
 
 @app.get("/health")

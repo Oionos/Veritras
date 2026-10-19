@@ -1,3 +1,4 @@
+import { activateWallets } from '@/config/wagmi'
 import { useEffect } from 'react'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { useAccount } from 'wagmi'
@@ -27,7 +28,7 @@ export default function ConnectAndAuth() {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-wrap items-center gap-3" onClickCapture={activateWallets}>
       <ConnectButton
         showBalance={false}
         accountStatus="address"

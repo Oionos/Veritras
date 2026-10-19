@@ -14,6 +14,7 @@ export default defineConfig(({ mode, command }) => {
   })
   return {
     define: {
+      'import.meta.env.VITE_RELEASE_COMMIT': JSON.stringify(raw.VERCEL_GIT_COMMIT_SHA || raw.RENDER_GIT_COMMIT || raw.VITE_RELEASE_COMMIT || ''),
       'import.meta.env.VITE_VERCEL_ENV': JSON.stringify(raw.VERCEL_ENV || ''),
       'import.meta.env.CI': JSON.stringify(raw.CI || ''),
     },
@@ -51,7 +52,7 @@ export default defineConfig(({ mode, command }) => {
       outDir: 'dist',
       sourcemap: mode === 'development',
       // Vite 8 (Rolldown): object-form output.manualChunks was removed, so the
-      // five vendor bundles are expressed as codeSplitting groups instead.
+      // vendor groups keep optional wallet connectors dynamically split.
       rolldownOptions: {
         output: {
           codeSplitting: {
@@ -64,11 +65,6 @@ export default defineConfig(({ mode, command }) => {
                 name: 'ui-vendor',
                 test: /node_modules\/(?:framer-motion|lucide-react)\//,
               },
-              {
-                name: 'web3-vendor',
-                test: /node_modules\/(?:wagmi|viem|@rainbow-me\/rainbowkit)\//,
-              },
-              { name: 'charts-vendor', test: /node_modules\/recharts\// },
               {
                 name: 'query-vendor',
                 test: /node_modules\/@tanstack\/(?:react-query|query-core)\//,
