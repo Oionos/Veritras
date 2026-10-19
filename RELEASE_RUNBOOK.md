@@ -14,6 +14,8 @@ This runbook accompanies [release controls](RELEASE_CONTROLS.md), [durable index
 
 Hosted readiness is an observer after successful CI, not an admission prerequisite. Keep Render's native setting **On Commit** when using these entrypoint gates: **After CI Checks Pass** waits for the readiness observer too and can deadlock. CI admission has bounded waiting and fails closed on public GitHub API errors/rate limits or a long queue. If a deployment times out, wait for the real main checks and retry that same SHA; never synthesize successful checks or turn off the gate.
 
+Shared hosting IPs may exhaust anonymous GitHub API quota. For reliable authenticated admission, create a fine-grained GitHub token for `Oionos/Veritras` with only Actions/Contents read access and store it as `GITHUB_RELEASE_TOKEN` in Render's production Environment settings (and Vercel Production build variables if needed). Keep the credential private and rotate it before expiration; no wallet, deployment or database permission is needed. Its value is used only in the GitHub request header and is never included in the browser bundle or release attestation. A missing/expired credential cannot bypass a failed check.
+
 ## Reproducible local rehearsal
 
 ```sh

@@ -6,15 +6,18 @@ export class ReleaseRejected extends Error {}
 export class ReleasePending extends Error {}
 
 export async function github(path) {
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'Veritras-release-gate',
+    'X-GitHub-Api-Version': '2022-11-28',
+  }
+  if (process.env.GITHUB_RELEASE_TOKEN)
+    headers.Authorization = `Bearer ${process.env.GITHUB_RELEASE_TOKEN}`
   try {
     const response = await fetch(
       `https://api.github.com/repos/${policy.repository}${path}`,
       {
-        headers: {
-          Accept: 'application/vnd.github+json',
-          'User-Agent': 'Veritras-release-gate',
-          'X-GitHub-Api-Version': '2022-11-28',
-        },
+        headers,
         signal: AbortSignal.timeout(10_000),
         redirect: 'error',
       },
