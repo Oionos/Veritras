@@ -1,0 +1,276 @@
+{
+  "baseline": {
+    "method": "Controlled mobile lab; 3 cold-cache Lighthouse runs; 390x844; simulated mobile CPU/network; gzip; frozen API fixtures; external HTTPS blocked. Interaction includes Playwright click overhead and two animation frames, not field INP.",
+    "browser": "154.0.8037.57",
+    "samples": [
+      {
+        "performance": 0.47,
+        "fcp_ms": 6465.762075000001,
+        "lcp_ms": 11292.51725,
+        "tbt_ms": 463,
+        "cls": 0,
+        "transfer_bytes": 1671523
+      },
+      {
+        "performance": 0.47,
+        "fcp_ms": 6531.2059,
+        "lcp_ms": 11326.437,
+        "tbt_ms": 482.2563,
+        "cls": 0,
+        "transfer_bytes": 1671556
+      },
+      {
+        "performance": 0.49,
+        "fcp_ms": 6502.119675,
+        "lcp_ms": 11331.885250000001,
+        "tbt_ms": 425,
+        "cls": 0,
+        "transfer_bytes": 1671523
+      }
+    ],
+    "median": {
+      "performance": 0.47,
+      "fcp_ms": 6502.119675,
+      "lcp_ms": 11326.437,
+      "tbt_ms": 463,
+      "cls": 0,
+      "transfer_bytes": 1671523
+    },
+    "menu_interaction_ms": 146.20000000001164,
+    "initial_script_bytes": 5004840,
+    "initial_script_gzip_bytes": 1226486,
+    "scripts": [
+      {
+        "path": "/assets/rolldown-runtime-BcKkbAw3.js",
+        "bytes": 1348,
+        "gzip_bytes": 728
+      },
+      {
+        "path": "/assets/query-vendor-DJgo8a-R.js",
+        "bytes": 43051,
+        "gzip_bytes": 12912
+      },
+      {
+        "path": "/assets/index-CloMir2O.js",
+        "bytes": 169958,
+        "gzip_bytes": 52985
+      },
+      {
+        "path": "/assets/react-vendor-3SPKybA3.js",
+        "bytes": 210630,
+        "gzip_bytes": 64998
+      },
+      {
+        "path": "/assets/ui-vendor-B5Tjc55t.js",
+        "bytes": 136665,
+        "gzip_bytes": 44801
+      },
+      {
+        "path": "/assets/charts-vendor-lDg_OUPr.js",
+        "bytes": 373609,
+        "gzip_bytes": 106138
+      },
+      {
+        "path": "/assets/web3-vendor-MseeSP9p.js",
+        "bytes": 2941433,
+        "gzip_bytes": 597750
+      },
+      {
+        "path": "/assets/dist-CoS6E-3x.js",
+        "bytes": 933,
+        "gzip_bytes": 450
+      },
+      {
+        "path": "/assets/events-CMzhc0tf.js",
+        "bytes": 6062,
+        "gzip_bytes": 2066
+      },
+      {
+        "path": "/assets/index.es-DZ7_0AsB.js",
+        "bytes": 393442,
+        "gzip_bytes": 110017
+      },
+      {
+        "path": "/assets/dist-DzuSKP3H.js",
+        "bytes": 256487,
+        "gzip_bytes": 105416
+      },
+      {
+        "path": "/assets/lit-BUxpUABm.js",
+        "bytes": 15003,
+        "gzip_bytes": 5803
+      },
+      {
+        "path": "/assets/ConstantsUtil-B2pB0X6-.js",
+        "bytes": 121260,
+        "gzip_bytes": 32163
+      },
+      {
+        "path": "/assets/core-D3tlAAzk.js",
+        "bytes": 334959,
+        "gzip_bytes": 90259
+      }
+    ]
+  },
+  "after": {
+    "method": "Controlled mobile lab; 3 cold-cache Lighthouse runs; 390x844; simulated mobile CPU/network; gzip; frozen API fixtures; external HTTPS blocked. Interaction includes Playwright click overhead and two animation frames, not field INP.",
+    "browser": "154.0.8037.57",
+    "samples": [
+      {
+        "performance": 0.61,
+        "fcp_ms": 3524.43825,
+        "lcp_ms": 5338.8765,
+        "tbt_ms": 464.5,
+        "cls": 0,
+        "transfer_bytes": 660866
+      },
+      {
+        "performance": 0.61,
+        "fcp_ms": 3532.873125,
+        "lcp_ms": 5367.74625,
+        "tbt_ms": 448,
+        "cls": 0,
+        "transfer_bytes": 660866
+      },
+      {
+        "performance": 0.62,
+        "fcp_ms": 3520.9522500000003,
+        "lcp_ms": 5485.685399999999,
+        "tbt_ms": 398.5617999999995,
+        "cls": 0,
+        "transfer_bytes": 662226
+      }
+    ],
+    "median": {
+      "performance": 0.61,
+      "fcp_ms": 3524.43825,
+      "lcp_ms": 5367.74625,
+      "tbt_ms": 448,
+      "cls": 0,
+      "transfer_bytes": 660866
+    },
+    "menu_interaction_ms": 106.39999999990687,
+    "initial_script_bytes": 1237708,
+    "initial_script_gzip_bytes": 383058,
+    "scripts": [
+      {
+        "path": "/assets/rolldown-runtime-BcKkbAw3.js",
+        "bytes": 1348,
+        "gzip_bytes": 728
+      },
+      {
+        "path": "/assets/query-vendor-DJgo8a-R.js",
+        "bytes": 43051,
+        "gzip_bytes": 12912
+      },
+      {
+        "path": "/assets/ui-vendor-B5Tjc55t.js",
+        "bytes": 136665,
+        "gzip_bytes": 44801
+      },
+      {
+        "path": "/assets/stringify-Bx8_8276.js",
+        "bytes": 7321,
+        "gzip_bytes": 2722
+      },
+      {
+        "path": "/assets/utils-BXiNjgTj.js",
+        "bytes": 3193,
+        "gzip_bytes": 1368
+      },
+      {
+        "path": "/assets/encodeFunctionData-5YZEskHs.js",
+        "bytes": 19575,
+        "gzip_bytes": 6513
+      },
+      {
+        "path": "/assets/react-vendor-3SPKybA3.js",
+        "bytes": 210630,
+        "gzip_bytes": 64998
+      },
+      {
+        "path": "/assets/Value-CyfJx_yS.js",
+        "bytes": 664,
+        "gzip_bytes": 445
+      },
+      {
+        "path": "/assets/index-DbS2JhRP.js",
+        "bytes": 678117,
+        "gzip_bytes": 211200
+      },
+      {
+        "path": "/assets/createBatchScheduler-aFWtjeYp.js",
+        "bytes": 7929,
+        "gzip_bytes": 2285
+      },
+      {
+        "path": "/assets/sepolia-Buht6mwa.js",
+        "bytes": 738,
+        "gzip_bytes": 459
+      },
+      {
+        "path": "/assets/preload-helper-BZ1Pz5am.js",
+        "bytes": 1218,
+        "gzip_bytes": 688
+      },
+      {
+        "path": "/assets/call-BPDGbFOU.js",
+        "bytes": 72617,
+        "gzip_bytes": 20491
+      },
+      {
+        "path": "/assets/clsx-DB0hHKMi.js",
+        "bytes": 369,
+        "gzip_bytes": 233
+      },
+      {
+        "path": "/assets/with-selector-CozBkNk_.js",
+        "bytes": 1671,
+        "gzip_bytes": 749
+      },
+      {
+        "path": "/assets/safeWallet-5MNKTR5Z-Ba8u5lpn.js",
+        "bytes": 1818,
+        "gzip_bytes": 706
+      },
+      {
+        "path": "/assets/rainbowWallet-O26YNBMX-CBGCSxd0.js",
+        "bytes": 5119,
+        "gzip_bytes": 953
+      },
+      {
+        "path": "/assets/base-QS6CYWIN-Dirz7KkB.js",
+        "bytes": 901,
+        "gzip_bytes": 390
+      },
+      {
+        "path": "/assets/metaMaskWallet-EI6MED72-BfqZnyky.js",
+        "bytes": 2202,
+        "gzip_bytes": 885
+      },
+      {
+        "path": "/assets/walletConnectWallet-YHWKVTDY-DvZwMEVq.js",
+        "bytes": 1876,
+        "gzip_bytes": 700
+      },
+      {
+        "path": "/assets/assets-Q6ZU7ZJ5-D-Bo-EQf.js",
+        "bytes": 23618,
+        "gzip_bytes": 4097
+      },
+      {
+        "path": "/assets/login-UP3DZBGS-CaoZ1sv9.js",
+        "bytes": 11994,
+        "gzip_bytes": 2973
+      },
+      {
+        "path": "/assets/PrivateAnalytics-CHvA_vTu.js",
+        "bytes": 5074,
+        "gzip_bytes": 1762
+      }
+    ]
+  },
+  "baseline_commit": "7adb990863aa399d2dd323d80e1bfa090794716f",
+  "measurement_date": "2026-10-20 Asia/Manila",
+  "measured_feature_commit": "25819f84866787e741ab4dcd039313ac094b451a"
+}

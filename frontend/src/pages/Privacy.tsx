@@ -13,9 +13,10 @@ export default function Privacy() {
           Privacy Policy
         </h1>
         <p className="max-w-xl text-sm leading-relaxed text-muted">
-          How Veritras handles your data on the blockchain supply-chain platform.
+          How Veritras handles your data on the blockchain supply-chain
+          platform.
         </p>
-        <p className="text-xs text-muted/50">Last Updated: July 31, 2026</p>
+        <p className="text-xs text-muted/50">Last Updated: October 20, 2026</p>
       </div>
 
       {/* ─── 1. Overview ─────────────────────────────────────────── */}
@@ -24,8 +25,9 @@ export default function Privacy() {
           Overview
         </h2>
         <p className="text-sm leading-relaxed text-muted">
-          Veritras is a blockchain-based supply chain transparency platform. This
-          policy explains what data we collect, how we use it, and your rights.
+          Veritras is a blockchain-based supply chain transparency platform.
+          This policy explains what data we collect, how we use it, and your
+          rights.
         </p>
       </section>
 
@@ -36,24 +38,28 @@ export default function Privacy() {
         </h2>
         <ul className="space-y-3 text-sm leading-relaxed text-muted">
           <li>
-            <span className="font-medium text-text">Wallet addresses</span>{' '}
+            <span className="font-medium text-text">Wallet addresses</span>{" "}
             (Ethereum / Sepolia) — collected via RainbowKit for authentication.
           </li>
           <li>
             <span className="font-medium text-text">
               IP addresses and browser metadata
-            </span>{' '}
-            — collected automatically by our hosting providers Vercel and Render.
+            </span>{" "}
+            — collected automatically by our hosting providers Vercel and
+            Render.
           </li>
           <li>
             <span className="font-medium text-text">
               Product and shipment data you submit
-            </span>{' '}
+            </span>{" "}
             — stored on our backend and referenced on-chain.
           </li>
           <li>
-            <span className="font-medium text-text">Usage analytics</span>{' '}
-            — Vercel Analytics and Speed Insights for performance monitoring.
+            <span className="font-medium text-text">Usage analytics</span> —
+            Vercel Analytics and Speed Insights for performance monitoring, with
+            dynamic identifiers and URL parameters removed. Aggregate error and
+            connection-health diagnostics exclude wallet addresses, signatures,
+            tokens and form input. Session replay is disabled.
           </li>
         </ul>
       </section>
@@ -80,8 +86,8 @@ export default function Privacy() {
         </h2>
         <p className="text-sm leading-relaxed text-muted">
           Transactions on Ethereum / Sepolia are publicly visible on the
-          blockchain by nature. Wallet addresses and transaction data are part of
-          the public ledger and cannot be deleted.
+          blockchain by nature. Wallet addresses and transaction data are part
+          of the public ledger and cannot be deleted.
         </p>
       </section>
 
@@ -92,8 +98,9 @@ export default function Privacy() {
         </h2>
         <p className="text-sm leading-relaxed text-muted">
           We do not sell your data. Data is shared only with hosting providers
-          (Vercel, Render) under their respective privacy policies, and the
-          blockchain network (public by design).
+          (Vercel, Render), an optional configured error-reporting provider,
+          under their respective privacy policies, and the blockchain network
+          (public by design).
         </p>
       </section>
 
@@ -104,9 +111,7 @@ export default function Privacy() {
         </h2>
         <ul className="space-y-3 text-sm leading-relaxed text-muted">
           <li>You can disconnect your wallet at any time.</li>
-          <li>
-            You can request deletion of off-chain data by contacting us.
-          </li>
+          <li>You can request deletion of off-chain data by contacting us.</li>
           <li>
             You can view all on-chain data associated with your wallet on
             blockchain explorers.
@@ -122,7 +127,8 @@ export default function Privacy() {
         <p className="text-sm leading-relaxed text-muted">
           Off-chain data is retained as long as your account is active. On-chain
           data is permanent by design. You may request deletion of off-chain
-          records at any time.
+          records at any time. Operational browser aggregates are held only in
+          API process memory and reset when that process restarts.
         </p>
       </section>
 
@@ -137,5 +143,5 @@ export default function Privacy() {
         </p>
       </section>
     </div>
-  )
+  );
 }

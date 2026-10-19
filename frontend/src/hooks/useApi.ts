@@ -1,3 +1,4 @@
+import { reportMetric } from '@/config/telemetry'
 import { appEnvironment } from '@/config/runtime'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Product, ProductDetail, Shipment } from '@/types'
@@ -16,16 +17,18 @@ export async function fetchApi(endpoint: string, options?: RequestInit) {
     headers['Authorization'] = `Bearer ${token}`
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
+  let response: Response
+  try { response = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     headers,
-  })
+  }) } catch (error) { if (!(error instanceof DOMException && error.name === 'AbortError')) reportMetric('api_error', 1); throw error }
 
   if (response.status === 401) {
     clearAuthToken()
   }
 
   if (!response.ok) {
+    if (response.status >= 500) reportMetric('api_error', 1)
     const errorText = await response.text().catch(() => response.statusText)
     throw new Error(
       `API Error (${response.status}): ${errorText || response.statusText}`

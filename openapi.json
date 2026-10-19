@@ -1862,6 +1862,40 @@
         }
       }
     },
+    "/telemetry/browser": {
+      "post": {
+        "tags": [
+          "telemetry"
+        ],
+        "summary": "Browser Metric",
+        "operationId": "browser_metric_telemetry_browser_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrowserMetric"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health/indexer": {
       "get": {
         "summary": "Health Indexer",
@@ -1930,6 +1964,25 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/operations": {
+      "get": {
+        "summary": "Health Operations",
+        "description": "Bounded diagnostics; public aggregates contain no user input or identities.",
+        "operationId": "health_operations_health_operations_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationsResponse"
                 }
               }
             }
@@ -2106,6 +2159,104 @@
           "flagged_at"
         ],
         "title": "AnomalyResponse"
+      },
+      "BrowserAggregate": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "title": "Metric"
+          },
+          "route": {
+            "type": "string",
+            "title": "Route"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "mean": {
+            "type": "number",
+            "title": "Mean"
+          }
+        },
+        "type": "object",
+        "required": [
+          "metric",
+          "route",
+          "count",
+          "mean"
+        ],
+        "title": "BrowserAggregate"
+      },
+      "BrowserMetric": {
+        "properties": {
+          "metric": {
+            "type": "string",
+            "enum": [
+              "LCP",
+              "CLS",
+              "interaction_max_ms",
+              "client_error",
+              "api_error",
+              "stream_disconnected",
+              "stream_recovered"
+            ],
+            "title": "Metric"
+          },
+          "route": {
+            "type": "string",
+            "enum": [
+              "dashboard",
+              "products",
+              "shipments",
+              "shipment_detail",
+              "analytics",
+              "exceptions",
+              "verify",
+              "demo",
+              "privacy",
+              "terms",
+              "not_found"
+            ],
+            "title": "Route"
+          },
+          "value": {
+            "type": "number",
+            "maximum": 600000.0,
+            "minimum": 0.0,
+            "title": "Value"
+          },
+          "release": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release"
+          },
+          "environment": {
+            "type": "string",
+            "enum": [
+              "development",
+              "testing",
+              "production"
+            ],
+            "title": "Environment"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "metric",
+          "route",
+          "value",
+          "environment"
+        ],
+        "title": "BrowserMetric"
       },
       "ChallengeRequest": {
         "properties": {
@@ -3260,6 +3411,102 @@
           "expires_at"
         ],
         "title": "NonceResponse"
+      },
+      "OperationalCounters": {
+        "properties": {
+          "window_seconds": {
+            "type": "integer",
+            "title": "Window Seconds"
+          },
+          "uptime_seconds": {
+            "type": "integer",
+            "title": "Uptime Seconds"
+          },
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          },
+          "api_requests": {
+            "type": "integer",
+            "title": "Api Requests"
+          },
+          "api_5xx": {
+            "type": "integer",
+            "title": "Api 5Xx"
+          },
+          "mean_duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Duration Ms"
+          },
+          "duration_buckets": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Duration Buckets"
+          },
+          "streams": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Streams"
+          },
+          "browser_metrics": {
+            "items": {
+              "$ref": "#/components/schemas/BrowserAggregate"
+            },
+            "type": "array",
+            "title": "Browser Metrics"
+          },
+          "storage": {
+            "type": "string",
+            "const": "process_memory",
+            "title": "Storage"
+          },
+          "reset_on_restart": {
+            "type": "boolean",
+            "title": "Reset On Restart"
+          }
+        },
+        "type": "object",
+        "required": [
+          "window_seconds",
+          "uptime_seconds",
+          "requests",
+          "api_requests",
+          "api_5xx",
+          "mean_duration_ms",
+          "duration_buckets",
+          "streams",
+          "browser_metrics",
+          "storage",
+          "reset_on_restart"
+        ],
+        "title": "OperationalCounters"
+      },
+      "OperationsResponse": {
+        "properties": {
+          "health": {
+            "$ref": "#/components/schemas/ReadinessResponse"
+          },
+          "counters": {
+            "$ref": "#/components/schemas/OperationalCounters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "health",
+          "counters"
+        ],
+        "title": "OperationsResponse"
       },
       "PolicyResponse": {
         "properties": {

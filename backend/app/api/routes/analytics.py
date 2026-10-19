@@ -121,19 +121,31 @@ async def analytics_events():
     queue = broadcaster.subscribe()
 
     async def event_generator():
+        from app.services.operations import operations
+        import logging
+
         try:
             revision = await asyncio.to_thread(chain_revision)
+            operations.stream("resyncs")
             yield "event: resync\ndata: {}\n\n"
             while True:
                 try:
                     message = await asyncio.wait_for(queue.get(), timeout=5)
                     yield message
                 except asyncio.TimeoutError:
-                    yield ": heartbeat\n\n"
+                    yield ": heartbeat\nevent: heartbeat\ndata: {}\n\n"
                 latest = await asyncio.to_thread(chain_revision)
                 if latest != revision:
                     revision = latest
                     yield "event: chain_updated\ndata: {}\n\n"
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            operations.stream("failures")
+            logging.getLogger("veritras.events").error(
+                "event_stream_unavailable", extra={"error_type": type(error).__name__}
+            )
+            yield "event: unavailable\ndata: {}\n\n"
         finally:
             broadcaster.unsubscribe(queue)
 
