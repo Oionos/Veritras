@@ -117,8 +117,16 @@ def test_readiness_observes_ci_without_becoming_a_release_prerequisite():
     )
     assert "git log -1 --format=%H HEAD -- backend" in health
     entrypoint = (root / "backend/start_api.py").read_text()
-    assert entrypoint.index("admit_production(os.environ)") < entrypoint.index(
+    assert entrypoint.index("verify_production_build(os.environ)") < entrypoint.index(
         "require_current_schema()"
+    )
+    dockerfile = (root / "backend/Dockerfile").read_text()
+    assert "python build_release.py" in dockerfile
+    assert "ARG GITHUB_RELEASE_TOKEN" not in dockerfile
+    assert "id=github-release-token" in dockerfile
+    assert (
+        "github-release-token"
+        in (root / "backend/.dockerignore").read_text().splitlines()
     )
     build = (root / "frontend/build-vercel.mjs").read_text()
     assert build.index("await waitForRelease(") < build.index("spawnSync('npm'")
@@ -224,3 +232,89 @@ def test_production_entrypoint_requires_commit_and_main():
         gate.admit_production(
             {"ENVIRONMENT": "production", "RENDER_GIT_BRANCH": "testing"}
         )
+
+
+def test_build_proof_survives_restart_without_github_access(monkeypatch, tmp_path):
+    runs, jobs, fetch = fixture_data()
+    monkeypatch.setattr(gate, "ATTESTATION", tmp_path / "admission.json")
+    monkeypatch.setattr(gate, "TOKEN_FILE", tmp_path / "absent-token")
+    monkeypatch.setattr(gate, "wait_for_release", lambda sha: gate.assess(sha, fetch))
+    env = {
+        "ENVIRONMENT": "production",
+        "RENDER_GIT_BRANCH": "main",
+        "RENDER_GIT_COMMIT": SHA,
+    }
+    gate.build_production(env)
+    monkeypatch.setattr(
+        gate, "wait_for_release", lambda _: pytest.fail("Cold start contacted GitHub")
+    )
+    gate.verify_production_build(env)
+    gate.verify_production_build(env)
+
+
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "missing",
+        "malformed",
+        "wrong_commit",
+        "wrong_policy",
+        "missing_workflow",
+        "bad_attempt",
+    ],
+)
+def test_startup_rejects_missing_or_incompatible_build_proof(
+    monkeypatch, tmp_path, mode
+):
+    runs, jobs, fetch = fixture_data()
+    path = tmp_path / "admission.json"
+    monkeypatch.setattr(gate, "ATTESTATION", path)
+    evidence = {**gate.assess(SHA, fetch), "policy_digest": gate.policy_digest()}
+    if mode == "wrong_commit":
+        evidence["commit"] = "b" * 40
+    elif mode == "wrong_policy":
+        evidence["policy_digest"] = "old"
+    elif mode == "missing_workflow":
+        evidence["workflows"].pop()
+    elif mode == "bad_attempt":
+        evidence["workflows"][0]["attempt"] = 0
+    if mode != "missing":
+        path.write_text("not-json" if mode == "malformed" else json.dumps(evidence))
+    with pytest.raises(gate.ReleaseRejected, match="build admission"):
+        gate.verify_production_build(
+            {"ENVIRONMENT": "production", "RENDER_GIT_COMMIT": SHA}
+        )
+
+
+def test_build_secret_is_only_used_for_lookup_and_never_saved(monkeypatch, tmp_path):
+    runs, jobs, fetch = fixture_data()
+    path = tmp_path / "admission.json"
+    secret = tmp_path / "github-release-token"
+    secret.write_text("synthetic-build-secret\n")
+    monkeypatch.setattr(gate, "ATTESTATION", path)
+    monkeypatch.setattr(gate, "TOKEN_FILE", secret)
+    monkeypatch.delenv("GITHUB_RELEASE_TOKEN", raising=False)
+
+    def check(sha):
+        assert gate.os.environ["GITHUB_RELEASE_TOKEN"] == "synthetic-build-secret"
+        return gate.assess(sha, fetch)
+
+    monkeypatch.setattr(gate, "wait_for_release", check)
+    gate.build_production({"ENVIRONMENT": "production", "RENDER_GIT_COMMIT": SHA})
+    assert "synthetic-build-secret" not in path.read_text()
+    assert "GITHUB_RELEASE_TOKEN" not in gate.os.environ
+
+
+def test_failed_build_discards_any_stale_proof(monkeypatch, tmp_path):
+    path = tmp_path / "admission.json"
+    path.write_text("stale")
+    monkeypatch.setattr(gate, "ATTESTATION", path)
+    monkeypatch.setattr(gate, "TOKEN_FILE", tmp_path / "absent-token")
+    monkeypatch.setattr(
+        gate,
+        "wait_for_release",
+        lambda _: (_ for _ in ()).throw(gate.ReleaseRejected("CI failed")),
+    )
+    with pytest.raises(gate.ReleaseRejected):
+        gate.build_production({"ENVIRONMENT": "production", "RENDER_GIT_COMMIT": SHA})
+    assert not path.exists()

@@ -6,6 +6,7 @@ The policy is mirrored in frontend because hosts build separate repository roots
 
 import json
 import os
+import hashlib
 import re
 import time
 from pathlib import Path
@@ -14,6 +15,8 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 POLICY = json.loads(Path(__file__).with_name("release_policy.json").read_text())
+ATTESTATION = Path(__file__).with_name(".release-admission.json")
+TOKEN_FILE = Path("/etc/secrets/github-release-token")
 
 
 class ReleaseRejected(RuntimeError):
@@ -148,7 +151,7 @@ def wait_for_release(
             pause(min(interval, remaining))
 
 
-def admit_production(environ):
+def production_commit(environ):
     if (
         environ.get("ENVIRONMENT", "").lower() == "production"
         or environ.get("RENDER_GIT_BRANCH") == "main"
@@ -159,5 +162,72 @@ def admit_production(environ):
             )
         if environ.get("RENDER_GIT_BRANCH") not in (None, "main"):
             raise ReleaseRejected("Production API must deploy the main branch")
-        evidence = wait_for_release(environ.get("RENDER_GIT_COMMIT", ""))
+        commit = environ.get("RENDER_GIT_COMMIT", "")
+        if not re.fullmatch(r"[0-9a-f]{40}", commit):
+            raise ReleaseRejected("A full production Git commit is required")
+        return commit
+
+
+def admit_production(environ):
+    if commit := production_commit(environ):
+        evidence = wait_for_release(commit)
         print(json.dumps({"release_gate": "passed", **evidence}), flush=True)
+        return evidence
+
+
+def policy_digest():
+    return hashlib.sha256(json.dumps(POLICY, sort_keys=True).encode()).hexdigest()
+
+
+def build_production(environ):
+    # Always discard a copied/stale proof before checking this build's commit.
+    ATTESTATION.unlink(missing_ok=True)
+    if production_commit(environ) is None:
+        return
+    previous_token = os.environ.get("GITHUB_RELEASE_TOKEN")
+    try:
+        if TOKEN_FILE.is_file():
+            token = TOKEN_FILE.read_text().strip()
+            if not token or len(token) > 8192:
+                raise ReleaseRejected("Invalid GitHub release credential file")
+            os.environ["GITHUB_RELEASE_TOKEN"] = token
+        evidence = admit_production(environ)
+        ATTESTATION.write_text(
+            json.dumps({**evidence, "policy_digest": policy_digest()}) + "\n"
+        )
+        ATTESTATION.chmod(0o600)
+    finally:
+        if previous_token is None:
+            os.environ.pop("GITHUB_RELEASE_TOKEN", None)
+        else:
+            os.environ["GITHUB_RELEASE_TOKEN"] = previous_token
+
+
+def verify_production_build(environ):
+    """Validate the built artifact locally; cold starts never depend on GitHub."""
+    if (commit := production_commit(environ)) is None:
+        return
+    try:
+        evidence = json.loads(ATTESTATION.read_text())
+        workflows = evidence["workflows"]
+        valid = (
+            evidence["commit"] == commit
+            and evidence["repository"] == POLICY["repository"]
+            and evidence["branch"] == POLICY["branch"]
+            and evidence["policy_digest"] == policy_digest()
+            and len(workflows) == len(POLICY["workflows"])
+            and {w["workflow"] for w in workflows}
+            == {w["path"] for w in POLICY["workflows"]}
+            and all(
+                type(w["run_id"]) is int
+                and w["run_id"] > 0
+                and type(w["attempt"]) is int
+                and w["attempt"] > 0
+                for w in workflows
+            )
+        )
+    except (OSError, ValueError, KeyError, TypeError):
+        valid = False
+    if not valid:
+        raise ReleaseRejected("Missing or incompatible production build admission")
+    print(json.dumps({"release_gate": "admitted_build", **evidence}), flush=True)
