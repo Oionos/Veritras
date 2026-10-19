@@ -1,6 +1,6 @@
 # Performance measurements
 
-Increment 10 measured the anonymous dashboard before changing loading boundaries. The baseline is main `7adb990863aa399d2dd323d80e1bfa090794716f`. Results and individual sample values are retained in [performance/increment10.json](performance/increment10.json).
+Increment 10 measured the anonymous dashboard before changing loading boundaries. The measured final frontend source is feature commit `25819f84866787e741ab4dcd039313ac094b451a`; subsequent monitoring/test/documentation changes do not alter that runtime. The baseline is main `7adb990863aa399d2dd323d80e1bfa090794716f`. Results and individual sample values are retained in [performance/increment10.json](performance/increment10.json).
 
 ## Controlled mobile comparison
 
@@ -8,17 +8,17 @@ Measured October 20, 2026 (Asia/Manila), Chromium 154.0.8037.57. Three cold-cach
 
 | Median | Before | After | Change |
 | --- | ---: | ---: | ---: |
-| Lighthouse performance | 47 | 66 | +19 points |
-| First contentful paint | 6.50 s | 3.50 s | 46% lower |
-| Largest contentful paint | 11.33 s | 5.22 s | 54% lower |
-| Total blocking time | 463 ms | 318 ms | 31% lower |
+| Lighthouse performance | 47 | 61 | +14 points |
+| First contentful paint | 6.50 s | 3.52 s | 46% lower |
+| Largest contentful paint | 11.33 s | 5.37 s | 53% lower |
+| Total blocking time | 463 ms | 448 ms | 3% lower |
 | Cumulative layout shift | 0 | 0 | unchanged |
-| Total transferred bytes | 1,671,523 | 660,648 | 60% lower |
-| Initial JavaScript, gzip | 1,226,486 | 382,948 | 69% lower |
+| Total transferred bytes | 1,671,523 | 660,866 | 60% lower |
+| Initial JavaScript, gzip | 1,226,486 | 383,058 | 69% lower |
 
-One supplementary menu interaction took 146 ms before and 104 ms after. It includes Playwright click overhead and two animation frames: **it is not field INP or a percentile**, and is not the basis of the improvement claim. LCP remains above the 2.5-second good threshold in this constrained lab.
+One supplementary menu interaction took 146 ms before and 106 ms after. It includes Playwright click overhead and two animation frames: **it is not field INP or a percentile**, and is not the basis of the improvement claim. LCP remains above the 2.5-second good threshold in this constrained lab.
 
-The previous manual Web3 group combined optional SDKs with eager imports. Removing it alone reduced transfer but worsened blocking time in an intermediate trial. The final change also defers remote connector setup until wallet intent, restores it immediately for stored wallet connections, defers the below-fold chart by visibility, and schedules optional diagnostic SDK loading during idle time. No dependency upgrade or weaker Lighthouse threshold was needed.
+A repeat on the final build retained the loading/transfer gains; blocking time varied from the initial trial, so the table uses the final measurements. The previous manual Web3 group combined optional SDKs with eager imports. Removing it alone reduced transfer but worsened blocking time in an intermediate trial. The final change also defers remote connector setup until wallet intent, restores it immediately for stored wallet connections, defers the below-fold chart by visibility, and schedules optional diagnostic SDK loading during idle time. No dependency upgrade or weaker Lighthouse threshold was needed.
 
 ## Reproduce and prevent regression
 

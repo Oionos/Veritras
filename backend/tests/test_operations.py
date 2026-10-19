@@ -127,7 +127,12 @@ def test_monitor_requires_sustained_readiness_and_checks_stream():
         fetch=lambda *a: (
             200,
             {
-                "health": {"environment": "testing", "indexer": {"enabled": True}},
+                "health": {
+                    "status": "ready",
+                    "database": "connected",
+                    "environment": "testing",
+                    "indexer": {"enabled": True},
+                },
                 "counters": {"api_requests": 10, "api_5xx": 0},
             },
         ),
@@ -149,7 +154,12 @@ def test_monitor_disabled_policy_is_expected_and_stream_failure_actionable():
         fetch=lambda *a: (
             200,
             {
-                "health": {"environment": "production", "indexer": {"enabled": False}},
+                "health": {
+                    "status": "ready",
+                    "database": "connected",
+                    "environment": "production",
+                    "indexer": {"enabled": False},
+                },
                 "counters": {"api_requests": 3, "api_5xx": 3},
             },
         ),
@@ -232,6 +242,7 @@ def test_migration_preflight_requires_awake_exact_prior_release(tmp_path):
                     {
                         "status": "ready",
                         "release_commit": commit,
+                        "database": "connected",
                         "environment": "production",
                     },
                 ),
@@ -299,3 +310,30 @@ async def test_stream_heartbeat_is_named_and_cancel_releases_subscription(monkey
     assert "event: heartbeat" in await anext(iterator)
     await iterator.aclose()
     assert operations.snapshot()["streams"]["active"] == baseline
+
+
+def test_monitor_rechecks_readiness_in_the_operations_snapshot():
+    now = [0.0]
+    result = monitor(
+        "https://example.invalid",
+        environment="testing",
+        expect_indexer=True,
+        grace=60,
+        readiness=lambda *a, **k: {"ready": True, "state": "current"},
+        fetch=lambda *a: (
+            200,
+            {
+                "health": {
+                    "status": "not_ready",
+                    "database": "connected",
+                    "environment": "testing",
+                    "indexer": {"enabled": True},
+                },
+                "counters": {"api_requests": 1, "api_5xx": 0},
+            },
+        ),
+        stream=lambda *a, **k: True,
+        clock=lambda: now[0],
+        sleep=lambda t: now.__setitem__(0, now[0] + t),
+    )
+    assert result["healthy"] is False and result["conditions"] == ["diagnostics"]
