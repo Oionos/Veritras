@@ -131,6 +131,23 @@ describe('ProductCombobox', () => {
     expect(screen.getByPlaceholderText('e.g., PROD-8842')).toHaveValue('PROD-001')
   })
 
+  it('supports keyboard selection and Escape without submitting the form', () => {
+    setProducts()
+    render(<StatefulCombobox />)
+    const input = screen.getByRole('combobox', { name: 'Product ID' })
+    fireEvent.change(input, { target: { value: 'PROD' } })
+    fireEvent.keyDown(input, { key: 'ArrowDown' })
+    expect(screen.getByRole('option', { name: 'PROD-001' })).toHaveAttribute('aria-selected', 'true')
+    fireEvent.keyDown(input, { key: 'ArrowDown' })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(input).toHaveValue('PROD-002')
+    expect(input).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.keyDown(input, { key: 'ArrowUp' })
+    expect(input).toHaveAttribute('aria-expanded', 'true')
+    fireEvent.keyDown(input, { key: 'Escape' })
+    expect(input).toHaveAttribute('aria-expanded', 'false')
+  })
+
   it('closes dropdown when clicking outside', () => {
     setProducts()
     render(<StatefulCombobox />)

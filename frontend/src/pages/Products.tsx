@@ -1,3 +1,4 @@
+import VerificationLabel from '@/components/VerificationLabel'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { useAccount } from 'wagmi'
@@ -768,9 +769,7 @@ export default function Products() {
               </div>
               <div className="rounded-xl bg-white/[0.03] p-4 text-center">
                 <ShieldCheck className="mx-auto h-8 w-8 text-muted" />
-                <p className="mt-2 text-xs font-medium text-muted">
-                  Check registration on the Verify page
-                </p>
+                <VerificationLabel productId={product.product_id} />
               </div>
             </div>
           </Card>
@@ -817,11 +816,12 @@ export default function Products() {
                     <div className="border-t border-white/[0.06] px-5 pb-5 pt-4 space-y-4">
                       {/* Location */}
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-text">
+                        <label className="mb-1 block text-sm font-medium text-text" htmlFor="products-checkpoint-location">
                           Location <span className="text-red-400">*</span>
                         </label>
                         <input
                           type="text"
+                          id="products-checkpoint-location"
                           value={cpLocation}
                           onChange={(e) => setCpLocation(e.target.value)}
                           placeholder="e.g., Port of Rotterdam"
@@ -832,10 +832,11 @@ export default function Products() {
 
                       {/* Status */}
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-text">
+                        <label className="mb-1 block text-sm font-medium text-text" htmlFor="products-checkpoint-status">
                           Status
                         </label>
                         <select
+                          id="products-checkpoint-status"
                           value={cpStatus}
                           onChange={(e) =>
                             setCpStatus(
@@ -857,10 +858,11 @@ export default function Products() {
 
                       {/* Notes */}
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-text">
+                        <label className="mb-1 block text-sm font-medium text-text" htmlFor="products-checkpoint-notes">
                           Notes <span className="text-muted">(optional)</span>
                         </label>
                         <textarea
+                          id="products-checkpoint-notes"
                           value={cpNotes}
                           onChange={(e) => setCpNotes(e.target.value)}
                           placeholder="Any additional notes..."
@@ -927,12 +929,13 @@ export default function Products() {
                   >
                     <div className="border-t border-white/[0.06] px-5 pb-5 pt-4 space-y-4">
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-text">
+                        <label className="mb-1 block text-sm font-medium text-text" htmlFor="products-custody-handler">
                           New Handler Address{' '}
                           <span className="text-red-400">*</span>
                         </label>
                         <input
                           type="text"
+                          id="products-custody-handler"
                           value={txHandler}
                           onChange={(e) => {
                             setTxHandler(e.target.value)
@@ -1127,10 +1130,11 @@ export default function Products() {
             )}
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-text">
+              <label className="mb-1 block text-sm font-medium text-text" htmlFor="products-name">
                 Product Name
               </label>
               <input
+                id="products-name"
                 {...register('name')}
                 placeholder="e.g., Organic Coffee Beans"
                 className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
@@ -1143,10 +1147,11 @@ export default function Products() {
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-text">
+              <label className="mb-1 block text-sm font-medium text-text" htmlFor="products-manufacturer_address">
                 Manufacturer Address
               </label>
               <input
+                id="products-manufacturer_address"
                 {...register('manufacturer_address')}
                 readOnly
                 aria-label="Manufacturer address from your signed-in wallet"
@@ -1161,10 +1166,11 @@ export default function Products() {
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-text">
+              <label className="mb-1 block text-sm font-medium text-text" htmlFor="products-description">
                 Description <span className="text-muted">(optional)</span>
               </label>
               <textarea
+                id="products-description"
                 {...register('description')}
                 rows={2}
                 placeholder="Brief description of the product..."
@@ -1178,10 +1184,11 @@ export default function Products() {
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-text">
+              <label className="mb-1 block text-sm font-medium text-text" htmlFor="products-metadata_uri">
                 Metadata URI <span className="text-muted">(optional)</span>
               </label>
               <input
+                id="products-metadata_uri"
                 {...register('metadata_uri')}
                 placeholder="https://..."
                 className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"

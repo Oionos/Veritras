@@ -15,6 +15,7 @@ export default function EtherealBackground() {
   const isMountedRef = useRef(true)
 
   useEffect(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
     const canvas = canvasRef.current
     if (!canvas) return
 

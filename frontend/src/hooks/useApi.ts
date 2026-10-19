@@ -58,7 +58,7 @@ export function useProducts(recent = false) {
 export function useProduct(id: string) {
   return useQuery<ProductDetail>({
     queryKey: ['product', id],
-    queryFn: () => fetchApi(`/products/${id}`),
+    queryFn: () => fetchApi(`/products/${encodeURIComponent(id)}`),
     enabled: !!id,
   })
 }
@@ -132,7 +132,7 @@ export function useVerifyProduct(id: string) {
   return useQuery({
     queryKey: ['verify', id],
     queryFn: () =>
-      fetchApi(`/products/${id}/verify`) as Promise<
+      fetchApi(`/products/${encodeURIComponent(id)}/verify`) as Promise<
         components['schemas']['VerificationResponse']
       >,
     enabled: !!id,

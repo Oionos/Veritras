@@ -47,6 +47,8 @@ function apiPath(url: URL, pathname: string): boolean {
 }
 
 export async function setupRoutes(page: Page): Promise<void> {
+  await page.route(url => isApiOrigin(url) && /^\/shipments\/[^/]+$/.test(url.pathname), route => route.fulfill({ json: MOCK_SHIPMENTS.items[0] }))
+  await page.route(url => isApiOrigin(url) && /^\/products\/[^/]+\/timeline$/.test(url.pathname), route => route.fulfill({ json: { product_id: 'PROD-001', items: [], total: 0, skip: 0, limit: 100 } }))
   // SSE — return an empty event stream so EventSource does not keep reconnecting
   await page.route(
     url => apiPath(url, '/analytics/events'),

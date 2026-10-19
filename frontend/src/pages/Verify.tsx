@@ -1,7 +1,11 @@
-import { useState } from 'react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import VerificationLabel from '@/components/VerificationLabel'
+import EvidenceTimeline from '@/components/EvidenceTimeline'
+import { verificationPath } from '@/utils/verificationLabel'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import Card from '@/components/ui/Card'
-import TransactionLink from '@/components/TransactionLink'
+import RegistrationEvidence from '@/components/RegistrationEvidence'
 import Button from '@/components/ui/Button'
 import Badge from '@/components/ui/Badge'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
@@ -10,23 +14,30 @@ import { Search, ShieldCheck, CheckCircle2, XCircle, MapPin, User } from 'lucide
 import { formatAddress, formatDate } from '@/utils/formatters'
 
 export default function Verify() {
-  const [inputId, setInputId] = useState('')
-  const [submittedId, setSubmittedId] = useState('')
+  const { productId = '' } = useParams()
+  const navigate = useNavigate()
+  const [inputId, setInputId] = useState(productId)
+  const submittedId = productId.trim()
+  useEffect(() => { setInputId(productId) }, [productId])
 
   const {
     data: verifyResult,
     isLoading: verifyLoading,
     error: verifyError,
+    refetch: retryVerify,
   } = useVerifyProduct(submittedId)
 
   const {
     data: productDetail,
     isLoading: productLoading,
+    error: productError,
+    refetch: retryProduct,
   } = useProduct(submittedId)
 
   const handleVerify = () => {
     if (!inputId.trim()) return
-    setSubmittedId(inputId.trim())
+    if (inputId.trim() === submittedId) { void retryVerify(); void retryProduct() }
+    else navigate(verificationPath(inputId.trim()))
   }
 
   const loading = verifyLoading || (verifyResult?.is_registered && productLoading)
@@ -70,6 +81,7 @@ export default function Verify() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted/40" />
               <input
+                aria-label="Product ID"
                 type="text"
                 placeholder="Enter product ID"
                 value={inputId}
@@ -96,6 +108,12 @@ export default function Verify() {
         </div>
       </div>
 
+      {submittedId && <div className="flex flex-wrap items-center gap-3">
+        <VerificationLabel key={submittedId} productId={submittedId} />
+        <p className="text-sm text-muted">No wallet is needed to inspect public evidence.</p>
+      </div>}
+      {loading && <p role="status">Loading registration evidence…</p>}
+      {productError && <p role="alert">Product details could not be loaded. <button className="underline" onClick={() => void retryProduct()}>Retry product details</button></p>}
       {/* ─── Not Found / Failed ───────────────────────────────────── */}
       {isFailed && (
         <motion.div
@@ -126,27 +144,14 @@ export default function Verify() {
           <div>
             <p className="font-medium text-red-400">Error</p>
             <p className="text-sm text-red-400/70">
-              {verifyError instanceof Error ? verifyError.message : 'Verification failed'}
+              Verification could not be completed. Try again when the API is available.
             </p>
+            <Button onClick={() => void retryVerify()}>Retry verification</Button>
           </div>
         </motion.div>
       )}
 
-      {verifyResult?.evidence && <Card>
-        <div className="space-y-2 text-sm" aria-label="Registration evidence">
-          <p role="status">{verifyResult.evidence.status} · {verifyResult.evidence.reason.replace(/_/g, ' ')}</p>
-          <p>Transaction state: {verifyResult.evidence.registration_status}</p>
-          <p className="break-all">Chain: {verifyResult.evidence.chain_id ?? 'Unknown'} · Registry: {verifyResult.evidence.registry_address ?? 'Unknown'}</p>
-          <p className="break-all">Canonical product: {verifyResult.evidence.on_chain_product_id ?? 'Unknown'}</p>
-          <p className="break-all">Manufacturer: {verifyResult.evidence.manufacturer_address}</p>
-          {verifyResult.evidence.transaction_hash && <TransactionLink hash={verifyResult.evidence.transaction_hash} />}
-          {verifyResult.evidence.block_number != null && <p className="break-all">Block {verifyResult.evidence.block_number} · {verifyResult.evidence.block_hash}</p>}
-          <p>Confirmation depth: {verifyResult.evidence.observed_confirmations ?? 'Unknown'} / {verifyResult.evidence.required_confirmations}</p>
-          <p>Synchronization: {verifyResult.synchronization.status} · {verifyResult.synchronization.reason?.replace(/_/g, ' ')}</p>
-          <p>Last successful synchronization: {verifyResult.synchronization.last_successful_sync ?? 'Unavailable'}</p>
-          <p>Registration evidence does not authenticate a physical item.</p>
-        </div>
-      </Card>}
+      {verifyResult?.evidence && <RegistrationEvidence verification={verifyResult} />}
 
       {/* ─── Verification Result ──────────────────────────────────── */}
       {isVerified && verifyResult && (
@@ -243,6 +248,8 @@ export default function Verify() {
         </div>
       )}
 
+      {productDetail?.product && <EvidenceTimeline key={productDetail.product.product_id} productId={productDetail.product.product_id} />}
+      {!submittedId && <Link className="inline-block text-sm text-accent underline" to="/demo">Explore the guided demo</Link>}
       {/* ─── Initial State Helper ─────────────────────────────────── */}
       {!isVerified && !isFailed && !loading && !verifyError && (
         <motion.div

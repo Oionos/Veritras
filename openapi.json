@@ -360,6 +360,71 @@
         }
       }
     },
+    "/products/{product_id}/timeline": {
+      "get": {
+        "tags": [
+          "products"
+        ],
+        "summary": "Get Product Timeline",
+        "operationId": "get_product_timeline_products__product_id__timeline_get",
+        "parameters": [
+          {
+            "name": "product_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Product Id"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TimelineResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/products/{product_id}/verify": {
       "get": {
         "tags": [
@@ -767,6 +832,46 @@
       }
     },
     "/shipments/{shipment_id}": {
+      "get": {
+        "tags": [
+          "shipments"
+        ],
+        "summary": "Get Shipment",
+        "operationId": "get_shipment_shipments__shipment_id__get",
+        "parameters": [
+          {
+            "name": "shipment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Shipment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShipmentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "put": {
         "tags": [
           "shipments"
@@ -3907,6 +4012,197 @@
           "indexer_enabled"
         ],
         "title": "SynchronizationResponse"
+      },
+      "TimelineEvent": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "event_type": {
+            "type": "string",
+            "enum": [
+              "ProductRegistered",
+              "ProductMetadataUpdated",
+              "CheckpointRecorded",
+              "CustodyTransferred",
+              "DeliveryCompleted"
+            ],
+            "title": "Event Type"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
+          },
+          "block_number": {
+            "type": "integer",
+            "title": "Block Number"
+          },
+          "block_hash": {
+            "type": "string",
+            "title": "Block Hash"
+          },
+          "transaction_hash": {
+            "type": "string",
+            "title": "Transaction Hash"
+          },
+          "transaction_index": {
+            "type": "integer",
+            "title": "Transaction Index"
+          },
+          "log_index": {
+            "type": "integer",
+            "title": "Log Index"
+          },
+          "contract_address": {
+            "type": "string",
+            "title": "Contract Address"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "handler": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Handler"
+          },
+          "from_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Address"
+          },
+          "to_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To Address"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "metadata_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata Uri"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_id",
+          "event_type",
+          "block_number",
+          "block_hash",
+          "transaction_hash",
+          "transaction_index",
+          "log_index",
+          "contract_address"
+        ],
+        "title": "TimelineEvent"
+      },
+      "TimelineResponse": {
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "title": "Product Id"
+          },
+          "chain_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chain Id"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TimelineEvent"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "skip": {
+            "type": "integer",
+            "title": "Skip"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "product_id",
+          "items",
+          "total",
+          "skip",
+          "limit"
+        ],
+        "title": "TimelineResponse"
       },
       "ValidationError": {
         "properties": {

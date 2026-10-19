@@ -120,6 +120,20 @@ async def create_shipment(
     return shipment
 
 
+@router.get("/{shipment_id}", response_model=ShipmentResponse)
+def get_shipment(shipment_id: str, db: Session = Depends(get_db)):
+    shipment = (
+        db.query(Shipment)
+        .options(joinedload(Shipment.product))
+        .filter_by(shipment_id=shipment_id)
+        .first()
+    )
+    if not shipment:
+        raise HTTPException(404, "Shipment not found")
+    hydrate_lifecycle(db, [shipment])
+    return shipment
+
+
 @router.put("/{shipment_id}", response_model=ShipmentResponse)
 @limiter.limit("30/minute")
 def update_shipment(

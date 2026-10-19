@@ -99,7 +99,7 @@ function ProvenanceChain() {
         <span
           className="text-[10px] font-medium uppercase tracking-[0.2em] text-muted"
         >
-          Live Provenance Chain
+          Illustrative Provenance Chain
         </span>
       </div>
 
@@ -369,11 +369,11 @@ export default function PremiumHero() {
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
           </button>
           <button
-            onClick={() => navigate('/products')}
+            onClick={() => navigate('/demo')}
             className="inline-flex items-center gap-2.5 rounded-full border border-white/20 bg-white/[0.03] px-8 py-3.5 text-sm font-medium text-text backdrop-blur-xl transition-all hover:border-white/30 hover:bg-white/[0.06]"
           >
             <Play className="h-3.5 w-3.5 fill-current" />
-            View Dashboard
+            Guided Demo
           </button>
         </motion.div>
       </div>
@@ -386,6 +386,7 @@ export default function PremiumHero() {
         variants={fadeIn}
         className="relative z-10 mt-12 max-w-4xl"
       >
+        <p className="mb-3 text-xs text-muted">Illustrative journey · Simulated data</p>
         <ProvenanceChain />
       </motion.div>
 

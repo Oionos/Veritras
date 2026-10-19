@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useState, useEffect, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import { useAccount } from 'wagmi'
@@ -473,7 +474,7 @@ export default function Shipments() {
                     className="transition-colors duration-150 ease-out hover:bg-white/[0.03]"
                   >
                     <td className="px-6 py-4 font-mono text-text">
-                      {shipment.shipment_id}
+                      <Link className="text-accent underline" to={`/shipments/${encodeURIComponent(shipment.shipment_id)}`}>{shipment.shipment_id}</Link>
                     </td>
                     <td className="px-6 py-4 font-mono text-muted">
                       {shipment.product_id}
@@ -624,11 +625,12 @@ export default function Shipments() {
                     <div className="border-t border-white/[0.06] px-5 pb-5 pt-4 space-y-4">
                       {/* Location */}
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-text">
+                        <label className="mb-1 block text-sm font-medium text-text" htmlFor="shipments-checkpoint-location">
                           Location <span className="text-red-400">*</span>
                         </label>
                         <input
                           type="text"
+                          id="shipments-checkpoint-location"
                           value={cpLocation}
                           onChange={(e) => setCpLocation(e.target.value)}
                           placeholder="e.g., Port of Rotterdam"
@@ -639,10 +641,11 @@ export default function Shipments() {
 
                       {/* Status */}
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-text">
+                        <label className="mb-1 block text-sm font-medium text-text" htmlFor="shipments-checkpoint-status">
                           Status
                         </label>
                         <select
+                          id="shipments-checkpoint-status"
                           value={cpStatus}
                           onChange={(e) =>
                             setCpStatus(
@@ -664,10 +667,11 @@ export default function Shipments() {
 
                       {/* Notes */}
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-text">
+                        <label className="mb-1 block text-sm font-medium text-text" htmlFor="shipments-checkpoint-notes">
                           Notes <span className="text-muted">(optional)</span>
                         </label>
                         <textarea
+                          id="shipments-checkpoint-notes"
                           value={cpNotes}
                           onChange={(e) => setCpNotes(e.target.value)}
                           placeholder="Any additional notes..."
@@ -748,12 +752,13 @@ export default function Shipments() {
                   >
                     <div className="border-t border-white/[0.06] px-5 pb-5 pt-4 space-y-4">
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-text">
+                        <label className="mb-1 block text-sm font-medium text-text" htmlFor="shipments-custody-handler">
                           New Handler Address{' '}
                           <span className="text-red-400">*</span>
                         </label>
                         <input
                           type="text"
+                          id="shipments-custody-handler"
                           value={txHandler}
                           onChange={(e) => {
                             setTxHandler(e.target.value)
@@ -838,7 +843,7 @@ export default function Shipments() {
           )}
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-text">
+            <label htmlFor="shipment-product" className="mb-1 block text-sm font-medium text-text">
               Product ID
             </label>
             <Controller
@@ -846,6 +851,7 @@ export default function Shipments() {
               control={control}
               render={({ field }) => (
                 <ProductCombobox
+                  id="shipment-product"
                   ownedOnly
                   ownerAddress={auth.address}
                   value={field.value}
@@ -859,10 +865,11 @@ export default function Shipments() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-text">
+              <label className="mb-1 block text-sm font-medium text-text" htmlFor="shipments-origin">
                 Origin
               </label>
               <input
+                id="shipments-origin"
                 {...register('origin')}
                 placeholder="Origin location"
                 className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
@@ -874,10 +881,11 @@ export default function Shipments() {
               )}
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-text">
+              <label className="mb-1 block text-sm font-medium text-text" htmlFor="shipments-destination">
                 Destination
               </label>
               <input
+                id="shipments-destination"
                 {...register('destination')}
                 placeholder="Destination location"
                 className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
@@ -913,11 +921,12 @@ export default function Shipments() {
             </p>
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-text">
+            <label className="mb-1 block text-sm font-medium text-text" htmlFor="shipments-notes">
               Notes <span className="text-muted">(optional)</span>
             </label>
             <textarea
-              {...register('notes')}
+              id="shipments-notes"
+                {...register('notes')}
               rows={3}
               placeholder="Additional notes..."
               className="w-full rounded-xl border border-white/[0.06] bg-bg py-2.5 px-4 text-sm text-text placeholder-muted/40 outline-hidden transition-colors focus:border-accent/30 focus:ring-1 focus:ring-accent/10"
