@@ -20,6 +20,15 @@ assert.equal(await rpcRequest('eth_chainId'), '0x7a69', 'Only the isolated Hardh
 const health = await (await fetch(`${api}/health/ready`)).json()
 assert.equal(health.environment, 'testing')
 assert.equal(health.chain_id, 31337)
+async function waitForApi(path, predicate, label) {
+  const deadline = Date.now() + 60_000
+  while (Date.now() < deadline) {
+    const response = await fetch(`${api}${path}`)
+    if (response.ok && predicate(await response.json())) { console.log(`PASS: ${label}`); return }
+    await new Promise(resolve => setTimeout(resolve, 500))
+  }
+  throw new Error(`Timed out waiting for ${label}`)
+}
 const accounts = await rpcRequest('eth_accounts')
 assert.ok(accounts.length >= 2)
 
@@ -54,8 +63,9 @@ try {
   page = await browser.newPage()
   const errors = []
   page.on('pageerror', error => errors.push(error.message))
+  page.on('console', message => { if (message.text().startsWith('Local wallet RPC failed')) console.warn(message.text()) })
   await page.addInitScript(({ accounts, rpc }) => {
-    let selected = accounts[0]
+    let selected = accounts[Number(sessionStorage.getItem('veritras_testing_wallet') || '0')] || accounts[0]
     const listeners = new Map()
     const provider = {
       isConnected: () => true,
@@ -76,13 +86,14 @@ try {
           body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
         })
         const result = await response.json()
-        if (result.error) throw new Error(result.error.message)
+        if (result.error) { console.warn('Local wallet RPC failed', method, result.error.code, String(result.error.message).slice(0, 180)); throw new Error(result.error.message) }
         return result.result
       },
     }
     window.ethereum = provider
     window.switchTestingWallet = index => {
       selected = accounts[index]
+      sessionStorage.setItem('veritras_testing_wallet', String(index))
       listeners.get('accountsChanged')?.forEach(fn => fn([selected]))
     }
   }, { accounts, rpc })
@@ -126,17 +137,14 @@ try {
   await page.getByPlaceholder('Enter product ID (e.g., PROD-8842)').press('Enter')
   const lifecycle = page.getByRole('region', { name: 'Registration lifecycle' })
   await lifecycle.waitFor()
-  await page.waitForFunction(async ({ api, productId }) => {
-    const response = await fetch(`${api}/products/${productId}/verify`)
-    return (await response.json()).evidence?.status === 'verified'
-  }, { api, productId: draft.product_id })
+  await waitForApi(`/products/${draft.product_id}/verify`, data => data.evidence?.status === 'verified', 'canonical registration evidence')
   await lifecycle.getByRole('button', { name: 'Refresh transaction evidence' }).first().click()
   await lifecycle.getByText('registration · indexed · matching confirmed event', { exact: true }).waitFor()
   await lifecycle.getByLabel('New metadata URI').fill('ipfs://browser-confirmed-version')
   const metadataSaved = page.waitForResponse(response => response.url().endsWith(`/products/${draft.product_id}/registration`) && response.request().method() === 'POST')
   await lifecycle.getByRole('button', { name: 'Sign metadata update' }).click()
   assert.equal((await metadataSaved).status(), 200)
-  await page.waitForFunction(async ({ api, productId }) => (await (await fetch(`${api}/products/${productId}`)).json()).product.metadata_uri === 'ipfs://browser-confirmed-version', { api, productId: draft.product_id })
+  await waitForApi(`/products/${draft.product_id}`, data => data.product.metadata_uri === 'ipfs://browser-confirmed-version', 'indexed metadata update')
   await page.reload({ waitUntil: 'domcontentloaded' })
   await page.getByPlaceholder('Enter product ID (e.g., PROD-8842)').fill(draft.product_id)
   await page.getByPlaceholder('Enter product ID (e.g., PROD-8842)').press('Enter')
@@ -154,13 +162,67 @@ try {
   const shipment = await (await shipmentResponse).json()
   assert.ok(shipment.shipment_id)
 
+  // Increment 8: real mobile detail actions, canonical history and public labels.
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto(`http://localhost:13000/shipments/${shipment.shipment_id}`, { waitUntil: 'domcontentloaded' })
+  const recordButton = page.getByRole('button', { name: 'Record checkpoint', exact: true })
+  await recordButton.waitFor()
+  await recordButton.click()
+  let actionDialog = page.getByRole('dialog', { name: 'Record checkpoint', exact: true })
+  await actionDialog.getByLabel('Location', { exact: true }).fill('Mobile factory departure')
+  await actionDialog.getByLabel('Status', { exact: true }).selectOption('0')
+  await actionDialog.getByRole('button', { name: 'Submit checkpoint', exact: true }).click()
+  await waitForApi(`/products/${draft.product_id}/timeline`, data => data.items.some(item => item.location === 'Mobile factory departure'), 'first Created checkpoint')
+  await recordButton.click()
+  await actionDialog.getByLabel('Location', { exact: true }).fill('Mobile route departure')
+  await actionDialog.getByLabel('Status', { exact: true }).selectOption('1')
+  await actionDialog.getByRole('button', { name: 'Submit checkpoint', exact: true }).click()
+  await waitForApi(`/products/${draft.product_id}/timeline`, data => data.items.some(item => item.location === 'Mobile route departure'), 'In Transit checkpoint')
+  await page.getByRole('button', { name: 'Transfer custody', exact: true }).click()
+  actionDialog = page.getByRole('dialog', { name: 'Transfer custody', exact: true })
+  await actionDialog.getByLabel('New handler address', { exact: true }).fill(accounts[1])
+  await actionDialog.getByRole('button', { name: 'Confirm custody transfer', exact: true }).click()
+  await waitForApi(`/products/${draft.product_id}/timeline`, data => data.items.some(item => item.event_type === 'CustodyTransferred'), 'canonical custody transfer')
+  await page.setViewportSize({ width: 1440, height: 1000 })
+
   await page.evaluate(() => window.switchTestingWallet(1))
   await page.getByRole('button', { name: 'Sign In', exact: true }).waitFor()
   assert.equal(await page.getByRole('button', { name: 'Sign out', exact: true }).count(), 0)
   await page.getByRole('button', { name: 'Sign In', exact: true }).click()
   await page.getByRole('button', { name: 'Sign out', exact: true }).waitFor()
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.getByRole('button', { name: 'Record checkpoint', exact: true }).click()
+  actionDialog = page.getByRole('dialog', { name: 'Record checkpoint', exact: true })
+  await actionDialog.getByLabel('Location', { exact: true }).fill('Mobile final depot')
+  await actionDialog.getByLabel('Status', { exact: true }).selectOption('3')
+  await actionDialog.getByRole('button', { name: 'Submit checkpoint', exact: true }).click()
+  await waitForApi(`/shipments/${shipment.shipment_id}`, data => data.status === '3', 'canonical delivery')
+  await page.getByText('This shipment is delivered. No further checkpoint or custody actions are available.', { exact: true }).waitFor()
+  assert.equal(await page.getByRole('button', { name: 'Record checkpoint', exact: true }).count(), 0)
+  assert.equal(await page.getByRole('button', { name: 'Transfer custody', exact: true }).count(), 0)
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true)
+  const visitor = await browser.newPage({ viewport: { width: 390, height: 844 } })
+  visitor.on('pageerror', error => errors.push(error.message))
+  await visitor.goto(`http://localhost:13000/verify/${draft.product_id}`, { waitUntil: 'domcontentloaded' })
+  await visitor.getByText('Blockchain Registration Confirmed', { exact: true }).waitFor()
+  const timeline = visitor.getByRole('region', { name: 'Evidence timeline' })
+  await timeline.getByRole('heading', { name: 'Delivery completed', exact: true }).waitFor()
+  await visitor.getByRole('button', { name: 'Share / QR label', exact: true }).click()
+  const label = visitor.getByRole('dialog', { name: 'Public verification label' })
+  assert.equal(await label.getByLabel('Public verification URL').inputValue(), `http://localhost:13000/verify/${draft.product_id}`)
+  const qrDownloadPromise = visitor.waitForEvent('download')
+  await label.getByRole('link', { name: 'Download QR label' }).click()
+  const qrDownload = await qrDownloadPromise
+  assert.ok(readFileSync(await qrDownload.path(), 'utf8').includes('Does not authenticate a physical item'))
+  await visitor.keyboard.press('Escape')
+  await visitor.screenshot({ path: '../.testing/journey-local-public-mobile.png', fullPage: true })
+  await visitor.close()
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.goto('http://localhost:13000/shipments', { waitUntil: 'domcontentloaded' })
+
   assert.equal(await page.getByRole('button', { name: `Edit shipment ${shipment.shipment_id}`, exact: true }).count(), 0)
   const checks = await page.evaluate(async ({ api, productId, shipmentId }) => {
+    if (!localStorage.getItem('veritras_auth_token')) throw new Error('Expected signed session for cross-wallet checks')
     const auth = { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('veritras_auth_token')}` }
     const edit = await fetch(`${api}/products/${productId}`, { method: 'PUT', headers: auth, body: JSON.stringify({ name: 'Unauthorized' }) })
     const plan = await fetch(`${api}/shipments/`, { method: 'POST', headers: auth, body: JSON.stringify({ product_id: productId, origin: 'Other', destination: 'Other' }) })
@@ -195,7 +257,7 @@ try {
   assert.deepEqual(errors, [])
   mkdirSync('../.testing', { recursive: true })
   await page.screenshot({ path: '../.testing/auth-browser.png', fullPage: true })
-  console.log('PASS: real browser registration/reload recovery, metadata update/history, wallet sign-in, owned draft/shipment writes, wallet-switch logout, cross-wallet denial, and anonymous public reads')
+  console.log('PASS: real browser registration/reload recovery, metadata update/history, wallet sign-in, owned draft/shipment writes, wallet-switch logout, mobile detail checkpoints/custody/delivery, public QR download/evidence, cross-wallet denial, and anonymous public reads')
 } catch (error) {
   if (page) await page.screenshot({ path: '../.testing/registration-browser-failure.png', fullPage: true })
   console.error({ buttons: page ? await page.locator('button').allTextContents() : [], lifecycle: page ? await page.getByRole('region', { name: 'Registration lifecycle' }).allTextContents() : [] })

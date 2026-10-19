@@ -20,7 +20,7 @@ Priority meanings: **P0 — release blocker** must be resolved before enabling p
 | Registration lifecycle and evidence (increment 5) | **Done** | **P1 addressed** | Persisted submissions, checked replacements/cancellations, reload recovery, typed receipt/journal evidence and signed metadata/history; see [runbook](REGISTRATION_LIFECYCLE.md) |
 | Analytics and exports (increment 6) | **Done** | **P1 addressed** | Canonical shipment cohorts/lifecycle, optional locked SLA, real route/sample metrics, UTC filters and safe matching exports; see [runbook](ANALYTICS.md) |
 | Integration and release controls (increment 7) | **Done** | **P1 addressed** | Real write-failure/restart, process-loss, reorg and backup/restore rehearsals; typed detail/verification; protected main and exact-commit production admission; see [runbook](RELEASE_RUNBOOK.md) |
-| QR verification, shipment detail and guided demo (increment 8) | **Pending** | P2 | Public verification exists; direct product links, QR labels, unified detail and guided/mobile journey remain |
+| QR verification, shipment detail and guided demo (increment 8) | **Done** | **P2 addressed** | Direct public links and SVG QR labels, canonical paginated timeline, shipment detail with contract-checked transitions, isolated guided demo, mobile wallet/keyboard access and route metadata; see [guide](PRODUCT_JOURNEY.md) |
 | Shipment exceptions (increment 9) | **Pending** | P2 | Depends on trustworthy lifecycle timestamps, SLA definitions and synchronization |
 | Performance and operations (increment 10) | **Pending** | P2 | Existing lazy routes/Lighthouse checks provide a baseline; measured optimization and operational completion remain |
 | Business pilot integrations | **Deferred** | Later | Organizations, evidence files, imports, standards integrations and repeated journeys |
@@ -43,7 +43,7 @@ Priority meanings: **P0 — release blocker** must be resolved before enabling p
 
 Historical increment 4 validation: **236 backend tests, 192 frontend tests, 23 Playwright regressions and 40 contract tests passed**, plus builds, generated-type checks, Lighthouse and real local integration/browser journeys. Hosted Sepolia registration → checkpoints → custody → delivery passed; a same-code testing redeploy preserved event counts. The backend matrix covers SQLite and PostgreSQL, with two intentional skips for PostgreSQL-only checks in the SQLite variant. A real local chain fork/recovery and hosted same-code redeploy also passed.
 
-Current released schema is `c62a904df318`; increment 7 adds no migration. Historical durable-indexing rollout is tracked by [PR #18](https://github.com/Oionos/Veritras/pull/18); analytics was released in [PR #22](https://github.com/Oionos/Veritras/pull/22). Production indexing remains explicitly disabled. Increment 7 adds real PostgreSQL failure/process-loss and restart checks, local reorganization recovery, a locked backup/restore and read-only reconciliation rehearsal, and production gate rejection regressions. Test counts and final commit/deployment evidence are recorded in its pull request. Testing uses a dedicated Neon project/database (`Veritras Testing` / `veritras_preview`), a separate Render API and distinct Sepolia contracts. Setup and resource details: [TESTING.md](TESTING.md), [HOSTED_TESTING.md](HOSTED_TESTING.md), [AUTHENTICATION.md](AUTHENTICATION.md).
+Current released schema is `c62a904df318`; increments 7–8 add no migration. Historical durable-indexing rollout is tracked by [PR #18](https://github.com/Oionos/Veritras/pull/18); analytics was released in [PR #22](https://github.com/Oionos/Veritras/pull/22). Production indexing remains explicitly disabled. Increment 7 adds real PostgreSQL failure/process-loss and restart checks, local reorganization recovery, a locked backup/restore and read-only reconciliation rehearsal, and production gate rejection regressions. Test counts and final commit/deployment evidence are recorded in its pull request. Testing uses a dedicated Neon project/database (`Veritras Testing` / `veritras_preview`), a separate Render API and distinct Sepolia contracts. Setup and resource details: [TESTING.md](TESTING.md), [HOSTED_TESTING.md](HOSTED_TESTING.md), [AUTHENTICATION.md](AUTHENTICATION.md).
 
 ## Goal and completion criteria
 
@@ -273,7 +273,7 @@ Completed in increment 7: actual PostgreSQL checkpoint failure after a metadata 
 
 ### PR 8: QR verification, shipment detail, and guided demo
 
-**Status: pending; existing public verification and branding are foundations. Priority: P2.** Public `/verify` lookup works, but `/verify/:productId`, downloadable QR labels, unified shipment detail and a complete guided/mobile journey remain. Existing owner/handler controls came from increment 2; mobile wallet and accessibility acceptance still need dedicated work.
+**Status: implemented. Priority: P2 addressed.** Direct `/verify/:productId` loading and shareable/downloadable SVG labels, `/shipments/:shipmentId` detail, scoped canonical journal pagination, state-aware wallet actions and `/demo` are delivered. The demo is explicitly simulated and never enters live aggregates. Mobile wallet controls, named/focus-managed scrolling dialogs, keyboard product selection, reduced motion, favicon, route metadata and missing-route recovery are included. See [PRODUCT_JOURNEY.md](PRODUCT_JOURNEY.md) for behavior, API semantics and regression acceptance. Final commit, CI and hosted release evidence are recorded in the implementation pull request.
 
 - Add `/verify/:productId` links with direct loading and downloadable QR labels. A phone's native camera can open the link; a custom in-app scanner is optional later.
 - Build a unified shipment detail view with checkpoint/custody history, current handler, registration evidence, synchronization status, and only the actions allowed for the connected account/current state.
@@ -330,7 +330,7 @@ After the reliable demo is complete and a specific user workflow has been valida
 
 ## Next implementation session
 
-The next product increment is **8: QR verification, unified shipment detail and guided/mobile demo**. Increments 5–7 are implemented, including truthful analytics and enforced release controls. **Production indexing enablement validation remains important and pending:** review the deployment anchor, rehearse identity/history reconciliation and hosted restore, then obtain explicit enablement before backfill. Keep that gate separate from ordinary application releases.
+The next product increment is **9: shipment exception list**. Increments 5–8 are implemented, including truthful analytics, enforced release controls, public QR verification and the guided/mobile journey. **Production indexing enablement validation remains important and pending:** review the deployment anchor, rehearse identity/history reconciliation and hosted restore, then obtain explicit enablement before backfill. Keep that gate separate from ordinary application releases.
 
 Preserve analytics definitions and sample/exclusion counts during subsequent work. Keep production indexing enablement and any change to release-gate configuration as explicit reviewed changes.
 

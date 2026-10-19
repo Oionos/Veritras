@@ -27,7 +27,7 @@ export default function ConnectAndAuth() {
   }
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex flex-wrap items-center gap-3">
       <ConnectButton
         showBalance={false}
         accountStatus="address"

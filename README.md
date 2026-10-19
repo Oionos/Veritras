@@ -9,7 +9,7 @@
 
 ## What is Veritras?
 
-Veritras is a blockchain-powered supply chain analytics platform that brings **transparency, traceability, and trust** to product journeys. From manufacturer to doorstep, every checkpoint is recorded on the Ethereum Sepolia testnet — creating an immutable, verifiable history that anyone can audit.
+Veritras is a blockchain-powered supply chain analytics platform that brings **transparency, traceability, and trust** to product journeys. From manufacturer to doorstep, recorded checkpoints and custody events can be inspected on Ethereum Sepolia. Registration evidence does not authenticate a physical item; recent history depends on synchronization. Production indexing currently remains disabled pending its separate enablement review.
 
 ---
 
@@ -20,7 +20,8 @@ Veritras is a blockchain-powered supply chain analytics platform that brings **t
 | **Product Registration** | Register products on-chain with unique IDs, manufacturer details, and IPFS metadata. |
 | **Shipment Tracking** | Follow shipments through a state-machine-driven lifecycle: Created → In Transit → At Checkpoint → Delivered. |
 | **Custody Transfers** | Every handoff is logged with timestamps, locations, and handler addresses. |
-| **Verification Portal** | Enter any product ID to instantly verify its on-chain provenance against off-chain records. |
+| **Verification Portal** | Open public product links, inspect receipt/journal evidence, and download QR labels. |
+| **Guided Demo** | Follow a labelled simulated journey, isolated from live data, with mobile wallet onboarding. |
 | **Analytics Dashboard** | Real-time KPIs, anomaly detection, and bottleneck analysis powered by Pandas. |
 | **Export Reports** | Download analytics as CSV or PDF for auditing and compliance. |
 | **Web3 Wallet Login** | Connect with MetaMask, Rainbow, or WalletConnect — no passwords needed. |
@@ -34,7 +35,7 @@ Veritras is a blockchain-powered supply chain analytics platform that brings **t
 | **Blockchain** | Solidity 0.8.19, Hardhat, Sepolia Testnet |
 | **Smart Contracts** | ProductRegistry, ShipmentTracker (92.86% test coverage) |
 | **Backend** | Python, FastAPI, SQLAlchemy, Web3.py, Neon PostgreSQL |
-| **Frontend** | React 18, TypeScript, Vite, Tailwind CSS, RainbowKit |
+| **Frontend** | React 19, TypeScript, Vite, Tailwind CSS, RainbowKit |
 | **Analytics** | Recharts, Pandas, Z-score anomaly detection |
 | **Deployment** | Vercel (Frontend), Render (Backend), Neon (Database) |
 
@@ -48,7 +49,7 @@ Veritras is a blockchain-powered supply chain analytics platform that brings **t
 | **API** | [chainlens-4qvy.onrender.com](https://chainlens-4qvy.onrender.com) | Online |
 | **Health Check** | `/health` | Database & Web3 Connected |
 
-> **Note:** The app runs on the **Sepolia Testnet**. You'll need test ETH to register products and create shipments. [Get free Sepolia ETH](https://sepoliafaucet.com/)
+> The app uses **Sepolia test ETH**, which has no monetary value. Sign-in and API drafts do not spend gas; contract writes do. Start with the [guided demo](https://veritras.vercel.app/demo) and use isolated testing for practice. See [PRODUCT_JOURNEY.md](PRODUCT_JOURNEY.md) for QR links, evidence limits and environment guidance.
 
 ---
 
