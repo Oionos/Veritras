@@ -20,7 +20,8 @@ from app.core.database import engine, Base
 from app.core.limiter import limiter
 from app.core.logging import LOGGING_CONFIG
 from app.core.security import SecurityHeadersMiddleware
-from app.api.routes import auth, products, shipments, analytics
+from app.api.routes import auth, products, shipments, analytics, exceptions
+from app.services.exceptions import ExceptionWorker
 from app.services.indexer import EventIndexer
 from app.services.health import DatabaseProbe
 from app.schemas.health import (
@@ -73,9 +74,15 @@ async def lifespan(app: FastAPI):
             logger.error("Indexer thread startup failed: %s", _indexer_startup_error)
     else:
         logger.info("Blockchain indexing explicitly disabled")
+    exception_worker = None
+    if settings.indexer_enabled:
+        exception_worker = ExceptionWorker(lambda: indexer_state().model_dump())
+        exception_worker.start()
     try:
         yield
     finally:
+        if exception_worker is not None:
+            exception_worker.stop()
         if owned_indexer is not None:
             owned_indexer.stop()
             logger.info("Blockchain indexer shutdown requested")
@@ -158,6 +165,7 @@ app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(products.router, prefix="/products", tags=["products"])
 app.include_router(shipments.router, prefix="/shipments", tags=["shipments"])
 app.include_router(analytics.router, prefix="/analytics", tags=["analytics"])
+app.include_router(exceptions.router, prefix="/exceptions", tags=["exceptions"])
 
 
 def indexer_state():

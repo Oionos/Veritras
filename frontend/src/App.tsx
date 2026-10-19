@@ -15,6 +15,7 @@ import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 
 const ShipmentDetail = lazy(() => import('./pages/ShipmentDetail'))
+const Exceptions = lazy(() => import('./pages/Exceptions'))
 const Demo = lazy(() => import('./pages/Demo'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 const Products = lazy(() => import('./pages/Products'))
@@ -63,6 +64,7 @@ function App() {
                   <Route path="/shipments" element={<Shipments />} />
                   <Route path="/shipments/:shipmentId" element={<ShipmentDetail />} />
                   <Route path="/analytics" element={<AnalyticsPage />} />
+                  <Route path="/exceptions" element={<Exceptions />} />
                   <Route path="/verify" element={<Verify />} />
                   <Route path="/verify/:productId" element={<Verify />} />
                   <Route path="/demo" element={<Demo />} />

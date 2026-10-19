@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { appEnvironment } from "@/config/runtime";
 
 const routes: Record<string, [string, string]> = {
+  "/exceptions": ["Shipment Exceptions", "Review shipment exception observations, acknowledgements and resolved history."],
   "/": [
     "Supply Chain Analytics",
     "Track recorded product provenance, shipments and supply chain metrics with Veritras.",

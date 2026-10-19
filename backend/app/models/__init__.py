@@ -6,3 +6,4 @@ __all__ = ["Product", "Checkpoint", "CustodyTransfer", "Shipment", "AuthChalleng
 
 from .chain import IndexerCursor, ChainBlock, ChainEvent, IndexedProduct
 from .registration import RegistrationAttempt
+from .exception import ExceptionPolicy, ShipmentException, ExceptionEvaluation

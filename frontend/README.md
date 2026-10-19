@@ -30,3 +30,7 @@ CI=true VITE_WALLETCONNECT_PROJECT_ID=ci-test-project-id npm run test:e2e
 Browser fixtures are separate from the real API/Hardhat browser acceptance in [TESTING.md](../TESTING.md). QR tests use an independent reader.
 
 `npm run build` compiles the configured environment. Production Vercel builds use `build-vercel.mjs`, which requires successful exact-main-commit CI and a compatible ready API. Use feature PRs and stable testing before all protected-main checks; do not promote preview artifacts into production. See [RELEASE_CONTROLS.md](../RELEASE_CONTROLS.md).
+
+## Shipment exceptions
+
+See [the exception guide](../SHIPMENT_EXCEPTIONS.md) for configurable rules, synchronization gates, acknowledgement/history, owner permissions and additive schema revision `e93a107bd624`. Open `/exceptions` or a shipment detail page. Production evaluation remains paused while indexing is disabled.
