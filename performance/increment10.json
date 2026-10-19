@@ -117,41 +117,41 @@
     "browser": "154.0.8037.57",
     "samples": [
       {
-        "performance": 0.66,
-        "fcp_ms": 3496.1353750000003,
-        "lcp_ms": 5142.4166000000005,
-        "tbt_ms": 318,
+        "performance": 0.61,
+        "fcp_ms": 3524.43825,
+        "lcp_ms": 5338.8765,
+        "tbt_ms": 464.5,
         "cls": 0,
-        "transfer_bytes": 660648
+        "transfer_bytes": 660866
+      },
+      {
+        "performance": 0.61,
+        "fcp_ms": 3532.873125,
+        "lcp_ms": 5367.74625,
+        "tbt_ms": 448,
+        "cls": 0,
+        "transfer_bytes": 660866
       },
       {
         "performance": 0.62,
-        "fcp_ms": 3543.559875,
-        "lcp_ms": 5223.0958,
-        "tbt_ms": 447.50000000000045,
+        "fcp_ms": 3520.9522500000003,
+        "lcp_ms": 5485.685399999999,
+        "tbt_ms": 398.5617999999995,
         "cls": 0,
-        "transfer_bytes": 660648
-      },
-      {
-        "performance": 0.66,
-        "fcp_ms": 3469.43075,
-        "lcp_ms": 5272.861499999999,
-        "tbt_ms": 313.5,
-        "cls": 0,
-        "transfer_bytes": 662008
+        "transfer_bytes": 662226
       }
     ],
     "median": {
-      "performance": 0.66,
-      "fcp_ms": 3496.1353750000003,
-      "lcp_ms": 5223.0958,
-      "tbt_ms": 318,
+      "performance": 0.61,
+      "fcp_ms": 3524.43825,
+      "lcp_ms": 5367.74625,
+      "tbt_ms": 448,
       "cls": 0,
-      "transfer_bytes": 660648
+      "transfer_bytes": 660866
     },
-    "menu_interaction_ms": 103.90000000002328,
-    "initial_script_bytes": 1237300,
-    "initial_script_gzip_bytes": 382948,
+    "menu_interaction_ms": 106.39999999990687,
+    "initial_script_bytes": 1237708,
+    "initial_script_gzip_bytes": 383058,
     "scripts": [
       {
         "path": "/assets/rolldown-runtime-BcKkbAw3.js",
@@ -174,14 +174,19 @@
         "gzip_bytes": 2722
       },
       {
+        "path": "/assets/utils-BXiNjgTj.js",
+        "bytes": 3193,
+        "gzip_bytes": 1368
+      },
+      {
         "path": "/assets/encodeFunctionData-5YZEskHs.js",
         "bytes": 19575,
         "gzip_bytes": 6513
       },
       {
-        "path": "/assets/utils-BXiNjgTj.js",
-        "bytes": 3193,
-        "gzip_bytes": 1368
+        "path": "/assets/react-vendor-3SPKybA3.js",
+        "bytes": 210630,
+        "gzip_bytes": 64998
       },
       {
         "path": "/assets/Value-CyfJx_yS.js",
@@ -189,9 +194,19 @@
         "gzip_bytes": 445
       },
       {
+        "path": "/assets/index-DbS2JhRP.js",
+        "bytes": 678117,
+        "gzip_bytes": 211200
+      },
+      {
         "path": "/assets/createBatchScheduler-aFWtjeYp.js",
         "bytes": 7929,
         "gzip_bytes": 2285
+      },
+      {
+        "path": "/assets/sepolia-Buht6mwa.js",
+        "bytes": 738,
+        "gzip_bytes": 459
       },
       {
         "path": "/assets/preload-helper-BZ1Pz5am.js",
@@ -204,29 +219,14 @@
         "gzip_bytes": 20491
       },
       {
-        "path": "/assets/sepolia-Buht6mwa.js",
-        "bytes": 738,
-        "gzip_bytes": 459
-      },
-      {
-        "path": "/assets/with-selector-CozBkNk_.js",
-        "bytes": 1671,
-        "gzip_bytes": 749
-      },
-      {
         "path": "/assets/clsx-DB0hHKMi.js",
         "bytes": 369,
         "gzip_bytes": 233
       },
       {
-        "path": "/assets/react-vendor-3SPKybA3.js",
-        "bytes": 210630,
-        "gzip_bytes": 64998
-      },
-      {
-        "path": "/assets/index-knZQ4hSZ.js",
-        "bytes": 677742,
-        "gzip_bytes": 211107
+        "path": "/assets/with-selector-CozBkNk_.js",
+        "bytes": 1671,
+        "gzip_bytes": 749
       },
       {
         "path": "/assets/safeWallet-5MNKTR5Z-Ba8u5lpn.js",
@@ -264,12 +264,13 @@
         "gzip_bytes": 2973
       },
       {
-        "path": "/assets/PrivateAnalytics-DpG6cLRZ.js",
-        "bytes": 5041,
-        "gzip_bytes": 1745
+        "path": "/assets/PrivateAnalytics-CHvA_vTu.js",
+        "bytes": 5074,
+        "gzip_bytes": 1762
       }
     ]
   },
   "baseline_commit": "7adb990863aa399d2dd323d80e1bfa090794716f",
-  "measurement_date": "2026-10-20 Asia/Manila"
+  "measurement_date": "2026-10-20 Asia/Manila",
+  "measured_feature_commit": "25819f84866787e741ab4dcd039313ac094b451a"
 }

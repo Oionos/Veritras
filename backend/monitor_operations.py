@@ -89,6 +89,8 @@ def monitor(
             code, body = fetch(origin + "/health/operations", timeout)
             if (
                 code != 200
+                or body["health"]["status"] != "ready"
+                or body["health"]["database"] != "connected"
                 or body["health"]["environment"] != environment
                 or body["health"]["indexer"]["enabled"] is not expect_indexer
             ):
