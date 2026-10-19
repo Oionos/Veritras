@@ -147,3 +147,7 @@ MIT
 ## Indexer startup and health
 
 Use `/health/live` for hosting HTTP checks and `/health/ready` for dependency/indexer readiness. Initialization, confirmed-target lag, cursor progress and head freshness are reported separately. See [INDEXER_HEALTH.md](../INDEXER_HEALTH.md) for configuration, capped retries, safe diagnostics and bounded release probes. Production indexing remains disabled pending its separate enablement gate.
+
+## Shipment exceptions
+
+See [the exception guide](../SHIPMENT_EXCEPTIONS.md) for configurable rules, synchronization gates, acknowledgement/history, owner permissions and additive schema revision `e93a107bd624`. Open `/exceptions` or a shipment detail page. Production evaluation remains paused while indexing is disabled.

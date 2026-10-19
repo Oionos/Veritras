@@ -1619,6 +1619,249 @@
         }
       }
     },
+    "/exceptions/": {
+      "get": {
+        "tags": [
+          "exceptions"
+        ],
+        "summary": "List Exceptions",
+        "operationId": "list_exceptions_exceptions__get",
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "open",
+                "unacknowledged",
+                "acknowledged",
+                "resolved",
+                "all"
+              ],
+              "type": "string",
+              "default": "open",
+              "title": "State"
+            }
+          },
+          {
+            "name": "shipment_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Shipment Id"
+            }
+          },
+          {
+            "name": "skip",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Skip"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionList"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exceptions/policies/{shipment_id}": {
+      "get": {
+        "tags": [
+          "exceptions"
+        ],
+        "summary": "Get Policy",
+        "operationId": "get_policy_exceptions_policies__shipment_id__get",
+        "parameters": [
+          {
+            "name": "shipment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Shipment Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "exceptions"
+        ],
+        "summary": "Update Policy",
+        "operationId": "update_policy_exceptions_policies__shipment_id__put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "shipment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Shipment Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/exceptions/{exception_id}/acknowledgement": {
+      "post": {
+        "tags": [
+          "exceptions"
+        ],
+        "summary": "Acknowledge",
+        "operationId": "acknowledge_exceptions__exception_id__acknowledgement_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "exception_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Exception Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Acknowledgement"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExceptionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health/indexer": {
       "get": {
         "summary": "Health Indexer",
@@ -1731,6 +1974,25 @@
   },
   "components": {
     "schemas": {
+      "Acknowledgement": {
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Acknowledgement"
+      },
       "AnalyticsFilters": {
         "properties": {
           "start": {
@@ -2084,6 +2346,285 @@
           "items"
         ],
         "title": "DailyVolumeResponse"
+      },
+      "EvaluationStatus": {
+        "properties": {
+          "paused": {
+            "type": "boolean",
+            "title": "Paused"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "evaluated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluated At"
+          },
+          "block_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Block Number"
+          },
+          "uncertain_shipments": {
+            "type": "integer",
+            "title": "Uncertain Shipments",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "paused",
+          "reason",
+          "evaluated_at",
+          "block_number"
+        ],
+        "title": "EvaluationStatus"
+      },
+      "ExceptionEvidence": {
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "title": "Product Id"
+          },
+          "anchor_event_id": {
+            "type": "string",
+            "title": "Anchor Event Id"
+          },
+          "anchor_occurrence_id": {
+            "type": "string",
+            "title": "Anchor Occurrence Id"
+          },
+          "threshold_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold Hours"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "receiving_handler": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receiving Handler"
+          },
+          "policy_revision": {
+            "type": "integer",
+            "title": "Policy Revision"
+          }
+        },
+        "type": "object",
+        "required": [
+          "product_id",
+          "anchor_event_id",
+          "anchor_occurrence_id",
+          "threshold_hours",
+          "policy_revision"
+        ],
+        "title": "ExceptionEvidence"
+      },
+      "ExceptionList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ExceptionResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "evaluation": {
+            "$ref": "#/components/schemas/EvaluationStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "evaluation"
+        ],
+        "title": "ExceptionList"
+      },
+      "ExceptionResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "shipment_id": {
+            "type": "string",
+            "title": "Shipment Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "arrival_overdue",
+              "checkpoint_inactivity",
+              "checkpoint_wait",
+              "custody_followup"
+            ],
+            "title": "Kind"
+          },
+          "owner_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Address"
+          },
+          "ownership_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ownership Source"
+          },
+          "triggered_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Triggered At"
+          },
+          "first_observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "First Observed At"
+          },
+          "last_observed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Observed At"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution"
+          },
+          "acknowledged_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged At"
+          },
+          "acknowledged_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged By"
+          },
+          "acknowledgement_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledgement Note"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/ExceptionEvidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "shipment_id",
+          "kind",
+          "owner_address",
+          "ownership_source",
+          "triggered_at",
+          "first_observed_at",
+          "last_observed_at",
+          "resolved_at",
+          "resolution",
+          "acknowledged_at",
+          "acknowledged_by",
+          "acknowledgement_note",
+          "evidence"
+        ],
+        "title": "ExceptionResponse"
       },
       "HTTPValidationError": {
         "properties": {
@@ -2719,6 +3260,150 @@
           "expires_at"
         ],
         "title": "NonceResponse"
+      },
+      "PolicyResponse": {
+        "properties": {
+          "arrival_enabled": {
+            "type": "boolean",
+            "title": "Arrival Enabled",
+            "default": true
+          },
+          "inactivity_hours": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 8760.0,
+                "minimum": 0.25
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inactivity Hours",
+            "default": 24.0
+          },
+          "checkpoint_hours": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 8760.0,
+                "minimum": 0.25
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkpoint Hours",
+            "default": 24.0
+          },
+          "custody_hours": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 8760.0,
+                "minimum": 0.25
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custody Hours",
+            "default": 6.0
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "default": 0
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PolicyResponse"
+      },
+      "PolicyUpdate": {
+        "properties": {
+          "arrival_enabled": {
+            "type": "boolean",
+            "title": "Arrival Enabled",
+            "default": true
+          },
+          "inactivity_hours": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 8760.0,
+                "minimum": 0.25
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inactivity Hours",
+            "default": 24.0
+          },
+          "checkpoint_hours": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 8760.0,
+                "minimum": 0.25
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkpoint Hours",
+            "default": 24.0
+          },
+          "custody_hours": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 8760.0,
+                "minimum": 0.25
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custody Hours",
+            "default": 6.0
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Revision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "expected_revision"
+        ],
+        "title": "PolicyUpdate"
       },
       "ProductCreate": {
         "properties": {

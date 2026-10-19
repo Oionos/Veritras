@@ -165,6 +165,16 @@ try {
   // Increment 8: real mobile detail actions, canonical history and public labels.
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(`http://localhost:13000/shipments/${shipment.shipment_id}`, { waitUntil: 'domcontentloaded' })
+  // Increment 9: owner policy is a durable API write, separate from chain custody.
+  await page.getByLabel('Hours without a checkpoint during transit', { exact: true }).fill('30')
+  const policyResponse = page.waitForResponse(response => response.request().method() === 'PUT' && response.url().includes(`/exceptions/policies/${shipment.shipment_id}`))
+  await page.getByRole('button', { name: 'Save exception policy', exact: true }).click()
+  const policy = await (await policyResponse).json()
+  assert.equal(policy.inactivity_hours, 30)
+  assert.equal(policy.revision, 1)
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await page.getByLabel('Hours without a checkpoint during transit', { exact: true }).waitFor()
+  assert.equal(await page.getByLabel('Hours without a checkpoint during transit', { exact: true }).inputValue(), '30')
   const recordButton = page.getByRole('button', { name: 'Record checkpoint', exact: true })
   await recordButton.waitFor()
   await recordButton.click()
@@ -227,11 +237,12 @@ try {
     const edit = await fetch(`${api}/products/${productId}`, { method: 'PUT', headers: auth, body: JSON.stringify({ name: 'Unauthorized' }) })
     const plan = await fetch(`${api}/shipments/`, { method: 'POST', headers: auth, body: JSON.stringify({ product_id: productId, origin: 'Other', destination: 'Other' }) })
     const shipmentEdit = await fetch(`${api}/shipments/${shipmentId}`, { method: 'PUT', headers: auth, body: JSON.stringify({ notes: 'Unauthorized' }) })
+    const exceptionPolicy = await fetch(`${api}/exceptions/policies/${shipmentId}`, { method: 'PUT', headers: auth, body: JSON.stringify({ expected_revision: 1, inactivity_hours: 31 }) })
     const anonymous = await fetch(`${api}/products/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Anonymous' }) })
     const publicRead = await fetch(`${api}/products/${productId}`)
-    return [edit.status, plan.status, shipmentEdit.status, anonymous.status, publicRead.status]
+    return [edit.status, plan.status, shipmentEdit.status, exceptionPolicy.status, anonymous.status, publicRead.status]
   }, { api, productId: draft.product_id, shipmentId: shipment.shipment_id })
-  assert.deepEqual(checks, [403, 403, 403, 401, 200])
+  assert.deepEqual(checks, [403, 403, 403, 403, 401, 200])
   // Real browser analytics and downloads must agree with the same API cohort.
   await page.goto('http://localhost:13000/analytics', { waitUntil: 'domcontentloaded' })
   await page.getByRole('region', { name: 'Shipment sample counts' }).waitFor()

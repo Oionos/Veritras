@@ -22,6 +22,9 @@ TABLES = (
     "indexed_products",
     "product_aliases",
     "registration_attempts",
+    "exception_policies",
+    "shipment_exceptions",
+    "exception_evaluations",
     "alembic_version",
 )
 

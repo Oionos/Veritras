@@ -1,6 +1,6 @@
 # Veritras implementation plan
 
-Originally prepared October 17, 2026 from [PROJECT_REVIEW.md](PROJECT_REVIEW.md). **Status updated October 19, 2026 for increment 7, following analytics release PR #22 (`ff88bcc`).** Integration recovery checks, typed contracts, protected-main merge controls and production admission gates are implemented. Final CI/deployment evidence is recorded in the increment 7 pull request; see [release controls](RELEASE_CONTROLS.md) and the [release/recovery runbook](RELEASE_RUNBOOK.md).
+Originally prepared October 17, 2026 from [PROJECT_REVIEW.md](PROJECT_REVIEW.md). **Status updated October 19, 2026 for increment 9.** Integration recovery checks, typed contracts, protected-main merge controls and production admission gates are implemented. Final CI/deployment evidence is recorded in the increment 7 pull request; see [release controls](RELEASE_CONTROLS.md) and the [release/recovery runbook](RELEASE_RUNBOOK.md).
 
 ## Status at a glance
 
@@ -21,7 +21,7 @@ Priority meanings: **P0 — release blocker** must be resolved before enabling p
 | Analytics and exports (increment 6) | **Done** | **P1 addressed** | Canonical shipment cohorts/lifecycle, optional locked SLA, real route/sample metrics, UTC filters and safe matching exports; see [runbook](ANALYTICS.md) |
 | Integration and release controls (increment 7) | **Done** | **P1 addressed** | Real write-failure/restart, process-loss, reorg and backup/restore rehearsals; typed detail/verification; protected main and exact-commit production admission; see [runbook](RELEASE_RUNBOOK.md) |
 | QR verification, shipment detail and guided demo (increment 8) | **Done** | **P2 addressed** | Direct public links and SVG QR labels, canonical paginated timeline, shipment detail with contract-checked transitions, isolated guided demo, mobile wallet/keyboard access and route metadata; see [guide](PRODUCT_JOURNEY.md) |
-| Shipment exceptions (increment 9) | **Pending** | P2 | Depends on trustworthy lifecycle timestamps, SLA definitions and synchronization |
+| Shipment exceptions (increment 9) | **Done** | **P2 addressed** | Configurable owner policy, canonical arrival/checkpoint/custody rules, durable deduplicated occurrences, acknowledgement/history, synchronized evaluation and public mobile list; see [guide](SHIPMENT_EXCEPTIONS.md) |
 | Performance and operations (increment 10) | **Pending** | P2 | Existing lazy routes/Lighthouse checks provide a baseline; measured optimization and operational completion remain |
 | Business pilot integrations | **Deferred** | Later | Organizations, evidence files, imports, standards integrations and repeated journeys |
 
@@ -43,7 +43,7 @@ Priority meanings: **P0 — release blocker** must be resolved before enabling p
 
 Historical increment 4 validation: **236 backend tests, 192 frontend tests, 23 Playwright regressions and 40 contract tests passed**, plus builds, generated-type checks, Lighthouse and real local integration/browser journeys. Hosted Sepolia registration → checkpoints → custody → delivery passed; a same-code testing redeploy preserved event counts. The backend matrix covers SQLite and PostgreSQL, with two intentional skips for PostgreSQL-only checks in the SQLite variant. A real local chain fork/recovery and hosted same-code redeploy also passed.
 
-Current released schema is `c62a904df318`; increments 7–8 add no migration. Historical durable-indexing rollout is tracked by [PR #18](https://github.com/Oionos/Veritras/pull/18); analytics was released in [PR #22](https://github.com/Oionos/Veritras/pull/22). Production indexing remains explicitly disabled. Increment 7 adds real PostgreSQL failure/process-loss and restart checks, local reorganization recovery, a locked backup/restore and read-only reconciliation rehearsal, and production gate rejection regressions. Test counts and final commit/deployment evidence are recorded in its pull request. Testing uses a dedicated Neon project/database (`Veritras Testing` / `veritras_preview`), a separate Render API and distinct Sepolia contracts. Setup and resource details: [TESTING.md](TESTING.md), [HOSTED_TESTING.md](HOSTED_TESTING.md), [AUTHENTICATION.md](AUTHENTICATION.md).
+Current schema is `e93a107bd624`; increments 7–8 add no migration. Historical durable-indexing rollout is tracked by [PR #18](https://github.com/Oionos/Veritras/pull/18); analytics was released in [PR #22](https://github.com/Oionos/Veritras/pull/22). Production indexing remains explicitly disabled. Increment 7 adds real PostgreSQL failure/process-loss and restart checks, local reorganization recovery, a locked backup/restore and read-only reconciliation rehearsal, and production gate rejection regressions. Test counts and final commit/deployment evidence are recorded in its pull request. Testing uses a dedicated Neon project/database (`Veritras Testing` / `veritras_preview`), a separate Render API and distinct Sepolia contracts. Setup and resource details: [TESTING.md](TESTING.md), [HOSTED_TESTING.md](HOSTED_TESTING.md), [AUTHENTICATION.md](AUTHENTICATION.md).
 
 ## Goal and completion criteria
 
@@ -285,7 +285,7 @@ Completed in increment 7: actual PostgreSQL checkpoint failure after a metadata 
 
 ### PR 9: Shipment exception list
 
-**Status: pending. Priority: P2, after trustworthy metrics and synchronization.** Existing anomaly calculations do not satisfy the planned deduplicated, acknowledged exception lifecycle.
+**Status: implemented (increment 9). Priority: P2 addressed.** Configurable rules, canonical/synchronization gates, durable episodes and acknowledgement/history are delivered. See [SHIPMENT_EXCEPTIONS.md](SHIPMENT_EXCEPTIONS.md) for definitions, defaults and recovery behavior.
 
 - Add configurable expected arrival and checkpoint-interval/dwell thresholds with explicit meanings.
 - Show overdue shipments, stale checkpoint activity, and unresolved custody handoffs in an in-app exception list.
