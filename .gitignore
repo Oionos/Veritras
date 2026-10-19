@@ -114,3 +114,5 @@ AGENTS.md
 
 # Isolated test output / local credentials
 .testing/
+backend/.release-admission.json
+backend/github-release-token
