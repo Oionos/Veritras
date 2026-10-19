@@ -109,6 +109,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/products/{product_id}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Product Timeline */
+        get: operations["get_product_timeline_products__product_id__timeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/products/{product_id}/verify": {
         parameters: {
             query?: never;
@@ -212,7 +229,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Get Shipment */
+        get: operations["get_shipment_shipments__shipment_id__get"];
         /**
          * Update Shipment
          * @description Update an existing shipment.
@@ -1216,6 +1234,59 @@ export interface components {
             /** Last Successful Sync */
             last_successful_sync?: string | null;
         };
+        /** TimelineEvent */
+        TimelineEvent: {
+            /** Event Id */
+            event_id: string;
+            /**
+             * Event Type
+             * @enum {string}
+             */
+            event_type: "ProductRegistered" | "ProductMetadataUpdated" | "CheckpointRecorded" | "CustodyTransferred" | "DeliveryCompleted";
+            /** Timestamp */
+            timestamp?: string | null;
+            /** Block Number */
+            block_number: number;
+            /** Block Hash */
+            block_hash: string;
+            /** Transaction Hash */
+            transaction_hash: string;
+            /** Transaction Index */
+            transaction_index: number;
+            /** Log Index */
+            log_index: number;
+            /** Contract Address */
+            contract_address: string;
+            /** Location */
+            location?: string | null;
+            /** Status */
+            status?: string | null;
+            /** Handler */
+            handler?: string | null;
+            /** From Address */
+            from_address?: string | null;
+            /** To Address */
+            to_address?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Metadata Uri */
+            metadata_uri?: string | null;
+        };
+        /** TimelineResponse */
+        TimelineResponse: {
+            /** Product Id */
+            product_id: string;
+            /** Chain Id */
+            chain_id?: number | null;
+            /** Items */
+            items: components["schemas"]["TimelineEvent"][];
+            /** Total */
+            total: number;
+            /** Skip */
+            skip: number;
+            /** Limit */
+            limit: number;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -1495,6 +1566,40 @@ export interface operations {
             };
         };
     };
+    get_product_timeline_products__product_id__timeline_get: {
+        parameters: {
+            query?: {
+                skip?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                product_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimelineResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     verify_product_products__product_id__verify_get: {
         parameters: {
             query?: never;
@@ -1704,6 +1809,37 @@ export interface operations {
                 "application/json": components["schemas"]["ShipmentCreate"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShipmentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_shipment_shipments__shipment_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shipment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

@@ -1,8 +1,9 @@
+import RouteMetadata from './RouteMetadata'
 import { Suspense } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Menu, X } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import LoadingSpinner from './ui/LoadingSpinner'
 import ConnectAndAuth from './ConnectAndAuth'
 import BrandLogo from './BrandLogo'
@@ -16,12 +17,24 @@ const navItems = [
   { to: '/shipments', label: 'Shipments' },
   { to: '/analytics', label: 'Analytics' },
   { to: '/verify', label: 'Verify' },
+  { to: '/demo', label: 'Demo' },
 ]
 
 export default function Layout() {
-  useChainEvents()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const menuButton = useRef<HTMLButtonElement>(null)
+  const { pathname } = useLocation()
+  useChainEvents(pathname !== '/demo')
+  useEffect(() => { setMobileMenuOpen(false) }, [pathname])
+  useEffect(() => {
+    if (!mobileMenuOpen) return
+    const close = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented && !document.querySelector('[role="dialog"], dialog[open]')) { setMobileMenuOpen(false); menuButton.current?.focus() }
+    }
+    document.addEventListener('keydown', close)
+    return () => document.removeEventListener('keydown', close)
+  }, [mobileMenuOpen])
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50)
@@ -31,6 +44,8 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-bg text-text">
+      <RouteMetadata />
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded focus:bg-accent focus:p-3 focus:text-black">Skip to content</a>
       {/* Top Navigation - LUMINA Style */}
       <motion.header
         initial={{ y: -20, opacity: 0 }}
@@ -57,7 +72,7 @@ export default function Layout() {
           </NavLink>
 
           {/* Desktop Navigation - Center */}
-          <nav className="hidden items-center gap-1 md:flex">
+          <nav className="hidden items-center gap-1 xl:flex">
             {navItems.map(({ to, label }) => (
               <NavLink
                 key={to}
@@ -88,12 +103,16 @@ export default function Layout() {
 
           {/* Right side - Wallet + Mobile Menu */}
           <div className="flex items-center gap-4">
-            <div className="hidden sm:block">
+            <div className="hidden xl:block">
               <ConnectAndAuth />
             </div>
             <button
+              ref={menuButton}
+              aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-navigation"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="flex h-9 w-9 items-center justify-center text-muted transition-colors hover:text-text md:hidden"
+              className="flex h-9 w-9 items-center justify-center text-muted transition-colors hover:text-text xl:hidden"
             >
               {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
@@ -107,9 +126,10 @@ export default function Layout() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="border-t border-white/5 bg-bg/95 backdrop-blur-2xl md:hidden"
+              id="mobile-navigation"
+              className="max-h-[calc(100dvh-5rem)] overflow-y-auto border-t border-white/5 bg-bg/95 backdrop-blur-2xl xl:hidden"
             >
-              <div className="space-y-1 px-6 py-4">
+              <nav aria-label="Mobile navigation" className="space-y-1 px-6 py-4">
                 {navItems.map(({ to, label }) => (
                   <NavLink
                     key={to}
@@ -126,15 +146,16 @@ export default function Layout() {
                     {label}
                   </NavLink>
                 ))}
-              </div>
+                <div className="border-t border-border px-4 py-4"><ConnectAndAuth /></div>
+              </nav>
             </motion.div>
           )}
         </AnimatePresence>
       </motion.header>
 
       {/* Main Content */}
-      <main className="relative z-10">
-        <IndexerStatusNotice />
+      <main id="main-content" tabIndex={-1} className="relative z-10 outline-none">
+        {pathname !== '/demo' && <IndexerStatusNotice />}
         <Suspense
           fallback={
             <div className="flex h-[calc(100vh-5rem)] items-center justify-center">

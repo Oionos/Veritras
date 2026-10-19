@@ -1,3 +1,4 @@
+import { MotionConfig } from 'framer-motion'
 import { lazy, useMemo } from 'react'
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit'
 import '@rainbow-me/rainbowkit/styles.css'
@@ -13,6 +14,9 @@ import ErrorBoundary from './components/ErrorBoundary'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 
+const ShipmentDetail = lazy(() => import('./pages/ShipmentDetail'))
+const Demo = lazy(() => import('./pages/Demo'))
+const NotFound = lazy(() => import('./pages/NotFound'))
 const Products = lazy(() => import('./pages/Products'))
 const Shipments = lazy(() => import('./pages/Shipments'))
 const AnalyticsPage = lazy(() => import('./pages/Analytics'))
@@ -45,7 +49,7 @@ function App() {
     <WagmiProvider config={rainbowKitConfig}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider theme={rainbowTheme}>
-          <BrowserRouter>
+          <MotionConfig reducedMotion="user"><BrowserRouter>
             <EtherealBackground />
             <Analytics />
             <SpeedInsights />
@@ -57,14 +61,18 @@ function App() {
                   <Route path="/" element={<Dashboard />} />
                   <Route path="/products" element={<Products />} />
                   <Route path="/shipments" element={<Shipments />} />
+                  <Route path="/shipments/:shipmentId" element={<ShipmentDetail />} />
                   <Route path="/analytics" element={<AnalyticsPage />} />
                   <Route path="/verify" element={<Verify />} />
+                  <Route path="/verify/:productId" element={<Verify />} />
+                  <Route path="/demo" element={<Demo />} />
+                  <Route path="*" element={<NotFound />} />
                   <Route path="/privacy" element={<Privacy />} />
                   <Route path="/terms" element={<Terms />} />
                 </Route>
               </Routes>
             </ErrorBoundary>
-          </BrowserRouter>
+          </BrowserRouter></MotionConfig>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

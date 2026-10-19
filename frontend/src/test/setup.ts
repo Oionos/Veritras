@@ -73,6 +73,7 @@ vi.mock('framer-motion', () => {
   })
   return {
     motion: MotionProxy,
+    MotionConfig: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
     AnimatePresence: ({ children }: { children: any }) =>
       React.createElement(React.Fragment, null, children),
   }

@@ -29,6 +29,8 @@ from app.services.registration import (
 )
 from app.models.registration import RegistrationAttempt
 from app.models.chain import ChainEvent
+from app.schemas.timeline import TimelineResponse
+from app.services.timeline import product_timeline
 from app.schemas.product import (
     RegistrationSubmission,
     RegistrationAttemptResponse,
@@ -185,6 +187,19 @@ def update_product(
     db.commit()
     db.refresh(product)
     return product
+
+
+@router.get("/{product_id}/timeline", response_model=TimelineResponse)
+def get_product_timeline(
+    product_id: str,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    product = resolve_product(db, product_id)
+    if not product:
+        raise HTTPException(404, "Product not found")
+    return product_timeline(db, product, skip, limit)
 
 
 @router.get("/{product_id}", response_model=ProductDetailResponse)

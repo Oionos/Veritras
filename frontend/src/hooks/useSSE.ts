@@ -4,11 +4,12 @@ import { useQueryClient } from '@tanstack/react-query'
 
 const API_URL = appEnvironment.apiUrl
 
-export function useAnalyticsEvents(onEvent: (type: string, data: unknown) => void) {
+export function useAnalyticsEvents(onEvent: (type: string, data: unknown) => void, enabled = true) {
   const onEventRef = useRef(onEvent)
   onEventRef.current = onEvent
 
   useEffect(() => {
+    if (!enabled) return
     let eventSource: EventSource | null = null
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -38,16 +39,16 @@ export function useAnalyticsEvents(onEvent: (type: string, data: unknown) => voi
       if (reconnectTimer) clearTimeout(reconnectTimer)
       eventSource?.close()
     }
-  }, [])
+  }, [enabled])
 }
 
 /** One stream for every page; a reconnect/resync refreshes committed state. */
-export function useChainEvents() {
+export function useChainEvents(enabled = true) {
   const queryClient = useQueryClient()
   useAnalyticsEvents(() => {
     for (const key of ['products', 'product', 'product-history', 'product-transfers',
-      'shipments', 'verify', 'registration', 'metadata-history', 'kpis', 'anomalies', 'bottlenecks', 'daily-volume']) {
+      'shipments', 'shipment', 'timeline', 'verify', 'registration', 'metadata-history', 'kpis', 'anomalies', 'bottlenecks', 'daily-volume']) {
       void queryClient.invalidateQueries({ queryKey: [key] })
     }
-  })
+  }, enabled)
 }
