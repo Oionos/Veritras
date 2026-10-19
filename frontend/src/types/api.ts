@@ -403,6 +403,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/exceptions/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Exceptions */
+        get: operations["list_exceptions_exceptions__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/exceptions/policies/{shipment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Policy */
+        get: operations["get_policy_exceptions_policies__shipment_id__get"];
+        /** Update Policy */
+        put: operations["update_policy_exceptions_policies__shipment_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/exceptions/{exception_id}/acknowledgement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Acknowledge */
+        post: operations["acknowledge_exceptions__exception_id__acknowledgement_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health/indexer": {
         parameters: {
             query?: never;
@@ -501,6 +553,11 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Acknowledgement */
+        Acknowledgement: {
+            /** Note */
+            note?: string | null;
+        };
         /** AnalyticsFilters */
         AnalyticsFilters: {
             /** Start */
@@ -640,6 +697,89 @@ export interface components {
         DailyVolumeResponse: {
             /** Items */
             items: components["schemas"]["DailyVolumeItem"][];
+        };
+        /** EvaluationStatus */
+        EvaluationStatus: {
+            /** Paused */
+            paused: boolean;
+            /** Reason */
+            reason: string | null;
+            /** Evaluated At */
+            evaluated_at: string | null;
+            /** Block Number */
+            block_number: number | null;
+            /**
+             * Uncertain Shipments
+             * @default 0
+             */
+            uncertain_shipments: number;
+        };
+        /** ExceptionEvidence */
+        ExceptionEvidence: {
+            /** Product Id */
+            product_id: string;
+            /** Anchor Event Id */
+            anchor_event_id: string;
+            /** Anchor Occurrence Id */
+            anchor_occurrence_id: string;
+            /** Threshold Hours */
+            threshold_hours: number | null;
+            /** Location */
+            location?: string | null;
+            /** Receiving Handler */
+            receiving_handler?: string | null;
+            /** Policy Revision */
+            policy_revision: number;
+        };
+        /** ExceptionList */
+        ExceptionList: {
+            /** Items */
+            items: components["schemas"]["ExceptionResponse"][];
+            /** Total */
+            total: number;
+            evaluation: components["schemas"]["EvaluationStatus"];
+        };
+        /** ExceptionResponse */
+        ExceptionResponse: {
+            /** Id */
+            id: string;
+            /** Shipment Id */
+            shipment_id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "arrival_overdue" | "checkpoint_inactivity" | "checkpoint_wait" | "custody_followup";
+            /** Owner Address */
+            owner_address: string | null;
+            /** Ownership Source */
+            ownership_source: string | null;
+            /**
+             * Triggered At
+             * Format: date-time
+             */
+            triggered_at: string;
+            /**
+             * First Observed At
+             * Format: date-time
+             */
+            first_observed_at: string;
+            /**
+             * Last Observed At
+             * Format: date-time
+             */
+            last_observed_at: string;
+            /** Resolved At */
+            resolved_at: string | null;
+            /** Resolution */
+            resolution: string | null;
+            /** Acknowledged At */
+            acknowledged_at: string | null;
+            /** Acknowledged By */
+            acknowledged_by: string | null;
+            /** Acknowledgement Note */
+            acknowledgement_note: string | null;
+            evidence: components["schemas"]["ExceptionEvidence"];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -848,6 +988,63 @@ export interface components {
              * Format: date-time
              */
             expires_at: string;
+        };
+        /** PolicyResponse */
+        PolicyResponse: {
+            /**
+             * Arrival Enabled
+             * @default true
+             */
+            arrival_enabled: boolean;
+            /**
+             * Inactivity Hours
+             * @default 24
+             */
+            inactivity_hours: number | null;
+            /**
+             * Checkpoint Hours
+             * @default 24
+             */
+            checkpoint_hours: number | null;
+            /**
+             * Custody Hours
+             * @default 6
+             */
+            custody_hours: number | null;
+            /**
+             * Revision
+             * @default 0
+             */
+            revision: number;
+            /** Updated At */
+            updated_at?: string | null;
+            /** Updated By */
+            updated_by?: string | null;
+        };
+        /** PolicyUpdate */
+        PolicyUpdate: {
+            /**
+             * Arrival Enabled
+             * @default true
+             */
+            arrival_enabled: boolean;
+            /**
+             * Inactivity Hours
+             * @default 24
+             */
+            inactivity_hours: number | null;
+            /**
+             * Checkpoint Hours
+             * @default 24
+             */
+            checkpoint_hours: number | null;
+            /**
+             * Custody Hours
+             * @default 6
+             */
+            custody_hours: number | null;
+            /** Expected Revision */
+            expected_revision: number;
         };
         /** ProductCreate */
         ProductCreate: {
@@ -2148,6 +2345,141 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    list_exceptions_exceptions__get: {
+        parameters: {
+            query?: {
+                state?: "open" | "unacknowledged" | "acknowledged" | "resolved" | "all";
+                shipment_id?: string | null;
+                skip?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExceptionList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_policy_exceptions_policies__shipment_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shipment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_policy_exceptions_policies__shipment_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                shipment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    acknowledge_exceptions__exception_id__acknowledgement_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                exception_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Acknowledgement"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExceptionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

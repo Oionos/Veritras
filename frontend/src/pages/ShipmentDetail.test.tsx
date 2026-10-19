@@ -6,6 +6,12 @@ import { useProduct, useVerifyProduct } from "@/hooks/useApi";
 import ShipmentDetail from "./ShipmentDetail";
 
 vi.mock("@/hooks/useJourney", () => ({ useShipment: vi.fn() }));
+vi.mock("@/components/ExceptionList", () => ({
+  default: () => <div>Exception observations</div>,
+}));
+vi.mock("@/components/ExceptionPolicy", () => ({
+  default: () => <div>Exception policy</div>,
+}));
 vi.mock("@/hooks/useApi", () => ({
   useProduct: vi.fn(),
   useVerifyProduct: vi.fn(),

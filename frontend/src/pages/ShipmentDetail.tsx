@@ -9,6 +9,8 @@ import VerificationLabel from "@/components/VerificationLabel";
 import ShipmentActions from "@/components/ShipmentActions";
 import Button from "@/components/ui/Button";
 import { verificationPath } from "@/utils/verificationLabel";
+import ExceptionList from "@/components/ExceptionList";
+import ExceptionPolicy from "@/components/ExceptionPolicy";
 
 export default function ShipmentDetail() {
   const { shipmentId = "" } = useParams();
@@ -103,6 +105,18 @@ export default function ShipmentDetail() {
               )}
           </section>
           <ShipmentActions key={item.shipment_id} shipment={item} />
+          <section aria-label="Shipment exceptions" className="space-y-3">
+            <h2 className="text-xl">Shipment exceptions</h2>
+            <Link className="text-accent underline" to="/exceptions">
+              All exception observations and history
+            </Link>
+            <ExceptionList shipmentId={item.shipment_id} />
+          </section>
+          {auth.isAuthenticated &&
+            ownsRecord(item, auth.address) &&
+            hasCurrentIdentity(item) && (
+              <ExceptionPolicy shipmentId={item.shipment_id} />
+            )}
           {verification.data?.evidence && (
             <RegistrationEvidence verification={verification.data} />
           )}
