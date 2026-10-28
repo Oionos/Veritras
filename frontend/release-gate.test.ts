@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, vi, afterEach } from 'vitest'
+import { environmentPolicy } from './environment-policy.mjs'
 import {
   assess,
   policy,
@@ -162,7 +163,15 @@ describe('production release admission', () => {
       database: 'connected',
       environment: 'production',
       chain_id: 11155111,
-      indexer: { enabled: false },
+      indexer: {
+        enabled: false,
+        status: 'disabled',
+        chain_id: 11155111,
+        confirmation_policy: 'depth',
+        confirmations: 12,
+        registry_address: environmentPolicy.environments.production.registry,
+        tracker_address: environmentPolicy.environments.production.tracker,
+      },
       release_commit: sha,
     }
     const get = async () => ({ ok: true, json: async () => body })

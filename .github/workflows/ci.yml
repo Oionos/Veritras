@@ -76,6 +76,7 @@ jobs:
           --health-interval 2s --health-timeout 5s --health-retries 30
     env:
       INDEXER_TEST_DATABASE_URL: postgresql+psycopg2://veritras_test:regression-only@localhost:5432/veritras_indexer_regression
+      RECOVERY_TEST_DATABASE_URL: postgresql+psycopg2://veritras_test:regression-only@localhost:5432/veritras_cicd_source
     defaults:
       run:
         working-directory: backend
@@ -114,7 +115,26 @@ jobs:
           assert app.openapi() == json.loads(Path('../openapi.json').read_text()), 'Regenerate openapi.json from app.openapi()'
           PYCODE
 
+      - name: Check environment policy copies
+        run: python sync_environment_policy.py
+
+      - name: Create disposable recovery comparison databases
+        run: |
+          python - <<'PY'
+          import psycopg2
+          from psycopg2 import sql
+          connection = psycopg2.connect(host='localhost', port=5432, user='veritras_test',
+                                        password='regression-only', dbname='veritras_indexer_regression')
+          connection.autocommit = True
+          with connection.cursor() as cursor:
+              for name in ('veritras_cicd_source', 'veritras_cicd_target', 'veritras_restore_cicd_regression'):
+                  cursor.execute(sql.SQL('CREATE DATABASE {}').format(sql.Identifier(name)))
+          connection.close()
+          PY
+
       - name: Run pytest
+        env:
+          RECOVERY_CLIENT_CONTAINER: ${{ job.services.postgres.id }}
         run: pytest -v --tb=short
 
   frontend-unit-tests:

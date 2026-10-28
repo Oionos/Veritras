@@ -42,6 +42,9 @@ class IndexerHealthResponse(BaseModel):
     head_stale_after_seconds: int
     max_lag_blocks: int
     chain_id: int
+    registry_address: Optional[str] = None
+    tracker_address: Optional[str] = None
+    start_block: Optional[int] = None
     confirmation_policy: Literal["depth"] = "depth"
     confirmations: int
     cursor_storage: Literal["database"] = "database"

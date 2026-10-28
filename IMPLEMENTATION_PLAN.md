@@ -332,6 +332,10 @@ After the reliable demo is complete and a specific user workflow has been valida
 
 ## Next implementation session
 
+**CI/CD readiness and recovery automation: phases A–C implemented locally; release and hosted acceptance pending.** Read-only identity/readiness, strict shared policy, scope health fields, PostgreSQL comparison, private dump/restore, hosted orchestration, encrypted evidence and guarded cleanup are implemented. Latest backend validation: **598 passed, five skipped**, including actual private worker restarts against PostgreSQL. See [current commands](CICD_AUTOMATION.md), [hosted recovery setup](HOSTED_RECOVERY.md) and [the phased plan](CICD_IMPLEMENTATION_PLAN.md). Next operational milestone: a supervised hosted drill after protected release/configuration. Next implementation: separately approved production activation (phase D). Production receipts/anchor still need verification; indexing remains disabled.
+
+See [the detailed next-steps guide](NEXT_STEPS_GUIDE.md) for the ordered procedures, commands, acceptance criteria, stop conditions and recovery actions for production indexing readiness, performance, monitoring and the business pilot.
+
 Increment **10: performance and operations** is delivered; final protected-main and provider evidence is recorded in [PR #28](https://github.com/Oionos/Veritras/pull/28). Increments 5–9 are delivered. After increment 10, prioritize field observation and a defined business pilot; there is no automatically authorized production backfill. **Production indexing enablement validation remains important and pending:** review the deployment anchor, rehearse identity/history reconciliation and hosted restore, then obtain explicit enablement before backfill. Keep that gate separate from ordinary application releases.
 
 Preserve analytics definitions and sample/exclusion counts during subsequent work. Keep production indexing enablement and any change to release-gate configuration as explicit reviewed changes.

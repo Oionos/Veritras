@@ -933,6 +933,12 @@ export interface components {
             max_lag_blocks: number;
             /** Chain Id */
             chain_id: number;
+            /** Registry Address */
+            registry_address?: string | null;
+            /** Tracker Address */
+            tracker_address?: string | null;
+            /** Start Block */
+            start_block?: number | null;
             /**
              * Confirmation Policy
              * @default depth
