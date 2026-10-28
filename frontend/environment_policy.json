@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "environments": {
+    "production": {
+      "api_origin": "https://chainlens-4qvy.onrender.com",
+      "chain_id": 11155111,
+      "registry": "0x1F76018532D619194f6628ADc186e3c86FcB5AaA",
+      "tracker": "0x95b09C0aeD53f6b63C072F4ecaC18861FcbBFB30",
+      "registry_creation_tx": null,
+      "tracker_creation_tx": null,
+      "start_block": null,
+      "confirmations": 12,
+      "indexer_mode": "disabled"
+    },
+    "testing": {
+      "api_origin": "https://veritras-api-testing.onrender.com",
+      "chain_id": 11155111,
+      "registry": "0xCf9C169752E1B7AF9A0A54C3086dBa11A2DeE285",
+      "tracker": "0xF5A251812Ec9A7645c29c63656EfB6b307360fDE",
+      "registry_creation_tx": "0x196341ce35a556b36d989ec322faf4ab0ce7db58f49f73bd3bd25515058b2635",
+      "tracker_creation_tx": "0x09fccc403bc9c9038c4c0f75aa5434f34ae9e9f0a859d6a66e2f053428f1601a",
+      "start_block": 11936013,
+      "confirmations": 12,
+      "indexer_mode": "enabled"
+    }
+  }
+}

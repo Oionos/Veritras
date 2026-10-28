@@ -1,0 +1,123 @@
+name: Hosted Recovery Rehearsal
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Private recovery copy of this environment
+        type: choice
+        options: [testing, production]
+        required: true
+      approved_reconciliation_digest:
+        description: Exact reviewed private reconciliation plan digest (empty stops on changes)
+        type: string
+        default: ''
+      target_block:
+        description: Reviewed confirmed block for a repeat plan (requires target_hash)
+        type: string
+        default: ''
+      target_hash:
+        description: Canonical hash of the reviewed block
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: recovery-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  rehearse:
+    if: github.ref == 'refs/heads/main' && github.repository == 'Oionos/Veritras'
+    runs-on: ubuntu-latest
+    environment: recovery-${{ inputs.environment }}
+    timeout-minutes: 30
+    env:
+      REHEARSAL_ENVIRONMENT: ${{ inputs.environment }}
+      NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+      NEON_SOURCE_BRANCH_ID: ${{ vars.NEON_SOURCE_BRANCH_ID }}
+      NEON_DATABASE_NAME: ${{ vars.NEON_DATABASE_NAME }}
+      NEON_DATABASE_ROLE: ${{ vars.NEON_DATABASE_ROLE }}
+      REHEARSAL_RPO_SECONDS: ${{ vars.REHEARSAL_RPO_SECONDS }}
+      REHEARSAL_RTO_SECONDS: ${{ vars.REHEARSAL_RTO_SECONDS }}
+      REHEARSAL_MAX_BRANCHES: ${{ vars.REHEARSAL_MAX_BRANCHES || '20' }}
+      REHEARSAL_BATCH_SIZE: ${{ vars.REHEARSAL_BATCH_SIZE || '1000' }}
+      POSTGRES_MAJOR: ${{ vars.POSTGRES_MAJOR }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install locked dependencies and check policy
+        run: |
+          pip install -r backend/requirements.lock
+          python backend/sync_environment_policy.py
+      - name: Prepare matching official PostgreSQL clients
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$POSTGRES_MAJOR" =~ ^(16|17|18)$ ]] || exit 1
+          image="postgres:${POSTGRES_MAJOR}-bookworm"
+          docker pull "$image"
+          mkdir -p "$RUNNER_TEMP/recovery-pg-bin"
+          for tool in pg_dump pg_restore; do
+            cat > "$RUNNER_TEMP/recovery-pg-bin/$tool" <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          exec python "$GITHUB_WORKSPACE/backend/pg_client.py" "$(basename "$0")" "$@"
+          SH
+            chmod 700 "$RUNNER_TEMP/recovery-pg-bin/$tool"
+          done
+          echo "$RUNNER_TEMP/recovery-pg-bin" >> "$GITHUB_PATH"
+          echo "PG_CLIENT_IMAGE=$image" >> "$GITHUB_ENV"
+      - name: Restore, review, replay and verify private recovery
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+          REHEARSAL_OWNERSHIP_KEY: ${{ secrets.REHEARSAL_OWNERSHIP_KEY }}
+          REHEARSAL_BACKUP_KEY: ${{ secrets.REHEARSAL_BACKUP_KEY }}
+          GITHUB_RELEASE_TOKEN: ${{ github.token }}
+          APPROVED_RECONCILIATION_DIGEST: ${{ inputs.approved_reconciliation_digest }}
+          REHEARSAL_TARGET_BLOCK: ${{ inputs.target_block }}
+          REHEARSAL_TARGET_HASH: ${{ inputs.target_hash }}
+        run: python backend/rehearse_hosted_recovery.py --directory "$RUNNER_TEMP/hosted-recovery"
+      - name: Independently retry owned-resource cleanup
+        if: always()
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          REHEARSAL_OWNERSHIP_KEY: ${{ secrets.REHEARSAL_OWNERSHIP_KEY }}
+        run: python backend/manage_rehearsal_resources.py cleanup --ledger "$RUNNER_TEMP/hosted-recovery/resource-ledger.json"
+      - name: Retain sanitized recovery report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recovery-report-${{ inputs.environment }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/hosted-recovery/recovery-report.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Retain encrypted backup and detailed evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recovery-encrypted-${{ inputs.environment }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/hosted-recovery/recovery-evidence.enc
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Publish sanitized recovery summary
+        if: always()
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          report = Path(os.environ['RUNNER_TEMP']) / 'hosted-recovery/recovery-report.json'
+          if report.exists():
+              with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as output:
+                  output.write('## Private recovery rehearsal\n\n```json\n')
+                  output.write(report.read_text())
+                  output.write('```\n\nThis is recovery evidence, not production activation approval.\n')
+          PY

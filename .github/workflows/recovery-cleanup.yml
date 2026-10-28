@@ -1,0 +1,47 @@
+name: Expired Recovery Resource Cleanup
+
+on:
+  schedule:
+    # API metadata only: does not wake database computes.
+    - cron: '17 * * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Remove only authenticated expired rehearsal resources
+        type: choice
+        options: [testing, production]
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    if: >-
+      github.ref == 'refs/heads/main' && github.repository == 'Oionos/Veritras' &&
+      (github.event_name == 'workflow_dispatch' || vars.RECOVERY_REAPER_ENABLED == 'true')
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: ${{ fromJSON(github.event_name == 'workflow_dispatch' && format('["{0}"]', inputs.environment) || '["production","testing"]') }}
+    runs-on: ubuntu-latest
+    environment: recovery-cleanup-${{ matrix.environment }}
+    timeout-minutes: 10
+    concurrency:
+      group: recovery-${{ matrix.environment }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Delete only expired resources with valid ownership proof
+        env:
+          REHEARSAL_ENVIRONMENT: ${{ matrix.environment }}
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
+          NEON_SOURCE_BRANCH_ID: ${{ vars.NEON_SOURCE_BRANCH_ID }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          REHEARSAL_OWNERSHIP_KEY: ${{ secrets.REHEARSAL_OWNERSHIP_KEY }}
+        run: python backend/manage_rehearsal_resources.py reap-expired --ledger "$RUNNER_TEMP/unused-recovery-ledger.json"

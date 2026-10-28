@@ -3059,6 +3059,39 @@
             "type": "integer",
             "title": "Chain Id"
           },
+          "registry_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registry Address"
+          },
+          "tracker_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tracker Address"
+          },
+          "start_block": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Block"
+          },
           "confirmation_policy": {
             "type": "string",
             "const": "depth",

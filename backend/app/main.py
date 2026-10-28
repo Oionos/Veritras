@@ -195,9 +195,22 @@ app.include_router(telemetry.router, prefix="/telemetry", tags=["telemetry"])
 
 
 def indexer_state():
+    def public_address(value):
+        return value if isinstance(value, str) and re.fullmatch(r"0x[0-9a-fA-F]{40}", value) else None
+
+    scope = dict(
+        registry_address=public_address(settings.product_registry_contract),
+        tracker_address=public_address(settings.shipment_tracker_contract),
+        start_block=settings.indexer_start_block,
+    )
     if settings.indexer_enabled and indexer is not None:
-        return IndexerHealthResponse.model_validate(indexer.health())
+        scope.update(
+            registry_address=public_address(indexer.product_registry_address),
+            tracker_address=public_address(indexer.shipment_tracker_address),
+        )
+        return IndexerHealthResponse.model_validate({**indexer.health(), **scope})
     return IndexerHealthResponse(
+        **scope,
         status="not_started" if settings.indexer_enabled else "disabled",
         enabled=settings.indexer_enabled,
         reason=(

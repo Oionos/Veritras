@@ -138,6 +138,9 @@ def test_liveness_readiness_and_worker_health_have_distinct_meaning(
     result = client_fixture.get("/health/ready")
     assert result.status_code == (200 if status == "current" else 503)
     assert result.json()["indexer"]["status"] == status
+    assert result.json()["indexer"]["registry_address"] == w.product_registry_address
+    assert result.json()["indexer"]["tracker_address"] == w.shipment_tracker_address
+    assert result.json()["indexer"]["start_block"] == settings.indexer_start_block
     assert client_fixture.get("/health/indexer").status_code == (
         200 if status in {"current", "catching_up"} else 503
     )
@@ -151,6 +154,14 @@ def test_disabled_is_consistent_and_never_calls_rpc(client_fixture, monkeypatch)
         assert client_fixture.get(path).status_code == 200
     unsafe.health.assert_not_called()
     assert client_fixture.get("/health/indexer").json()["status"] == "disabled"
+
+
+def test_scope_fields_never_publish_misconfigured_private_urls(client_fixture, monkeypatch):
+    monkeypatch.setattr(settings, "indexer_enabled", False)
+    monkeypatch.setattr(settings, "product_registry_contract", "https://private.example/secret-key")
+    response = client_fixture.get("/health/ready")
+    assert response.json()["indexer"]["registry_address"] is None
+    assert "secret-key" not in response.text
 
 
 def test_liveness_has_no_dependency_work_and_release_is_validated(

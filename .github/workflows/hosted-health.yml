@@ -55,13 +55,10 @@ jobs:
           elif [ "$EVENT" = push ]; then
             if [ "$SOURCE_BRANCH" = main ]; then environment=production; else environment=testing; fi
           fi
-          if [ "$environment" = production ]; then
-            api=https://chainlens-4qvy.onrender.com
-            indexing=disabled
-          else
-            api=https://veritras-api-testing.onrender.com
-            indexing=enabled
-          fi
-          args=(--url "$api" --environment "$environment" --expect-indexer "$indexing" --deadline 600 --interval 15 --timeout 4)
+          api="$(python backend/environment_policy.py --environment "$environment" --field api_origin)"
+          indexing="$(python backend/environment_policy.py --environment "$environment" --field indexer_mode)"
+          chain="$(python backend/environment_policy.py --environment "$environment" --field chain_id)"
+          confirmations="$(python backend/environment_policy.py --environment "$environment" --field confirmations)"
+          args=(--url "$api" --environment "$environment" --chain-id "$chain" --confirmations "$confirmations" --expect-indexer "$indexing" --deadline 600 --interval 15 --timeout 4)
           if [ "$EVENT" = push ] || [ "$EVENT" = workflow_run ]; then args+=(--expected-commit "$RELEASE_SHA"); fi
           python backend/check_health.py "${args[@]}"
