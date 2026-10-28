@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { environmentPolicy, apiMatchesPolicy } from './environment-policy.mjs'
 export const policy = JSON.parse(
   readFileSync(new URL('./release_policy.json', import.meta.url), 'utf8'),
 )
@@ -156,11 +157,7 @@ export async function waitForApi(
       const body = await response.json()
       if (
         response.ok &&
-        body.status === 'ready' &&
-        body.database === 'connected' &&
-        body.environment === 'production' &&
-        body.chain_id === 11155111 &&
-        body.indexer?.enabled === false &&
+        apiMatchesPolicy(body, environmentPolicy.environments.production) &&
         commits.includes(body.release_commit)
       )
         return body.release_commit

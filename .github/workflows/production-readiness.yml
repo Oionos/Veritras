@@ -1,0 +1,78 @@
+name: Deployment Identity and Readiness
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to inspect (read-only)
+        type: choice
+        options: [production, testing]
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deployment-readiness-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    if: github.ref == 'refs/heads/main' && github.repository == 'Oionos/Veritras'
+    runs-on: ubuntu-latest
+    environment: readiness
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install locked verification dependencies
+        run: pip install -r backend/requirements.lock
+      - name: Check policy copies
+        run: python backend/sync_environment_policy.py
+      - name: Verify deployed health and canonical contract evidence
+        env:
+          SELECTED_ENVIRONMENT: ${{ inputs.environment }}
+          CANDIDATE_SHA: ${{ github.sha }}
+          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          backend_sha="$(git log -1 --format=%H HEAD -- backend)"
+          release_sha="$CANDIDATE_SHA"
+          if [ "$SELECTED_ENVIRONMENT" = testing ]; then
+            # Inspect the explicitly fetched testing branch, never an arbitrary
+            # SHA reported by the remote API being verified.
+            release_sha="$(git rev-parse refs/remotes/origin/testing)"
+            backend_sha="$(git log -1 --format=%H refs/remotes/origin/testing -- backend)"
+          fi
+          python backend/prepare_readiness_report.py \
+            --environment "$SELECTED_ENVIRONMENT" \
+            --candidate-sha "$CANDIDATE_SHA" --release-sha "$release_sha" --backend-sha "$backend_sha" \
+            --output readiness-report.json
+      - name: Retain sanitized report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: readiness-${{ inputs.environment }}-${{ github.sha }}
+          path: readiness-report.json
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Publish summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f readiness-report.json ]; then
+            python - <<'PY'
+          import os
+          from pathlib import Path
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('## Read-only readiness evidence\n\n```json\n')
+              summary.write(Path('readiness-report.json').read_text())
+              summary.write('```\n\nThis report does not authorize production activation.\n')
+          PY
+          fi

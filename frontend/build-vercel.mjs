@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { waitForRelease, backendCommit, waitForApi } from './release-gate.mjs'
+import { environmentPolicy } from './environment-policy.mjs'
 
 const env = { ...process.env }
 // Public browser configuration for the existing live deployment. Preview builds
@@ -21,7 +22,7 @@ let evidence
 if (env.VERCEL_ENV === 'production') {
   if (
     env.VERCEL_GIT_COMMIT_REF !== 'main' ||
-    env.VITE_API_URL !== 'https://chainlens-4qvy.onrender.com'
+    env.VITE_API_URL !== environmentPolicy.environments.production.api_origin
   )
     throw new Error('Production must use main and its reviewed API')
   evidence = await waitForRelease(env.VERCEL_GIT_COMMIT_SHA)

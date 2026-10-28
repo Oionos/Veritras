@@ -17,13 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - environment: production
-            api: https://chainlens-4qvy.onrender.com
-            indexer: disabled
-          - environment: testing
-            api: https://veritras-api-testing.onrender.com
-            indexer: enabled
+        environment: [production, testing]
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -33,7 +27,8 @@ jobs:
           python-version: '3.11'
       - name: Check sustained readiness, API errors and SSE heartbeat
         env:
-          API: ${{ matrix.api }}
           ENVIRONMENT: ${{ matrix.environment }}
-          INDEXER: ${{ matrix.indexer }}
-        run: python backend/monitor_operations.py --url "$API" --environment "$ENVIRONMENT" --expect-indexer "$INDEXER"
+        run: |
+          api="$(python backend/environment_policy.py --environment "$ENVIRONMENT" --field api_origin)"
+          indexing="$(python backend/environment_policy.py --environment "$ENVIRONMENT" --field indexer_mode)"
+          python backend/monitor_operations.py --url "$api" --environment "$ENVIRONMENT" --expect-indexer "$indexing"
