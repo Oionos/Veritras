@@ -1,6 +1,6 @@
 # CI/CD implementation preparation
 
-Prepared October 21, 2026. Status: **phases A–C implemented locally; protected release and hosted acceptance pending; phases D–E pending**. See [current commands](CICD_AUTOMATION.md) and [hosted recovery setup](HOSTED_RECOVERY.md). The workflows become available after release to main; production identity remains blocked until its creation receipts/anchor are verified.
+Prepared October 21, 2026; status updated October 29. **Phases A–C are released; full hosted acceptance remains blocked at testing RPC verification. Phases D–E are pending.** See [current commands](CICD_AUTOMATION.md) and [hosted recovery setup](HOSTED_RECOVERY.md). Production identity remains blocked until its creation receipts/anchor are verified.
 
 This translates [the next-steps guide](NEXT_STEPS_GUIDE.md) into an implementation backlog. Production indexing remains disabled. Resource creation, reconciliation applies and activation are separate operational actions; preparing this plan does not perform them.
 
@@ -18,7 +18,7 @@ Automate production readiness first, then private recovery and replay, then appr
 
 Each PR stages through persistent testing and protected main. Do not add hosted observers to the eight deployment prerequisites: a job waiting for deployment cannot also be a prerequisite for that deployment.
 
-**Implemented slices: phases A–C.** The read-only observer, strict shared policy, recovery comparison, private dump/restore coordination, hosted orchestration, encryption and guarded resource lifecycle are implemented with local regression coverage. Validation used disposable local resources, not live Neon data. A supervised hosted readiness/recovery pass remains pending; local validation does not close that acceptance gate.
+**Implemented slices: phases A–C.** The read-only observer, strict shared policy, recovery comparison, private dump/restore coordination, hosted orchestration, encryption and guarded resource lifecycle are released with regression coverage. Protected testing environments are configured. The original hosted restore failed only on equivalent PostgreSQL CHECK array casts; [PR #32](https://github.com/Oionos/Veritras/pull/32) fixed that comparison with real dump/restore regression coverage. Fresh [run 40853717474](https://github.com/Oionos/Veritras/actions/runs/40853717474) stopped at RPC verification before creating resources or exercising the fix. Next: obtain passing read-only testing RPC evidence, then run a fresh full rehearsal within its objective. Full hosted acceptance remains open.
 
 ## 2. Current components to reuse
 
@@ -211,11 +211,12 @@ RPO/RTO, branch retention/cost limits, backup destination and approval owner are
 
 Implementation includes regression coverage for identity mismatches, strict modes, target protection, covered fingerprints, sanitized errors and real dump/restore. The user approved adding/running these tests. Provenance enforcement, resource cleanup/cancellation and production activation recovery remain acceptance work for phases C–D. Run the existing eight required checks before release.
 
-- [x] Phase A implemented with local regression coverage; protected release checks and hosted verification remain pending.
+- [x] Phase A implemented and released through protected checks; hosted contract verification remains pending.
 - [ ] Read-only hosted identity report succeeds with verified production receipts.
 - [x] Phase B comparison detects deliberate differences on disposable local databases; real dump/atomic restore passes and refuses a populated target.
 - [x] Phase C orchestration, protected-environment checks, encrypted artifacts and guarded cleanup implemented locally.
-- [ ] Protected credentials, reviewer controls, recovery objectives and resource limits configured and verified for hosted execution.
+- [x] Protected testing environments, reviewer controls, objectives and resource limits configured; archived evidence successfully decrypted through the protected inspection job.
+- [ ] Testing RPC access passes the protected read-only observer using `recovery-testing` configuration.
 - [ ] Phase C completes a supervised hosted drill and produces verifiable evidence.
 - [ ] Cancellation/cleanup and failed-rehearsal behavior demonstrated safely.
 - [ ] Phase D provider coordination and write-pause design verified before mutation support is enabled.
@@ -223,4 +224,4 @@ Implementation includes regression coverage for identity mismatches, strict mode
 - [ ] Explicit production activation approval recorded; gated job completes or reports a verified safe recovery state.
 - [ ] Performance, alert delivery, field reporting and business pilot follow the acceptance criteria in the next-steps guide.
 
-**Next operational milestone:** release/configure phase C and complete a supervised hosted drill using [HOSTED_RECOVERY.md](HOSTED_RECOVERY.md). **Next implementation slice:** phase D production activation. Keep production activation gated until hosted evidence, scope and explicit approval prerequisites are demonstrably satisfied.
+**Next operational milestone:** resolve testing RPC verification, then complete a fresh supervised hosted drill using [HOSTED_RECOVERY.md](HOSTED_RECOVERY.md). **Next implementation slice:** phase D production activation. Keep production activation gated until hosted evidence, scope and explicit approval prerequisites are demonstrably satisfied.
