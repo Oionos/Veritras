@@ -280,6 +280,16 @@ def test_console_summary_preserves_preflight_output_and_excludes_other_report_fi
     }
 
 
+def test_console_identity_failure_exposes_only_safe_code_fields():
+    report = {"overall_result": "blocked", "state": "deployment_identity_not_verified",
+              "deployment_identity": {"state": "rpc_invalid_or_unavailable", "rpc_http_status": 403,
+                                      "rpc_error_code": -32005, "private_message": "private-key"}}
+    result = hosted.console_summary(report)
+    assert result["deployment_identity"] == {"state": "rpc_invalid_or_unavailable",
+                                             "rpc_http_status": 403, "rpc_error_code": -32005}
+    assert "private" not in json.dumps(result)
+
+
 def test_wrong_rotation_scope_blocks_sql_connections_and_still_cleans(drill):
     execute, calls, _, _ = drill
     resources = FakeResources()

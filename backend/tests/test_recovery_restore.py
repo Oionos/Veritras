@@ -86,6 +86,7 @@ def test_existing_output_stops_cli_before_restore(monkeypatch, tmp_path, capsys)
 
 
 def test_real_dump_restore_on_disposable_postgres(tmp_path, monkeypatch):
+    from app.core.database import Base
     value = os.environ.get("RECOVERY_TEST_DATABASE_URL")
     container = os.environ.get("RECOVERY_CLIENT_CONTAINER")
     have_clients = all(restore.shutil.which(name) for name in ("pg_dump", "pg_restore"))
@@ -124,18 +125,28 @@ def test_real_dump_restore_on_disposable_postgres(tmp_path, monkeypatch):
     for name, url in (("source", source), ("target", target)):
         manifest[name] = {"host": url.host, "port": url.port or 5432, "database": url.database}
     try:
+        # Exercise the full application CHECK patterns as well as real rows.
+        # pg_dump redistributes varchar[] -> text[] casts in IN predicates.
+        Base.metadata.create_all(source_engine)
         with source_engine.begin() as connection:
-            connection.execute(text("CREATE TABLE public.restore_sample(id serial PRIMARY KEY, secret_note text NOT NULL)"))
+            connection.execute(text("CREATE TABLE public.restore_sample(id serial PRIMARY KEY, secret_note text NOT NULL, status varchar(32) NOT NULL DEFAULT 'draft', CONSTRAINT ck_restore_status CHECK(status IN ('draft','indexed')))"))
             connection.execute(text("INSERT INTO public.restore_sample(secret_note) VALUES ('do-not-publish')"))
         result = restore.restore_checkpoint(manifest, source.render_as_string(hide_password=False),
             target.render_as_string(hide_password=False), tmp_path, run=run)
         assert result["restore_completed"] and result["matches"]
         assert "do-not-publish" not in json.dumps(result)
+        with target_engine.begin() as connection:
+            connection.execute(text("ALTER TABLE public.restore_sample DROP CONSTRAINT ck_restore_status"))
+            connection.execute(text("ALTER TABLE public.restore_sample ADD CONSTRAINT ck_restore_status CHECK(status IN ('draft','indexed','replaced'))"))
+        changed = restore.run_comparison(manifest, source.render_as_string(hide_password=False), target.render_as_string(hide_password=False))
+        assert changed["matches"] is False
+        assert {"section": "schema", "object": "constraints"} in changed["differences"]
         with pytest.raises(ValueError, match="empty rehearsal"):
             restore.restore_checkpoint(manifest, source.render_as_string(hide_password=False),
                 target.render_as_string(hide_password=False), tmp_path, run=run)
     finally:
         for engine in (source_engine, target_engine):
+            Base.metadata.drop_all(engine)
             with engine.begin() as connection:
                 connection.execute(text("DROP TABLE IF EXISTS public.restore_sample"))
             engine.dispose()

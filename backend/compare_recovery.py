@@ -16,6 +16,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.pool import NullPool
 
+from constraint_fingerprint import NORMALIZATION, canonical_constraint
+
 SYSTEM_SCHEMA = (
     "n.nspname NOT LIKE 'pg\\_%' ESCAPE '\\' AND n.nspname <> 'information_schema'"
 )
@@ -166,6 +168,7 @@ def fingerprint(engine, *, expected_database, stable_cursor=False):
             connection.execute(text("SET LOCAL timezone = 'UTC'"))
             connection.execute(text("SET LOCAL datestyle = 'ISO, YMD'"))
             connection.execute(text("SET LOCAL extra_float_digits = 3"))
+            connection.execute(text("SET LOCAL standard_conforming_strings = on"))
             connection.execute(text("SET LOCAL search_path = pg_catalog"))
             database, read_only = connection.execute(
                 text(
@@ -175,6 +178,8 @@ def fingerprint(engine, *, expected_database, stable_cursor=False):
             if database != expected_database or read_only != "on":
                 raise ValueError("Unexpected recovery connection")
             catalogs = {name: rows(connection, sql) for name, sql in CATALOGS.items()}
+            for constraint in catalogs["constraints"]:
+                constraint[3] = canonical_constraint(constraint[3])
             relations = catalogs["relations"]
             if not relations or any(row[2] == "f" for row in relations):
                 raise ValueError("Empty or externally backed recovery schema")
@@ -236,6 +241,7 @@ def fingerprint(engine, *, expected_database, stable_cursor=False):
                     if stable_cursor
                     else "complete_rows"
                 ),
+                "constraint_normalization": NORMALIZATION,
             }
 
 
@@ -243,6 +249,8 @@ def compare(source, target):
     differences = []
     if source.get("normalization") != target.get("normalization"):
         differences.append({"section": "normalization"})
+    if source.get("constraint_normalization") != target.get("constraint_normalization"):
+        differences.append({"section": "constraint_normalization"})
     for section in ("tables", "schema", "sequence_state"):
         for name in sorted(set(source[section]) | set(target[section])):
             if source[section].get(name) != target[section].get(name):
@@ -259,7 +267,7 @@ def summarize_differences(comparison):
         return {"available": False}
     sections = {}
     catalogs = set()
-    allowed = {"tables", "schema", "sequence_state", "effective_table_access", "normalization"}
+    allowed = {"tables", "schema", "sequence_state", "effective_table_access", "normalization", "constraint_normalization"}
     unclassified = 0
     for difference in differences:
         if not isinstance(difference, dict):
