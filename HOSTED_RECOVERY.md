@@ -89,6 +89,21 @@ After both cleanup scopes are configured, set repository variable `RECOVERY_REAP
 
 No migration is automatically applied. An older/unrecognized restored schema blocks the private worker. Rehearse any future migration explicitly rather than stamping or silently adopting it. Source integrations or database jobs that would execute automatically from a clone must be reviewed before enabling this drill.
 
+## Diagnose a restore comparison failure
+
+`restore_comparison_failed` means the dump and restore completed, but the frozen
+source and restored database did not compare equal. Inspect the sanitized report's
+`restore_comparison.difference_summary` (also printed as `restore_difference_summary`
+in the command output): it contains mismatch counts by section and
+allowlisted schema categories such as `columns`, `constraints` or `indexes`.
+Object names, row values and complete fingerprints remain in the encrypted
+`restore-comparison.json`. Missing legacy diagnostics are reported as unavailable.
+
+Do not skip a failed comparison or assume its differences are harmless. Identify
+the failing category, reproduce the cause and review any correction before the
+next drill. Start a new workflow run after a correction; rerunning an old execution
+retains its original recovery declaration time.
+
 ## When reconciliation requires review
 
 The first run saves the detailed plan inside the encrypted archive. Its public summary contains a plan digest and the confirmed target block/hash.

@@ -252,6 +252,39 @@ def compare(source, target):
     return {"matches": not differences, "differences": differences}
 
 
+def summarize_differences(comparison):
+    """Public diagnostic categories only; object names and snapshots stay private."""
+    differences = comparison.get("differences")
+    if not isinstance(differences, list):
+        return {"available": False}
+    sections = {}
+    catalogs = set()
+    allowed = {"tables", "schema", "sequence_state", "effective_table_access", "normalization"}
+    unclassified = 0
+    for difference in differences:
+        if not isinstance(difference, dict):
+            unclassified += 1
+            continue
+        section = difference.get("section")
+        if not isinstance(section, str) or section not in allowed:
+            unclassified += 1
+            continue
+        sections[section] = sections.get(section, 0) + 1
+        if section == "schema":
+            name = difference.get("object")
+            if isinstance(name, str) and name in CATALOGS:
+                catalogs.add(name)
+            else:
+                unclassified += 1
+    return {
+        "available": True,
+        "difference_count": len(differences),
+        "sections": sections,
+        "schema_categories": sorted(catalogs),
+        "unclassified_count": unclassified,
+    }
+
+
 def run_comparison(manifest, source_url, target_url):
     urls = validate_targets(manifest, source_url, target_url)
     snapshots = []
