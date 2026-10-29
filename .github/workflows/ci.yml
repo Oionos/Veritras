@@ -137,6 +137,9 @@ jobs:
           RECOVERY_CLIENT_CONTAINER: ${{ job.services.postgres.id }}
         run: pytest -v --tb=short
 
+      - name: Test private saved-evidence inspection
+        run: pytest ../release/tests -q --tb=short
+
   frontend-unit-tests:
     name: Frontend Unit Tests
     runs-on: ubuntu-latest
