@@ -47,6 +47,15 @@ def console_summary(report):
     return result
 
 
+def report_exit_code(report):
+    if report.get("overall_result") == "pass":
+        return 0
+    # A first protected run can stop here to publish a digest for reviewed replay.
+    if report.get("state") == "private_reconciliation_not_accepted":
+        return 0
+    return 1
+
+
 def configuration(env):
     required = (
         "NEON_DATABASE_NAME",
@@ -597,7 +606,7 @@ def main():
         }
         private_json(args.directory / "recovery-report.json", report)
     print(json.dumps(console_summary(report)))
-    return 0 if report["overall_result"] == "pass" else 1
+    return report_exit_code(report)
 
 
 if __name__ == "__main__":

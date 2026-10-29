@@ -292,6 +292,24 @@ def test_console_identity_failure_exposes_only_safe_code_fields():
     assert "private" not in json.dumps(result)
 
 
+def test_report_exit_code_allows_pass_or_review_required():
+    assert hosted.report_exit_code(
+        {"overall_result": "pass", "state": "rehearsal_completed"}
+    ) == 0
+    assert hosted.report_exit_code(
+        {
+            "overall_result": "blocked",
+            "state": "private_reconciliation_not_accepted",
+        }
+    ) == 0
+
+
+def test_report_exit_code_blocks_other_failures():
+    assert hosted.report_exit_code(
+        {"overall_result": "blocked", "state": "restore_comparison_failed"}
+    ) == 1
+
+
 def test_wrong_rotation_scope_blocks_sql_connections_and_still_cleans(drill):
     execute, calls, _, _ = drill
     resources = FakeResources()
