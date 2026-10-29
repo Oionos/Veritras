@@ -104,6 +104,26 @@ the failing category, reproduce the cause and review any correction before the
 next drill. Start a new workflow run after a correction; rerunning an old execution
 retains its original recovery declaration time.
 
+### Inspect an existing encrypted report in CI
+
+Use **Actions → Inspect Saved Recovery Evidence** from **main**, with the original
+testing recovery run ID and attempt. For the first comparison failure, use run
+`40649974176`, attempt `1`. Approve its `recovery-testing` environment job.
+
+This job downloads the existing report and encrypted evidence, verifies the source
+workflow/main ancestry, authenticates the archive's run/SHA/policy provenance and
+checks the saved comparison digest. It publishes only fixed mismatch categories
+and counts. It does not connect to a database or RPC, create a branch, restore
+data, change the original result or certify recovery objectives. Its execution
+timeout starts when the approved job runs; it does not declare a new RTO/RPO drill.
+
+The existing `REHEARSAL_BACKUP_KEY` is the only application secret required. Keep
+the original key available until evidence expires. Wrong keys, expired artifacts,
+untrusted origins, mismatched provenance and missing comparison evidence block
+inspection. Plaintext is confined to a private temporary directory, removed on
+completion and excluded from workflow artifacts. Both the sanitized inspection
+and its report explicitly have `authorizes_activation: false`.
+
 ## When reconciliation requires review
 
 The first run saves the detailed plan inside the encrypted archive. Its public summary contains a plan digest and the confirmed target block/hash.
