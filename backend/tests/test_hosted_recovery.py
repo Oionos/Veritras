@@ -237,6 +237,49 @@ def test_unverified_identity_never_creates_resources(drill):
     assert not calls and resources.cleaned == 1
 
 
+def test_failed_comparison_reports_safe_categories_and_stops_before_replay(drill):
+    execute, calls, directory, _ = drill
+    resources = FakeResources()
+    comparison = {
+        "matches": False,
+        "differences": [
+            {"section": "schema", "object": "constraints"},
+            {"section": "tables", "object": "private-schema.private-table"},
+        ],
+        "source": {"private-row": "private-password"},
+    }
+    report = execute(resources, restore=lambda *args, **kwargs: comparison)
+    assert report["overall_result"] == "blocked"
+    assert report["state"] == "restore_comparison_failed"
+    assert report["authorizes_activation"] is False
+    assert report["restore_comparison"]["matches"] is False
+    assert report["restore_comparison"]["difference_summary"] == {
+        "available": True, "difference_count": 2,
+        "sections": {"schema": 1, "tables": 1},
+        "schema_categories": ["constraints"], "unclassified_count": 0,
+    }
+    assert not calls and resources.cleaned == 1
+    assert report["cleanup"]["state"] == "deleted"
+    assert report["archive"]["state"] == "encrypted"
+    assert json.loads((directory / "private/restore-comparison.json").read_text()) == comparison
+    serialized = json.dumps(report)
+    assert "private-schema" not in serialized
+    assert "private-row" not in serialized
+    assert "private-password" not in serialized
+    assert hosted.console_summary(report) == {
+        "overall_result": "blocked", "state": "restore_comparison_failed",
+        "restore_difference_summary": report["restore_comparison"]["difference_summary"],
+    }
+
+
+def test_console_summary_preserves_preflight_output_and_excludes_other_report_fields():
+    report = {"overall_result": "blocked", "state": "required_configuration_missing",
+              "private_extra": "private-password"}
+    assert hosted.console_summary(report) == {
+        "overall_result": "blocked", "state": "required_configuration_missing",
+    }
+
+
 def test_wrong_rotation_scope_blocks_sql_connections_and_still_cleans(drill):
     execute, calls, _, _ = drill
     resources = FakeResources()
