@@ -6,7 +6,9 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 
-from compare_recovery import checked_url, compare, fingerprint, run_comparison, validate_targets
+from compare_recovery import (
+    checked_url, compare, fingerprint, run_comparison, summarize_differences, validate_targets,
+)
 
 
 def target(database):
@@ -15,6 +17,52 @@ def target(database):
 
 def manifest():
     return {"version": 1, "frozen": True, "source": target("checkpoint"), "target": target("restore")}
+
+
+def test_public_difference_summary_emits_only_allowlisted_categories_and_counts():
+    comparison = {
+        "matches": False,
+        "source": {"private-row": "private-password"},
+        "differences": [
+            {"section": "tables", "object": "private-schema.private-table"},
+            {"section": "tables", "object": "private-schema.other-table"},
+            {"section": "schema", "object": "columns", "value": "private-row"},
+            {"section": "schema", "object": "indexes"},
+            {"section": "schema", "object": "columns"},
+            {"section": "sequence_state", "object": "private-sequence"},
+            {"section": "effective_table_access"},
+            {"section": "normalization"},
+            {"section": "schema", "object": "private-category"},
+            {"section": "private-section", "object": "private-object"},
+            {"section": ["private-section"]},
+            "private-unstructured-error",
+        ],
+    }
+    before = copy.deepcopy(comparison)
+    summary = summarize_differences(comparison)
+    assert summary == {
+        "available": True,
+        "difference_count": 12,
+        "sections": {"tables": 2, "schema": 4, "sequence_state": 1,
+                     "effective_table_access": 1, "normalization": 1},
+        "schema_categories": ["columns", "indexes"],
+        "unclassified_count": 4,
+    }
+    assert "private" not in json.dumps(summary)
+    assert comparison == before and comparison["matches"] is False
+
+
+@pytest.mark.parametrize("differences", [None, "private-error", {"private": "value"}])
+def test_invalid_difference_payload_never_enters_public_summary(differences):
+    assert summarize_differences({"differences": differences}) == {"available": False}
+
+
+def test_empty_difference_summary_and_legacy_report():
+    assert summarize_differences({"matches": True, "differences": []}) == {
+        "available": True, "difference_count": 0, "sections": {},
+        "schema_categories": [], "unclassified_count": 0,
+    }
+    assert summarize_differences({"matches": False}) == {"available": False}
 
 
 def test_only_explicit_distinct_postgres_targets_are_allowed():

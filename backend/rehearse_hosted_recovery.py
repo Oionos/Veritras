@@ -16,7 +16,7 @@ import time
 from sqlalchemy.engine import make_url
 
 from check_deployment_identity import configured_verification
-from compare_recovery import checked_url, digest
+from compare_recovery import checked_url, digest, summarize_differences
 from environment_policy import environment, load_policy, policy_digest
 from manage_rehearsal_resources import (
     ResourceError,
@@ -33,6 +33,14 @@ WORKFLOW = "Oionos/Veritras/.github/workflows/recovery-rehearsal.yml@refs/heads/
 
 class RehearsalBlocked(Exception):
     pass
+
+
+def console_summary(report):
+    result = {"overall_result": report["overall_result"], "state": report["state"]}
+    comparison = report.get("restore_comparison", {})
+    if "difference_summary" in comparison:
+        result["restore_difference_summary"] = comparison["difference_summary"]
+    return result
 
 
 def configuration(env):
@@ -328,6 +336,7 @@ def execute(
         report["restore_comparison"] = {
             "matches": comparison["matches"],
             "digest": digest(comparison),
+            "difference_summary": summarize_differences(comparison),
         }
         if not comparison["matches"]:
             raise RehearsalBlocked("restore_comparison_failed")
@@ -583,11 +592,7 @@ def main():
             "authorizes_activation": False,
         }
         private_json(args.directory / "recovery-report.json", report)
-    print(
-        json.dumps(
-            {"overall_result": report["overall_result"], "state": report["state"]}
-        )
-    )
+    print(json.dumps(console_summary(report)))
     return 0 if report["overall_result"] == "pass" else 1
 
 
