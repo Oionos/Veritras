@@ -1,0 +1,63 @@
+name: Inspect Saved Recovery Evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Original testing recovery run containing encrypted comparison evidence
+        type: string
+        required: true
+      attempt:
+        description: Original attempt containing the evidence
+        type: string
+        default: '1'
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  inspect:
+    if: github.ref == 'refs/heads/main' && github.repository == 'Oionos/Veritras'
+    runs-on: ubuntu-latest
+    environment: recovery-testing
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install locked inspection dependencies
+        run: pip install -r backend/requirements.lock
+      - name: Inspect authenticated saved comparison
+        env:
+          SOURCE_RUN_ID: ${{ inputs.run_id }}
+          SOURCE_ATTEMPT: ${{ inputs.attempt }}
+          REHEARSAL_BACKUP_KEY: ${{ secrets.REHEARSAL_BACKUP_KEY }}
+          GITHUB_RELEASE_TOKEN: ${{ github.token }}
+        run: python release/inspect_recovery_evidence.py --output "$RUNNER_TEMP/recovery-evidence-summary.json"
+      - name: Retain sanitized diagnosis
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: saved-recovery-diagnosis-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/recovery-evidence-summary.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Publish sanitized summary
+        if: always()
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          report = Path(os.environ['RUNNER_TEMP']) / 'recovery-evidence-summary.json'
+          if report.exists():
+              with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as output:
+                  output.write('## Saved recovery evidence inspection\n\n```json\n')
+                  output.write(report.read_text())
+                  output.write('\n```\n\nThis diagnosis does not change the original recovery result or authorize activation.\n')
+          PY
