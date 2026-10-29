@@ -43,7 +43,7 @@ def console_summary(report):
     if report["state"] == "deployment_identity_not_verified":
         identity = report.get("deployment_identity", {})
         result["deployment_identity"] = {key: identity[key] for key in
-                                         ("state", "rpc_http_status", "rpc_error_code") if key in identity}
+                                         ("state", "rpc_http_status", "rpc_error_code", "rpc_stage", "rpc_failure_kind") if key in identity}
     return result
 
 

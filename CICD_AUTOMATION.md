@@ -34,7 +34,7 @@ The initial production policy is `indexer_mode: disabled`. A policy change does 
 
 After this workflow is merged to main:
 
-1. Create/configure GitHub's `readiness` environment and restrict deployment branches to main. Set `SEPOLIA_RPC_URL` there as a secret. No database password, wallet key or Render credential is required.
+1. Testing uses the existing protected `recovery-testing` environment and its `SEPOLIA_RPC_URL` secret. Production uses `readiness`, restricted to main with its own RPC secret. No database password, wallet key or Render credential is required. Approve the testing environment job when prompted; this observer does not declare an RTO/RPO drill.
 2. Verify and commit the production creation hashes/anchor before expecting a production pass. Hosted testing's separate deployment evidence is already recorded in policy.
 3. In Actions, run **Deployment Identity and Readiness** from main and select production or testing. Alternatively:
 
@@ -48,6 +48,11 @@ After this workflow is merged to main:
 The workflow reads main's reviewed policy. For testing it inspects the fetched testing branch tip and its latest backend-changing ancestor. For production it uses main and its backend ancestor. Both health responses must agree on one of those specifically allowed SHAs; an arbitrary SHA reported by the API is never accepted as its own proof.
 
 Reports distinguish the verifier's `candidate_sha`, target `release_sha`, expected backend ancestor, and verified observed `backend_sha`. A 24-hour expiry is descriptive metadata for later orchestration, not an activation credential. Every current report explicitly has `authorizes_activation: false`.
+
+RPC failures include a fixed `rpc_stage` and `rpc_failure_kind`, plus numeric HTTP
+or JSON-RPC codes when available. These distinguish invalid endpoint configuration,
+missing historical receipts/blocks, response formatting and contract-call errors.
+Raw exception messages, URLs, keys and unknown exception class names are withheld.
 
 For an operator-run contract-only check, with RPC supplied privately:
 
