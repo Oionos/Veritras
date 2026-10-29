@@ -99,6 +99,18 @@ allowlisted schema categories such as `columns`, `constraints` or `indexes`.
 Object names, row values and complete fingerprints remain in the encrypted
 `restore-comparison.json`. Missing legacy diagnostics are reported as unavailable.
 
+Constraint fingerprints parse CHECK definitions and normalize the specific
+lossless rewrite PostgreSQL performs when a literal `varchar[]` is cast to
+`text[]` during dump/restore. The parser handles SQL literals and quoted names;
+normalization does not execute SQL. Literal values, surrounding predicates,
+names and validation flags remain checked. Other definitions retain exact
+comparison; domains, length-limited casts and nonliteral arrays are not treated
+as this rewrite. Fingerprints record the normalization/parser version, and mixed
+versions cannot compare equal. Older saved results are not changed retroactively.
+
+An RPC verification failure also prints its fixed state and numeric HTTP/JSON-RPC
+error codes when available. Provider messages, URLs and credentials remain hidden.
+
 Do not skip a failed comparison or assume its differences are harmless. Identify
 the failing category, reproduce the cause and review any correction before the
 next drill. Start a new workflow run after a correction; rerunning an old execution
