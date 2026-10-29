@@ -110,6 +110,11 @@ versions cannot compare equal. Older saved results are not changed retroactively
 
 An RPC verification failure also prints its fixed state and numeric HTTP/JSON-RPC
 error codes when available. Provider messages, URLs and credentials remain hidden.
+The fixed `rpc_stage` and `rpc_failure_kind` identify which call failed, including
+configuration, historical receipts/blocks and registry linkage. Use the manual
+**Deployment Identity and Readiness** workflow with environment **testing** to
+inspect these checks through `recovery-testing` without allocating recovery
+resources or declaring a timed drill. Approve that read-only job when prompted.
 
 Do not skip a failed comparison or assume its differences are harmless. Identify
 the failing category, reproduce the cause and review any correction before the

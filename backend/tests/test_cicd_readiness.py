@@ -119,7 +119,7 @@ def test_observer_is_trusted_manual_read_only_and_not_an_admission_prerequisite(
     job = workflow["jobs"]["inspect"]
     assert "github.ref == 'refs/heads/main'" in job["if"]
     assert "github.repository == 'Oionos/Veritras'" in job["if"]
-    assert job["environment"] == "readiness"
+    assert job["environment"] == "${{ inputs.environment == 'testing' && 'recovery-testing' || 'readiness' }}"
     commands = "\n".join(step.get("run", "") for step in job["steps"])
     assert "prepare_readiness_report.py" in commands
     assert "--apply" not in commands
@@ -175,14 +175,16 @@ def test_rpc_failure_publishes_numeric_codes_and_never_provider_messages(policy,
     error = RuntimeError("https://provider.example/private-key and private-message")
     error.response = SimpleNamespace(status_code=status)
     error.rpc_response = {"error": {"code": code, "message": "private-message"}}
-    wanted = {"verified": False, "state": "rpc_invalid_or_unavailable", **expected}
+    wanted = {"verified": False, "state": "rpc_invalid_or_unavailable",
+              "rpc_failure_kind": "http_error" if "rpc_http_status" in expected else "client_error", **expected}
     assert rpc_failure(error) == wanted
     w3 = FakeWeb3(policy["environments"]["testing"])
     def fail(_):
         raise error
     w3.eth.get_transaction_receipt = fail
     result = verify_identity(policy["environments"]["testing"], w3)
-    assert result == wanted and "private" not in json.dumps(result)
+    assert result == {**wanted, "rpc_stage": "registry_creation_receipt"}
+    assert "private" not in json.dumps(result)
 
 
 @pytest.mark.parametrize(
@@ -247,8 +249,50 @@ def test_provider_failure_is_sanitized(policy):
 
     w3.eth.get_block = fail
     result = verify_identity(expected, w3)
-    assert result == {"verified": False, "state": "rpc_invalid_or_unavailable"}
+    assert result == {"verified": False, "state": "rpc_invalid_or_unavailable",
+                      "rpc_stage": "registry_creation_block", "rpc_failure_kind": "client_error"}
     assert "secret" not in json.dumps(result)
+
+
+@pytest.mark.parametrize("url", [
+    "private-api-key-only", "SEPOLIA_RPC_URL=https://provider.example/private-key",
+    '"https://provider.example/private-key"', "http://provider.example/private-key",
+    "https://provider.example/private-key#fragment",
+])
+def test_invalid_rpc_endpoint_shape_is_identified_without_printing_value(policy, url):
+    result = configured_verification(policy["environments"]["testing"], url)
+    assert result == {"verified": False, "state": "rpc_invalid_or_unavailable",
+                      "rpc_stage": "configuration", "rpc_failure_kind": "configuration_invalid"}
+    assert "private" not in json.dumps(result) and "provider.example" not in json.dumps(result)
+
+
+@pytest.mark.parametrize("error_name,kind", [
+    ("TransactionNotFound", "receipt_not_found"), ("BlockNotFound", "block_not_found"),
+    ("ExtraDataLengthError", "block_header_format"), ("JSONDecodeError", "response_not_json"),
+    ("BadFunctionCallOutput", "contract_call_failed"), ("ReadTimeout", "timeout"),
+    ("PrivateSecretException", "client_error"),
+])
+def test_rpc_error_kinds_are_allowlisted_and_unknown_class_names_stay_private(error_name, kind):
+    error = type(error_name, (Exception,), {})("private-key-in-error-message")
+    result = rpc_failure(error, "registry_creation_receipt")
+    assert result["rpc_failure_kind"] == kind
+    assert result["rpc_stage"] == "registry_creation_receipt"
+    assert "PrivateSecretException" not in json.dumps(result)
+    assert "private-key" not in json.dumps(result)
+    assert "rpc_stage" not in rpc_failure(error, ["private-stage"])
+
+
+def test_rpc_call_sites_identify_linkage_failures(policy):
+    expected = policy["environments"]["testing"]
+    w3 = FakeWeb3(expected)
+    def fail():
+        raise type("BadFunctionCallOutput", (Exception,), {})("private-key")
+    w3.eth.contract = lambda **_: SimpleNamespace(functions=SimpleNamespace(
+        productRegistry=lambda: SimpleNamespace(call=fail)))
+    result = verify_identity(expected, w3)
+    assert result["rpc_stage"] == "tracker_registry"
+    assert result["rpc_failure_kind"] == "contract_call_failed"
+    assert result["verified"] is False and "private" not in json.dumps(result)
 
 
 def test_readiness_report_binds_scope_policy_and_exact_backend(policy):
