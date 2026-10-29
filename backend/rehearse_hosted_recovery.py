@@ -40,6 +40,10 @@ def console_summary(report):
     comparison = report.get("restore_comparison", {})
     if "difference_summary" in comparison:
         result["restore_difference_summary"] = comparison["difference_summary"]
+    if report["state"] == "deployment_identity_not_verified":
+        identity = report.get("deployment_identity", {})
+        result["deployment_identity"] = {key: identity[key] for key in
+                                         ("state", "rpc_http_status", "rpc_error_code") if key in identity}
     return result
 
 

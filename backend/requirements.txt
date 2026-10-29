@@ -21,5 +21,6 @@ python-jose[cryptography]>=3.3.0
 eth-account>=0.13.6,<0.14
 siwe==4.4.0
 cryptography>=50.0.2,<51
+pglast==8.7
 # Newer abnf releases reject siwe's bundled RFC 5234 grammar definitions.
 abnf==2.2.0

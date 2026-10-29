@@ -12,6 +12,19 @@ class IdentityMismatch(Exception):
     """Public fixed diagnostic only; never include provider exception strings."""
 
 
+def rpc_failure(error):
+    result = {"verified": False, "state": "rpc_invalid_or_unavailable"}
+    status = getattr(getattr(error, "response", None), "status_code", None)
+    if type(status) is int and 100 <= status <= 599:
+        result["rpc_http_status"] = status
+    response = getattr(error, "rpc_response", None)
+    detail = response.get("error") if isinstance(response, dict) else None
+    code = detail.get("code") if isinstance(detail, dict) else None
+    if type(code) is int and -32768 <= code <= 32767:
+        result["rpc_error_code"] = code
+    return result
+
+
 def verify_identity(policy, w3):
     if (policy["start_block"] is None or not policy["registry_creation_tx"]
             or not policy["tracker_creation_tx"]):
@@ -56,8 +69,8 @@ def verify_identity(policy, w3):
                 "start_block": anchor, "confirmations": policy["confirmations"], "receipts": receipts}
     except IdentityMismatch as error:
         return {"verified": False, "state": str(error)}
-    except Exception:
-        return {"verified": False, "state": "rpc_invalid_or_unavailable"}
+    except Exception as error:
+        return rpc_failure(error)
 
 
 def configured_verification(policy, rpc_url=None):
@@ -72,8 +85,8 @@ def configured_verification(policy, rpc_url=None):
             raise ValueError("Invalid RPC configuration")
         from web3 import Web3
         return verify_identity(policy, Web3(Web3.HTTPProvider(rpc_url, request_kwargs={"timeout": 10})))
-    except Exception:
-        return {"verified": False, "state": "rpc_invalid_or_unavailable"}
+    except Exception as error:
+        return rpc_failure(error)
 
 
 def main():

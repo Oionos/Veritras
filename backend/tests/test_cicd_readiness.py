@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from check_deployment_identity import configured_verification, verify_identity
+from check_deployment_identity import configured_verification, rpc_failure, verify_identity
 from environment_policy import load_policy, policy_digest
 from prepare_readiness_report import build_report
 from sync_environment_policy import sync
@@ -163,6 +163,26 @@ def test_canonical_creation_and_registry_linkage(policy):
     assert result["verified"]
     assert result["start_block"] == expected["start_block"]
     assert len(result["receipts"]) == 2
+
+
+@pytest.mark.parametrize("status,code,expected", [
+    (403, None, {"rpc_http_status": 403}),
+    (429, -32005, {"rpc_http_status": 429, "rpc_error_code": -32005}),
+    (True, "private-message", {}),
+    (900, 10**20, {}),
+])
+def test_rpc_failure_publishes_numeric_codes_and_never_provider_messages(policy, status, code, expected):
+    error = RuntimeError("https://provider.example/private-key and private-message")
+    error.response = SimpleNamespace(status_code=status)
+    error.rpc_response = {"error": {"code": code, "message": "private-message"}}
+    wanted = {"verified": False, "state": "rpc_invalid_or_unavailable", **expected}
+    assert rpc_failure(error) == wanted
+    w3 = FakeWeb3(policy["environments"]["testing"])
+    def fail(_):
+        raise error
+    w3.eth.get_transaction_receipt = fail
+    result = verify_identity(policy["environments"]["testing"], w3)
+    assert result == wanted and "private" not in json.dumps(result)
 
 
 @pytest.mark.parametrize(
