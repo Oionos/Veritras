@@ -15,12 +15,38 @@ import re
 import time
 
 from compare_recovery import checked_url, digest, fingerprint
+from check_deployment_identity import rpc_failure
 from environment_policy import environment
 from manage_rehearsal_resources import private_json
 
 
 class ReplayBlocked(Exception):
-    pass
+    def __init__(self, state, *, error=None, stage=None, start=None, end=None, attempts=None):
+        super().__init__(state)
+        self.diagnostics = {}
+        if error is not None:
+            details = rpc_failure(error, stage)
+            self.diagnostics = {key: value for key, value in details.items()
+                                if key not in {"verified", "state"}}
+        if type(start) is int and type(end) is int and 0 <= start <= end:
+            self.diagnostics.update(from_block=start, to_block=end)
+        if type(attempts) is int and 1 <= attempts <= 5:
+            self.diagnostics["attempts"] = attempts
+
+
+def retry_pause(failures, deadline, timeout_state):
+    delay = min(2 ** (failures - 1), 8)
+    if time.monotonic() + delay >= deadline:
+        raise ReplayBlocked(timeout_state)
+    time.sleep(delay)
+
+
+def reconciliation_header(worker, number):
+    try:
+        return worker._header(number)
+    except Exception as error:
+        raise ReplayBlocked("reconciliation_rpc_failed", error=error,
+                            stage="reconciliation_header", start=number, end=number) from None
 
 
 def validate_private_target(manifest, env):
@@ -52,7 +78,7 @@ def confirmed_events(worker, target, target_hash, deadline):
     from app.core.config import settings
     from app.services.indexer import _hex
 
-    if target < settings.indexer_start_block or worker._header(target) != target_hash:
+    if target < settings.indexer_start_block or reconciliation_header(worker, target) != target_hash:
         raise ReplayBlocked("canonical_target_mismatch")
     events, start, headers, failures = [], settings.indexer_start_block + 1, {}, 0
     while start <= target:
@@ -61,23 +87,25 @@ def confirmed_events(worker, target, target_hash, deadline):
         end = min(target, start + worker._batch_size - 1)
         try:
             batch = worker._fetch_events(start, end)
-        except Exception:
+        except Exception as error:
             failures += 1
             if failures >= 5:
-                raise ReplayBlocked("reconciliation_rpc_failed") from None
+                raise ReplayBlocked("reconciliation_rpc_failed", error=error,
+                                    stage="reconciliation_events", start=start, end=end, attempts=failures) from None
+            retry_pause(failures, deadline, "reconciliation_timeout")
             continue
         failures = 0
         for event in batch:
             number = event["blockNumber"]
             if number not in headers:
-                headers[number] = worker._header(number)
+                headers[number] = reconciliation_header(worker, number)
             if headers[number] != _hex(event["blockHash"]):
                 raise ReplayBlocked("canonical_target_mismatch")
         events.extend(batch)
         if len(events) > 100000:
             raise ReplayBlocked("reconciliation_event_budget_exceeded")
         start = end + 1
-    if worker._header(target) != target_hash:
+    if reconciliation_header(worker, target) != target_hash:
         raise ReplayBlocked("canonical_target_mismatch")
     return events
 
@@ -154,10 +182,11 @@ def replay_fixed(worker, target, target_hash, confirmations, deadline):
         try:
             worker.poll_once()
             failures = 0
-        except Exception:
+        except Exception as error:
             failures += 1
             if failures >= 5:
-                raise ReplayBlocked("fixed_replay_failed") from None
+                raise ReplayBlocked("fixed_replay_failed", error=error, stage="replay_poll", attempts=failures) from None
+            retry_pause(failures, deadline, "replay_timeout")
             continue
         if worker.last_processed_block == target:
             if worker._header(target) != target_hash:
@@ -368,7 +397,7 @@ def main():
             raise ReplayBlocked("invalid_replay_deadline")
         result = execute(args)
     except ReplayBlocked as error:
-        result = {"passed": False, "state": str(error)}
+        result = {"passed": False, "state": str(error), **error.diagnostics}
     except Exception:
         result = {"passed": False, "state": "private_worker_failed"}
     private_json(args.output, result)

@@ -29,6 +29,12 @@ from rehearse_recovery_restore import restore_checkpoint
 from release_gate import assess, github
 
 WORKFLOW = "Oionos/Veritras/.github/workflows/recovery-rehearsal.yml@refs/heads/main"
+RECONCILIATION_STATES = {
+    "reconciliation_review_required", "reconciliation_rpc_failed",
+    "reconciliation_conflicts", "reconciliation_timeout", "private_worker_failed",
+    "canonical_target_mismatch", "reconciliation_event_budget_exceeded",
+    "restored_schema_admission_failed",
+}
 
 
 class RehearsalBlocked(Exception):
@@ -44,14 +50,54 @@ def console_summary(report):
         identity = report.get("deployment_identity", {})
         result["deployment_identity"] = {key: identity[key] for key in
                                          ("state", "rpc_http_status", "rpc_error_code", "rpc_stage", "rpc_failure_kind") if key in identity}
+    reconciliation = report.get("reconciliation", {})
+    if reconciliation.get("state") in RECONCILIATION_STATES:
+        result["reconciliation"] = {key: reconciliation[key] for key in
+                                     ("state", "rpc_http_status", "rpc_error_code", "rpc_stage",
+                                      "rpc_failure_kind", "from_block", "to_block", "attempts") if key in reconciliation}
+    if report["overall_result"] == "review_required":
+        result["recovery_completed"] = False
     return result
+
+
+def review_ready(report):
+    """Only a complete, safely retained planning result can be non-failing."""
+    reconciliation = report.get("reconciliation")
+    if not isinstance(reconciliation, dict):
+        return False
+    evidence = [report.get(name) for name in ("restore_comparison", "RPO", "archive", "cleanup", "review_window")]
+    if not all(isinstance(item, dict) for item in evidence):
+        return False
+    comparison, rpo, archive, cleanup, window = evidence
+    return (
+        report.get("state") == "private_reconciliation_not_accepted"
+        and report.get("stage") == "reconciliation"
+        and report.get("authorizes_activation") is False
+        and reconciliation.get("state") == "reconciliation_review_required"
+        and reconciliation.get("passed") is False
+        and reconciliation.get("applied") is False
+        and all(type(reconciliation.get(key)) is int and reconciliation[key] >= 0
+                for key in ("history_matches", "identity_changes"))
+        and reconciliation["history_matches"] + reconciliation["identity_changes"] > 0
+        and isinstance(reconciliation.get("plan_digest"), str)
+        and re.fullmatch(r"[0-9a-f]{64}", reconciliation["plan_digest"]) is not None
+        and type(reconciliation.get("target_block")) is int
+        and reconciliation["target_block"] > 0
+        and isinstance(reconciliation.get("target_hash"), str)
+        and re.fullmatch(r"0x[0-9a-fA-F]{64}", reconciliation["target_hash"]) is not None
+        and comparison.get("matches") is True and rpo.get("passed") is True
+        and archive.get("state") == "encrypted"
+        and archive.get("format") == "AES-256-GCM" and archive.get("plaintext_uploaded") is False
+        and cleanup.get("state") in {"deleted", "already_deleted"}
+        and cleanup.get("manual_review_required", False) is False
+        and window.get("within_objective") is True
+    )
 
 
 def report_exit_code(report):
     if report.get("overall_result") == "pass":
         return 0
-    # A first protected run can stop here to publish a digest for reviewed replay.
-    if report.get("state") == "private_reconciliation_not_accepted":
+    if report.get("overall_result") == "review_required" and review_ready(report):
         return 0
     return 1
 
@@ -550,6 +596,14 @@ def execute(
         report["expires_at"] = datetime.fromtimestamp(
             started_wall + 86400, timezone.utc
         ).isoformat()
+        if report["state"] == "private_reconciliation_not_accepted":
+            elapsed = elapsed_before + clock() - started
+            report["review_window"] = {
+                "seconds": elapsed, "objective_seconds": config["rto"],
+                "within_objective": elapsed <= config["rto"],
+            }
+            if review_ready(report):
+                report["overall_result"] = "review_required"
         private_json(directory / "recovery-report.json", report)
     return report
 

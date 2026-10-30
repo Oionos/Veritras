@@ -120,6 +120,10 @@ def test_observer_is_trusted_manual_read_only_and_not_an_admission_prerequisite(
     assert "github.ref == 'refs/heads/main'" in job["if"]
     assert "github.repository == 'Oionos/Veritras'" in job["if"]
     assert job["environment"] == "${{ inputs.environment == 'testing' && 'recovery-testing' || 'readiness' }}"
+    assert workflow["on"]["workflow_dispatch"]["inputs"]["inspect_history"]["default"] == "false"
+    history = next(step for step in job["steps"] if "check_reconciliation_rpc.py" in step.get("run", ""))
+    assert history["if"] == "${{ inputs.inspect_history }}"
+    assert set(history["env"]) == {"SELECTED_ENVIRONMENT", "SEPOLIA_RPC_URL"}
     commands = "\n".join(step.get("run", "") for step in job["steps"])
     assert "prepare_readiness_report.py" in commands
     assert "--apply" not in commands
@@ -135,6 +139,21 @@ def test_observer_is_trusted_manual_read_only_and_not_an_admission_prerequisite(
             }
             for item in admission["workflows"]
         )
+
+
+@pytest.mark.parametrize("filename", ["production-readiness.yml", "recovery-rehearsal.yml"])
+def test_recovery_workflow_embedded_python_is_valid(filename):
+    import re
+    import yaml
+    root = Path(__file__).resolve().parents[2]
+    workflow = yaml.load((root / ".github/workflows" / filename).read_text(), Loader=yaml.BaseLoader)
+    snippets = []
+    for job in workflow["jobs"].values():
+        for step in job["steps"]:
+            snippets.extend(re.findall(r"python - <<'PY'\n(.*?)\nPY", step.get("run", ""), re.S))
+    assert snippets
+    for source in snippets:
+        compile(source, filename, "exec")
 
 
 @pytest.mark.parametrize(

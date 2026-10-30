@@ -8,6 +8,10 @@ on:
         type: choice
         options: [production, testing]
         required: true
+      inspect_history:
+        description: Also probe the first 1000 historical blocks (RPC reads only)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -54,12 +58,20 @@ jobs:
             --environment "$SELECTED_ENVIRONMENT" \
             --candidate-sha "$CANDIDATE_SHA" --release-sha "$release_sha" --backend-sha "$backend_sha" \
             --output readiness-report.json
+      - name: Inspect historical event RPC calls without recovery resources
+        if: ${{ inputs.inspect_history }}
+        env:
+          SELECTED_ENVIRONMENT: ${{ inputs.environment }}
+          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+        run: python backend/check_reconciliation_rpc.py --environment "$SELECTED_ENVIRONMENT" --output reconciliation-rpc-report.json
       - name: Retain sanitized report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: readiness-${{ inputs.environment }}-${{ github.sha }}
-          path: readiness-report.json
+          path: |
+            readiness-report.json
+            reconciliation-rpc-report.json
           if-no-files-found: warn
           retention-days: 7
       - name: Publish summary
@@ -73,6 +85,9 @@ jobs:
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
               summary.write('## Read-only readiness evidence\n\n```json\n')
               summary.write(Path('readiness-report.json').read_text())
+              if Path('reconciliation-rpc-report.json').exists():
+                  summary.write('\n```\n\n## Historical RPC probe\n\n```json\n')
+                  summary.write(Path('reconciliation-rpc-report.json').read_text())
               summary.write('```\n\nThis report does not authorize production activation.\n')
           PY
           fi
