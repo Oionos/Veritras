@@ -119,6 +119,24 @@ Select **inspect_history** to additionally probe the first 1,000 confirmed block
 through all five contract-event filters. This identifies the failing event,
 RPC method and safe numeric error codes without returning event data or opening
 a database. Passing this bounded probe does not prove full history replay.
+The history step runs after a failed readiness check too, but repeats its own
+canonical identity verification before reading logs. A failed readiness step
+still fails the job; a later probe cannot turn it into a successful observation.
+
+Identity RPC reads retry temporary missing receipts/blocks, timeouts and
+throttling at most three times, waiting one and two seconds. Authentication
+errors, returned identity mismatches and known permanent range/history errors
+remain blocking. Provider-internal retries are disabled so they cannot multiply
+this attempt budget. Reports retain retry counts and fixed reasons such as
+`rate_limited`, `range_limit` or `historical_data_unavailable`; provider messages
+remain private.
+
+If `receipt_not_found` persists after three attempts for a previously verified
+creation transaction, verify that public transaction on Sepolia and use an RPC
+endpoint that serves its historical receipts and logs. Save the complete HTTPS
+endpoint privately in **GitHub Settings → Environments → recovery-testing →
+SEPOLIA_RPC_URL**. Keep the existing contract addresses, transaction hashes and
+anchor; missing provider data cannot establish a different deployment identity.
 
 Reconciliation RPC failures now retain their fixed worker state, error category,
 numeric HTTP/JSON-RPC codes and failed block range in the sanitized report and
