@@ -84,7 +84,7 @@ After both cleanup scopes are configured, set repository variable `RECOVERY_REAP
      --ref main --field environment=testing
    ```
 
-5. Approve the protected environment job. Inspect both its final conclusion and sanitized `recovery-report-...` artifact. A report's `pass` alone is not approval to activate production.
+5. Approve the protected environment job. Inspect both its final conclusion and sanitized `recovery-report-...` artifact. A `review_required` result can finish the planning job successfully, but full recovery remains incomplete. Only a genuine, unapplied review plan with a digest/target, matching restore, passing RPO, encrypted archive, verified cleanup and an unexpired review window qualifies. RPC errors, conflicts, encryption/cleanup failures and expired objectives still fail. A report's `pass` alone is not approval to activate production.
 6. Require successful restore comparison, actual schema revision, accepted reconciliation, two stable restarts, fresh zero-lag private reads, measured RPO/RTO, encrypted evidence and verified cleanup.
 
 No migration is automatically applied. An older/unrecognized restored schema blocks the private worker. Rehearse any future migration explicitly rather than stamping or silently adopting it. Source integrations or database jobs that would execute automatically from a clone must be reviewed before enabling this drill.
@@ -115,6 +115,17 @@ configuration, historical receipts/blocks and registry linkage. Use the manual
 **Deployment Identity and Readiness** workflow with environment **testing** to
 inspect these checks through `recovery-testing` without allocating recovery
 resources or declaring a timed drill. Approve that read-only job when prompted.
+Select **inspect_history** to additionally probe the first 1,000 confirmed blocks
+through all five contract-event filters. This identifies the failing event,
+RPC method and safe numeric error codes without returning event data or opening
+a database. Passing this bounded probe does not prove full history replay.
+
+Reconciliation RPC failures now retain their fixed worker state, error category,
+numeric HTTP/JSON-RPC codes and failed block range in the sanitized report and
+console. The coordinator's broad `private_reconciliation_not_accepted` state
+alone does not mean review is needed. For example, `reconciliation_rpc_failed`
+is a real failure. The worker retries at most five times with 1/2/4/8-second
+backoff, preserves the failed range for retry, and obeys its existing deadline.
 
 Do not skip a failed comparison or assume its differences are harmless. Identify
 the failing category, reproduce the cause and review any correction before the
@@ -177,6 +188,7 @@ History attribution is simulated before identity planning, then both are committ
 | Provider expiry unsupported or absent | Resolve account/API support; do not retry without expiration |
 | Restore/schema admission failure | Check compatible clients, TLS, empty target and schema on a private copy; do not drop platform objects to force success |
 | Reconciliation review/conflicts | Review encrypted evidence; approve only an exact conflict-free plan |
+| Reconciliation RPC failure | Run the read-only observer with `inspect_history=true`; inspect fixed method/stage, codes and block range before repeating a full rehearsal |
 | Restart/history mismatch | Keep production activation blocked; inspect canonical evidence and the private reports |
 | Encryption failure | Fix the private archive key/configuration and repeat the drill; plaintext is not uploaded as a fallback |
 | Cleanup failed/uncertain | Inspect `resource_intent` and cleanup-step results; verify only the authenticated owned resource in Neon or run the configured reaper |

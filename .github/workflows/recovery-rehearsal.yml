@@ -119,5 +119,6 @@ jobs:
               with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as output:
                   output.write('## Private recovery rehearsal\n\n```json\n')
                   output.write(report.read_text())
-                  output.write('```\n\nThis is recovery evidence, not production activation approval.\n')
+                  output.write('```\n\nA `review_required` result is a retained planning outcome; full recovery is incomplete.\n')
+                  output.write('This is recovery evidence, not production activation approval.\n')
           PY
