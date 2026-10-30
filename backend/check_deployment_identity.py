@@ -18,6 +18,7 @@ RPC_STAGES = {
     "registry_creation_block", "tracker_creation_block",
     "registry_code", "tracker_code", "tracker_registry",
     "registry_creation_recheck", "tracker_creation_recheck",
+    "reconciliation_events", "reconciliation_header", "replay_poll",
 }
 RPC_FAILURES = {
     "TransactionNotFound": "receipt_not_found", "BlockNotFound": "block_not_found",
@@ -33,6 +34,7 @@ RPC_FAILURES = {
     "KeyError": "response_invalid", "AttributeError": "response_invalid", "TypeError": "response_invalid",
     "InvalidURL": "configuration_invalid", "MissingSchema": "configuration_invalid",
     "InvalidSchema": "configuration_invalid",
+    "MismatchedABI": "log_decode_failed",
 }
 
 
@@ -46,6 +48,8 @@ def rpc_failure(error, stage=None):
         result["rpc_http_status"] = status
         result["rpc_failure_kind"] = "http_error"
     response = getattr(error, "rpc_response", None)
+    if response is None and isinstance(error, ValueError) and error.args and isinstance(error.args[0], dict):
+        response = {"error": error.args[0]}
     detail = response.get("error") if isinstance(response, dict) else None
     code = detail.get("code") if isinstance(detail, dict) else None
     if type(code) is int and -32768 <= code <= 32767:

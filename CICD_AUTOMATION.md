@@ -53,6 +53,11 @@ RPC failures include a fixed `rpc_stage` and `rpc_failure_kind`, plus numeric HT
 or JSON-RPC codes when available. These distinguish invalid endpoint configuration,
 missing historical receipts/blocks, response formatting and contract-call errors.
 Raw exception messages, URLs, keys and unknown exception class names are withheld.
+For the reconciliation failure, select **inspect_history** or add
+`--field inspect_history=true` when dispatching the observer. It additionally
+probes the initial 1,000 confirmed blocks through five historical event filters,
+retaining only counts and safe error categories/codes. It has no database or
+provider-management credentials, and does not certify full recovery.
 
 For an operator-run contract-only check, with RPC supplied privately:
 

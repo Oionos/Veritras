@@ -11,6 +11,7 @@ from environment_policy import environment
 from recovery_evidence import decrypt_archive
 from replay_private_restore import (
     ReplayBlocked,
+    confirmed_events,
     reconcile_private,
     replay_fixed,
     validate_private_target,
@@ -292,6 +293,24 @@ def test_console_identity_failure_exposes_only_safe_code_fields():
     assert "private" not in json.dumps(result)
 
 
+def test_report_exit_code_allows_pass_but_not_a_generic_reconciliation_failure():
+    assert hosted.report_exit_code(
+        {"overall_result": "pass", "state": "rehearsal_completed"}
+    ) == 0
+    assert hosted.report_exit_code(
+        {
+            "overall_result": "blocked",
+            "state": "private_reconciliation_not_accepted",
+        }
+    ) == 1
+
+
+def test_report_exit_code_blocks_other_failures():
+    assert hosted.report_exit_code(
+        {"overall_result": "blocked", "state": "restore_comparison_failed"}
+    ) == 1
+
+
 def test_wrong_rotation_scope_blocks_sql_connections_and_still_cleans(drill):
     execute, calls, _, _ = drill
     resources = FakeResources()
@@ -348,8 +367,10 @@ def test_declaring_an_environment_does_not_prove_review_protection():
         hosted.verify_environment_protection("recovery-testing", lambda _: settings)
 
 
-def test_fixed_replay_retries_bounded_failures_without_echoing_provider_errors():
+def test_fixed_replay_retries_bounded_failures_without_echoing_provider_errors(monkeypatch):
     import time
+    pauses = []
+    monkeypatch.setattr("replay_private_restore.retry_pause", lambda failures, *args: pauses.append(failures))
 
     calls = []
     worker = SimpleNamespace(
@@ -367,6 +388,7 @@ def test_fixed_replay_retries_bounded_failures_without_echoing_provider_errors()
     worker.poll_once = poll
     replay_fixed(worker, 108, "0xhash", 12, time.monotonic() + 2)
     assert len(calls) == 3
+    assert pauses == [1, 2]
 
 
 def test_reconciliation_review_stops_before_private_backfill_and_still_cleans(drill):
@@ -375,12 +397,149 @@ def test_reconciliation_review_stops_before_private_backfill_and_still_cleans(dr
 
     def review(*args, **kwargs):
         result = phase(*args, **kwargs)
-        return {**result, "passed": False, "state": "reconciliation_review_required"}
+        return {**result, "passed": False, "state": "reconciliation_review_required", "identity_changes": 1}
 
     report = execute(resources, phase=review)
-    assert report["overall_result"] == "blocked"
+    assert report["overall_result"] == "review_required"
+    assert hosted.report_exit_code(report) == 0
+    assert report["authorizes_activation"] is False
+    assert report["review_window"]["within_objective"] is True
+    assert "restart_checks" not in report and "live_readiness" not in report
     assert [name for name, _, _ in calls] == ["reconcile"]
     assert report["archive"]["state"] == "encrypted" and resources.cleaned == 1
+
+
+@pytest.mark.parametrize("state", [
+    "reconciliation_rpc_failed", "reconciliation_conflicts", "reconciliation_timeout",
+    "canonical_target_mismatch", "private_worker_failed",
+])
+def test_real_reconciliation_errors_never_become_success(drill, state):
+    execute, calls, _, phase = drill
+    def fail(*args, **kwargs):
+        return {**phase(*args, **kwargs), "passed": False, "state": state}
+    report = execute(phase=fail)
+    assert report["overall_result"] == "blocked"
+    assert hosted.report_exit_code(report) == 1
+    assert [name for name, _, _ in calls] == ["reconcile"]
+    assert hosted.console_summary(report)["reconciliation"]["state"] == state
+
+
+@pytest.mark.parametrize("failure", ["encryption", "cleanup", "timeout", "missing_digest", "missing_target", "applied"])
+def test_review_exit_requires_safely_retained_complete_planning_evidence(drill, monkeypatch, failure):
+    execute, _, _, phase = drill
+    resources = FakeResources(cleanup_failure=failure == "cleanup")
+    if failure == "encryption":
+        monkeypatch.setattr(hosted, "encrypt_files", lambda *args: (_ for _ in ()).throw(RuntimeError("private-key")))
+    def review(*args, **kwargs):
+        result = {**phase(*args, **kwargs), "passed": False, "state": "reconciliation_review_required", "identity_changes": 1}
+        if failure == "missing_digest":
+            result.pop("plan_digest")
+        elif failure == "missing_target":
+            result.pop("target_hash")
+        elif failure == "applied":
+            result["applied"] = True
+        return result
+    def clock():
+        # Initial deadline checks remain in budget; final retention exceeds it.
+        if failure == "timeout" and resources.cleaned:
+            return 701.0
+        return 100.0
+    report = execute(resources, phase=review, clock=clock)
+    assert hosted.report_exit_code(report) == 1
+    assert report["overall_result"] == "blocked"
+    assert resources.cleaned == 1
+
+
+def test_reconciliation_rpc_console_excludes_unstructured_provider_values():
+    report = {"overall_result": "blocked", "state": "private_reconciliation_not_accepted",
+              "reconciliation": {"state": "reconciliation_rpc_failed", "passed": False,
+                                  "rpc_failure_kind": "http_error", "rpc_http_status": 429,
+                                  "rpc_stage": "reconciliation_events", "from_block": 1, "to_block": 62,
+                                  "attempts": 5, "private_message": "private-api-key"}}
+    result = hosted.console_summary(report)
+    assert result["reconciliation"]["rpc_http_status"] == 429
+    assert "private-api-key" not in json.dumps(result)
+    assert hosted.report_exit_code(report) == 1
+
+
+def fake_reconciliation_clock(monkeypatch):
+    import replay_private_restore as replay
+    clock = SimpleNamespace(now=0.0, pauses=[])
+    def pause(delay):
+        clock.pauses.append(delay)
+        clock.now += delay
+    monkeypatch.setattr(replay, "time", SimpleNamespace(monotonic=lambda: clock.now, sleep=pause))
+    return clock
+
+
+def test_reconciliation_retries_keep_failed_ranges_and_apply_bounded_backoff(monkeypatch):
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "indexer_start_block", 0)
+    clock = fake_reconciliation_clock(monkeypatch)
+    calls = []
+    worker = SimpleNamespace(_batch_size=8, _header=lambda number: "0xhash")
+    def fetch(start, end):
+        calls.append((start, end))
+        if len(calls) <= 2:
+            worker._batch_size //= 2
+            raise RuntimeError("private-rpc-key")
+        return []
+    worker._fetch_events = fetch
+    assert confirmed_events(worker, 8, "0xhash", 30) == []
+    assert calls[:3] == [(1, 8), (1, 4), (1, 2)]
+    assert calls[3:] == [(3, 4), (5, 6), (7, 8)]
+    assert clock.pauses == [1, 2]
+
+
+def test_reconciliation_exhaustion_exposes_only_fixed_categories_and_numeric_codes(monkeypatch):
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "indexer_start_block", 0)
+    clock = fake_reconciliation_clock(monkeypatch)
+    worker = SimpleNamespace(_batch_size=1000, _header=lambda number: "0xhash")
+    def fail(*args):
+        worker._batch_size //= 2
+        error = RuntimeError("https://provider.example/private-key")
+        error.response = SimpleNamespace(status_code=429)
+        raise error
+    worker._fetch_events = fail
+    with pytest.raises(ReplayBlocked) as failure:
+        confirmed_events(worker, 1000, "0xhash", 60)
+    assert str(failure.value) == "reconciliation_rpc_failed"
+    assert failure.value.diagnostics == {
+        "rpc_failure_kind": "http_error", "rpc_http_status": 429,
+        "rpc_stage": "reconciliation_events", "from_block": 1, "to_block": 62, "attempts": 5,
+    }
+    assert clock.pauses == [1, 2, 4, 8]
+    assert "private" not in json.dumps(failure.value.diagnostics)
+
+
+def test_reconciliation_backoff_cannot_exceed_deadline(monkeypatch):
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "indexer_start_block", 0)
+    clock = fake_reconciliation_clock(monkeypatch)
+    def fail(*args):
+        raise RuntimeError("private-key")
+    worker = SimpleNamespace(_batch_size=10, _header=lambda number: "0xhash", _fetch_events=fail)
+    with pytest.raises(ReplayBlocked, match="reconciliation_timeout"):
+        confirmed_events(worker, 10, "0xhash", 2)
+    assert clock.pauses == [1]
+
+
+def test_worker_report_preserves_safe_rpc_diagnostics(tmp_path, monkeypatch):
+    import replay_private_restore as replay
+    monkeypatch.setattr(replay.logging, "disable", lambda *args: None)
+    output = tmp_path / "worker.json"
+    monkeypatch.setattr("sys.argv", ["worker", "--phase", "reconcile", "--manifest", "unused.json", "--output", str(output)])
+    error = ValueError({"code": -32005, "message": "private-rpc-key"})
+    def fail(args):
+        raise ReplayBlocked("reconciliation_rpc_failed", error=error,
+                            stage="reconciliation_events", start=1, end=62, attempts=5)
+    monkeypatch.setattr(replay, "execute", fail)
+    assert replay.main() == 1
+    report = json.loads(output.read_text())
+    assert report["state"] == "reconciliation_rpc_failed" and report["passed"] is False
+    assert report["rpc_error_code"] == -32005 and report["attempts"] == 5
+    assert "private-rpc-key" not in json.dumps(report)
 
 
 @pytest.mark.parametrize("failure", ["restart", "cleanup", "encryption", "interrupt"])
