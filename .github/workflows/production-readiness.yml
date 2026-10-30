@@ -39,6 +39,7 @@ jobs:
       - name: Check policy copies
         run: python backend/sync_environment_policy.py
       - name: Verify deployed health and canonical contract evidence
+        id: readiness
         env:
           SELECTED_ENVIRONMENT: ${{ inputs.environment }}
           CANDIDATE_SHA: ${{ github.sha }}
@@ -59,7 +60,7 @@ jobs:
             --candidate-sha "$CANDIDATE_SHA" --release-sha "$release_sha" --backend-sha "$backend_sha" \
             --output readiness-report.json
       - name: Inspect historical event RPC calls without recovery resources
-        if: ${{ inputs.inspect_history }}
+        if: ${{ !cancelled() && inputs.inspect_history && steps.readiness.outcome != 'skipped' }}
         env:
           SELECTED_ENVIRONMENT: ${{ inputs.environment }}
           SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}

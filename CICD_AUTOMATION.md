@@ -58,6 +58,10 @@ For the reconciliation failure, select **inspect_history** or add
 probes the initial 1,000 confirmed blocks through five historical event filters,
 retaining only counts and safe error categories/codes. It has no database or
 provider-management credentials, and does not certify full recovery.
+Identity reads use at most three attempts with one/two-second waits for temporary
+RPC failures. Persistent missing history stays blocked. The optional historical
+probe also runs after failed readiness, verifies identity independently, and
+retains its separate report; it cannot erase the original failed check.
 
 For an operator-run contract-only check, with RPC supplied privately:
 

@@ -122,7 +122,9 @@ def test_observer_is_trusted_manual_read_only_and_not_an_admission_prerequisite(
     assert job["environment"] == "${{ inputs.environment == 'testing' && 'recovery-testing' || 'readiness' }}"
     assert workflow["on"]["workflow_dispatch"]["inputs"]["inspect_history"]["default"] == "false"
     history = next(step for step in job["steps"] if "check_reconciliation_rpc.py" in step.get("run", ""))
-    assert history["if"] == "${{ inputs.inspect_history }}"
+    assert history["if"] == "${{ !cancelled() && inputs.inspect_history && steps.readiness.outcome != 'skipped' }}"
+    readiness = next(step for step in job["steps"] if step.get("id") == "readiness")
+    assert "prepare_readiness_report.py" in readiness["run"]
     assert set(history["env"]) == {"SELECTED_ENVIRONMENT", "SEPOLIA_RPC_URL"}
     commands = "\n".join(step.get("run", "") for step in job["steps"])
     assert "prepare_readiness_report.py" in commands
@@ -201,8 +203,9 @@ def test_rpc_failure_publishes_numeric_codes_and_never_provider_messages(policy,
     def fail(_):
         raise error
     w3.eth.get_transaction_receipt = fail
-    result = verify_identity(policy["environments"]["testing"], w3)
-    assert result == {**wanted, "rpc_stage": "registry_creation_receipt"}
+    result = verify_identity(policy["environments"]["testing"], w3, sleep=lambda _: None)
+    retry = {"rpc_attempts": 3, "rpc_retries": 2} if status == 429 else {}
+    assert result == {**wanted, "rpc_stage": "registry_creation_receipt", **retry}
     assert "private" not in json.dumps(result)
 
 
@@ -257,6 +260,138 @@ def test_missing_production_evidence_and_rpc_never_pass(policy):
         configured_verification(policy["environments"]["testing"], "")["state"]
         == "rpc_not_configured"
     )
+
+
+def test_transient_missing_creation_receipt_is_retried_then_fully_verified(policy):
+    from web3.exceptions import TransactionNotFound
+    expected = policy["environments"]["testing"]
+    w3 = FakeWeb3(expected)
+    calls, pauses = [], []
+    original = w3.eth.get_transaction_receipt
+    def receipt(tx):
+        calls.append(tx)
+        if len(calls) <= 2:
+            raise TransactionNotFound("private-provider-message")
+        return original(tx)
+    w3.eth.get_transaction_receipt = receipt
+    result = verify_identity(expected, w3, sleep=pauses.append)
+    assert result["verified"] is True and result["rpc_retries"] == 2
+    assert len(result["receipts"]) == 2 and len(calls) == 4
+    assert pauses == [1, 2]
+    assert "private" not in json.dumps(result)
+
+
+def test_persistently_missing_receipt_fails_after_bounded_attempts(policy):
+    from web3.exceptions import TransactionNotFound
+    expected = policy["environments"]["testing"]
+    w3 = FakeWeb3(expected)
+    calls, pauses = [], []
+    def fail(tx):
+        calls.append(tx)
+        raise TransactionNotFound("https://provider.example/private-key")
+    w3.eth.get_transaction_receipt = fail
+    result = verify_identity(expected, w3, sleep=pauses.append)
+    assert result == {"verified": False, "state": "rpc_invalid_or_unavailable",
+                      "rpc_stage": "registry_creation_receipt", "rpc_failure_kind": "receipt_not_found",
+                      "rpc_attempts": 3, "rpc_retries": 2}
+    assert pauses == [1, 2] and len(calls) == 3
+    assert "private" not in json.dumps(result)
+
+
+def test_receipt_identity_mismatch_is_not_retried_or_accepted(policy):
+    expected = policy["environments"]["testing"]
+    w3 = FakeWeb3(expected)
+    calls, pauses = [], []
+    original = w3.eth.get_transaction_receipt
+    def wrong(tx):
+        calls.append(tx)
+        return {**original(tx), "contractAddress": expected["tracker"]}
+    w3.eth.get_transaction_receipt = wrong
+    assert verify_identity(expected, w3, sleep=pauses.append) == {"verified": False, "state": "creation_receipt_mismatch"}
+    assert len(calls) == 1 and pauses == []
+
+
+def test_recovered_receipt_still_must_match_the_reviewed_transaction(policy):
+    from web3.exceptions import TransactionNotFound
+    expected = policy["environments"]["testing"]
+    w3 = FakeWeb3(expected)
+    original = w3.eth.get_transaction_receipt
+    calls, pauses = [], []
+    def receipt(tx):
+        calls.append(tx)
+        if len(calls) == 1:
+            raise TransactionNotFound("private-key")
+        return {**original(tx), "transactionHash": b"wrong"}
+    w3.eth.get_transaction_receipt = receipt
+    result = verify_identity(expected, w3, sleep=pauses.append)
+    assert result == {"verified": False, "state": "creation_receipt_mismatch"}
+    assert pauses == [1] and len(calls) == 2
+
+
+@pytest.mark.parametrize("message,reason", [
+    ("block range exceeds limit", "range_limit"),
+    ("historical state unavailable", "historical_data_unavailable"),
+    ("method not found", "method_unavailable"),
+])
+def test_permanent_rpc_errors_do_not_consume_retry_budget(policy, message, reason):
+    expected = policy["environments"]["testing"]
+    w3 = FakeWeb3(expected)
+    calls, pauses = [], []
+    def fail(tx):
+        calls.append(tx)
+        raise ValueError({"code": -32005, "message": message + " private-key"})
+    w3.eth.get_transaction_receipt = fail
+    result = verify_identity(expected, w3, sleep=pauses.append)
+    assert not result["verified"] and result["rpc_reason"] == reason
+    assert len(calls) == 1 and pauses == []
+    assert "private" not in json.dumps(result)
+
+
+def test_provider_internal_retries_are_disabled(policy, monkeypatch):
+    import web3
+    expected = policy["environments"]["testing"]
+    options = {}
+    class Factory:
+        @staticmethod
+        def HTTPProvider(url, **kwargs):
+            options.update(kwargs)
+            return object()
+        def __new__(cls, provider):
+            return FakeWeb3(expected)
+    monkeypatch.setattr(web3, "Web3", Factory)
+    assert configured_verification(expected, "https://provider.example/private-key")["verified"]
+    assert options == {"request_kwargs": {"timeout": 10}, "exception_retry_configuration": None}
+
+
+@pytest.mark.parametrize("status,attempts", [(401, 1), (403, 1), (429, 3), (503, 3)])
+def test_identity_retries_transient_http_errors_but_not_auth_failures(policy, status, attempts):
+    expected = policy["environments"]["testing"]
+    w3 = FakeWeb3(expected)
+    calls, pauses = [], []
+    def fail(tx):
+        calls.append(tx)
+        error = RuntimeError("private-key")
+        error.response = SimpleNamespace(status_code=status)
+        raise error
+    w3.eth.get_transaction_receipt = fail
+    result = verify_identity(expected, w3, sleep=pauses.append)
+    assert not result["verified"] and len(calls) == attempts
+    assert pauses == ([1, 2] if attempts == 3 else [])
+    assert result["rpc_http_status"] == status
+
+
+@pytest.mark.parametrize("message,reason", [
+    ("Too many requests: private-key", "rate_limited"),
+    ("Please reduce block range: private-key", "range_limit"),
+    ("Historical state unavailable: private-key", "historical_data_unavailable"),
+    ("missing trie node: private-key", "historical_data_unavailable"),
+    ("Method not found: private-key", "method_unavailable"),
+    ("Unrecognized private provider message", None),
+])
+def test_rpc_messages_are_classified_into_fixed_reasons_without_publishing_them(message, reason):
+    report = rpc_failure(ValueError({"code": -32000, "message": message}))
+    assert report.get("rpc_reason") == reason
+    assert "private" not in json.dumps(report)
 
 
 def test_provider_failure_is_sanitized(policy):
