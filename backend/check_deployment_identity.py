@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import time
 from urllib.parse import urlsplit
 
 from environment_policy import environment
@@ -36,6 +37,13 @@ RPC_FAILURES = {
     "InvalidSchema": "configuration_invalid",
     "MismatchedABI": "log_decode_failed",
 }
+RPC_RETRY_ATTEMPTS = 3
+RPC_REASONS = {
+    "rate_limited": ("rate limit", "too many requests", "request limit", "compute units", "quota exceeded"),
+    "range_limit": ("block range", "range is too wide", "query returned more than", "maximum block range"),
+    "historical_data_unavailable": ("missing trie node", "historical state", "history has been pruned", "historical receipts", "pruned history"),
+    "method_unavailable": ("method not found", "method not allowed", "method is not available"),
+}
 
 
 def rpc_failure(error, stage=None):
@@ -56,24 +64,57 @@ def rpc_failure(error, stage=None):
         result["rpc_error_code"] = code
         if "rpc_http_status" not in result:
             result["rpc_failure_kind"] = "rpc_response_error"
+    message = detail.get("message") if isinstance(detail, dict) else None
+    if isinstance(message, str):
+        message = message[:8192].casefold()
+        for reason, patterns in RPC_REASONS.items():
+            if any(pattern in message for pattern in patterns):
+                result["rpc_reason"] = reason
+                break
     return result
 
 
-def verify_identity(policy, w3):
+def retryable_rpc_failure(error):
+    details = rpc_failure(error)
+    status = details.get("rpc_http_status")
+    if type(status) is int and status >= 400:
+        return status in {408, 425, 429} or 500 <= status <= 599
+    if details.get("rpc_reason") in {"range_limit", "historical_data_unavailable", "method_unavailable"}:
+        return False
+    if details["rpc_failure_kind"] in {"receipt_not_found", "block_not_found", "timeout", "connection_failed", "response_not_json"}:
+        return True
+    return (details.get("rpc_reason") == "rate_limited"
+            or details.get("rpc_error_code") in {-32005, -32603})
+
+
+def verify_identity(policy, w3, *, sleep=time.sleep):
     if (policy["start_block"] is None or not policy["registry_creation_tx"]
             or not policy["tracker_creation_tx"]):
         return {"verified": False, "state": "deployment_evidence_missing"}
     stage = "chain_id"
+    attempts, retries = 1, 0
+
+    def read(operation):
+        nonlocal attempts, retries
+        for attempts in range(1, RPC_RETRY_ATTEMPTS + 1):
+            try:
+                return operation()
+            except Exception as error:
+                if attempts == RPC_RETRY_ATTEMPTS or not retryable_rpc_failure(error):
+                    raise
+                sleep(2 ** (attempts - 1))
+                retries += 1
+
     try:
-        if w3.eth.chain_id != policy["chain_id"]:
+        if read(lambda: w3.eth.chain_id) != policy["chain_id"]:
             raise IdentityMismatch("chain_mismatch")
         stage = "chain_head"
-        head = w3.eth.block_number
+        head = read(lambda: w3.eth.block_number)
         receipts = []
         for name in ("registry", "tracker"):
             tx = policy[name + "_creation_tx"]
             stage = name + "_creation_receipt"
-            receipt = w3.eth.get_transaction_receipt(tx)
+            receipt = read(lambda: w3.eth.get_transaction_receipt(tx))
             address = policy[name].lower()
             if (receipt["status"] != 1
                     or (receipt["contractAddress"] or "").lower() != address
@@ -83,18 +124,18 @@ def verify_identity(policy, w3):
             if type(block_number) is not int or block_number < 1 or block_number > head - policy["confirmations"]:
                 raise IdentityMismatch("creation_not_confirmed")
             stage = name + "_creation_block"
-            block = w3.eth.get_block(block_number)
+            block = read(lambda: w3.eth.get_block(block_number))
             if block["hash"] != receipt["blockHash"]:
                 raise IdentityMismatch("noncanonical_creation")
             stage = name + "_code"
-            if not w3.eth.get_code(w3.to_checksum_address(policy[name])):
+            if not read(lambda: w3.eth.get_code(w3.to_checksum_address(policy[name]))):
                 raise IdentityMismatch("contract_not_deployed")
             receipts.append({"contract": name, "address": policy[name], "transaction": tx,
                              "block": block_number, "block_hash": "0x" + block["hash"].hex().removeprefix("0x")})
         abi = [{"type": "function", "name": "productRegistry", "stateMutability": "view",
                 "inputs": [], "outputs": [{"name": "", "type": "address"}]}]
         stage = "tracker_registry"
-        linked = w3.eth.contract(address=w3.to_checksum_address(policy["tracker"]), abi=abi).functions.productRegistry().call()
+        linked = read(lambda: w3.eth.contract(address=w3.to_checksum_address(policy["tracker"]), abi=abi).functions.productRegistry().call())
         if linked.lower() != policy["registry"].lower():
             raise IdentityMismatch("tracker_registry_mismatch")
         anchor = min(item["block"] for item in receipts) - 1
@@ -103,15 +144,23 @@ def verify_identity(policy, w3):
         # Re-read inclusion headers after all calls; reject a fork during inspection.
         for receipt in receipts:
             stage = receipt["contract"] + "_creation_recheck"
-            observed = "0x" + w3.eth.get_block(receipt["block"])["hash"].hex().removeprefix("0x")
+            observed = "0x" + read(lambda: w3.eth.get_block(receipt["block"]))["hash"].hex().removeprefix("0x")
             if observed != receipt["block_hash"]:
                 raise IdentityMismatch("noncanonical_creation")
-        return {"verified": True, "state": "verified", "chain_id": policy["chain_id"],
-                "start_block": anchor, "confirmations": policy["confirmations"], "receipts": receipts}
+        result = {"verified": True, "state": "verified", "chain_id": policy["chain_id"],
+                  "start_block": anchor, "confirmations": policy["confirmations"], "receipts": receipts}
+        if retries:
+            result["rpc_retries"] = retries
+        return result
     except IdentityMismatch as error:
         return {"verified": False, "state": str(error)}
     except Exception as error:
-        return rpc_failure(error, stage)
+        result = rpc_failure(error, stage)
+        if attempts > 1:
+            result["rpc_attempts"] = attempts
+        if retries:
+            result["rpc_retries"] = retries
+        return result
 
 
 def configured_verification(policy, rpc_url=None):
@@ -129,7 +178,7 @@ def configured_verification(policy, rpc_url=None):
                 "rpc_stage": "configuration", "rpc_failure_kind": "configuration_invalid"}
     try:
         from web3 import Web3
-        return verify_identity(policy, Web3(Web3.HTTPProvider(rpc_url, request_kwargs={"timeout": 10})))
+        return verify_identity(policy, Web3(Web3.HTTPProvider(rpc_url, request_kwargs={"timeout": 10}, exception_retry_configuration=None)))
     except Exception as error:
         return rpc_failure(error, "provider_initialization")
 
