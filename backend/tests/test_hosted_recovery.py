@@ -487,8 +487,43 @@ def test_reconciliation_retries_keep_failed_ranges_and_apply_bounded_backoff(mon
     worker._fetch_events = fetch
     assert confirmed_events(worker, 8, "0xhash", 30) == []
     assert calls[:3] == [(1, 8), (1, 4), (1, 2)]
-    assert calls[3:] == [(3, 4), (5, 6), (7, 8)]
+    assert calls[3:] == [(3, 6), (7, 8)]
+    assert worker._batch_size == 8
     assert clock.pauses == [1, 2]
+
+
+def test_transient_rate_limits_cannot_leave_reconciliation_at_one_block(monkeypatch):
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "indexer_start_block", 0)
+    clock = fake_reconciliation_clock(monkeypatch)
+    worker = SimpleNamespace(_batch_size=8, _header=lambda number: "0xhash")
+    calls, progress = [], []
+
+    def fetch(start, end):
+        calls.append((start, end))
+        if len(calls) <= 3:
+            worker._batch_size = max(1, worker._batch_size // 2)
+            error = RuntimeError("private-rpc-url")
+            error.response = SimpleNamespace(status_code=429)
+            raise error
+        return []
+
+    worker._fetch_events = fetch
+    assert confirmed_events(worker, 64, "0xhash", 120, progress=progress.append) == []
+    successes = calls[3:]
+    assert successes[:4] == [(1, 1), (2, 3), (4, 7), (8, 15)]
+    assert len(successes) < 12 and worker._batch_size == 8
+    cursor = 1
+    for first, last in successes:
+        assert first == cursor and last - first + 1 <= 8
+        cursor = last + 1
+    assert cursor == 65
+    assert progress[-1]["scan_state"] == "complete"
+    assert progress[-1]["last_completed_block"] == 64
+    assert progress[-1]["rpc_retries"] == 3
+    assert progress[-1]["events_count"] == 0
+    assert "private-rpc-url" not in json.dumps(progress)
+    assert clock.pauses == [1, 2, 4]
 
 
 def test_reconciliation_exhaustion_exposes_only_fixed_categories_and_numeric_codes(monkeypatch):
@@ -523,6 +558,71 @@ def test_reconciliation_backoff_cannot_exceed_deadline(monkeypatch):
     with pytest.raises(ReplayBlocked, match="reconciliation_timeout"):
         confirmed_events(worker, 10, "0xhash", 2)
     assert clock.pauses == [1]
+
+
+@pytest.mark.parametrize("phase,state", [
+    ("reconcile", "reconciliation_timeout"),
+    ("fixed", "private_worker_timeout"),
+    ("live", "private_worker_timeout"),
+])
+def test_killed_worker_deadline_retains_safe_progress_and_never_accepts_a_late_pass(
+    tmp_path, monkeypatch, phase, state
+):
+    import subprocess
+    from manage_rehearsal_resources import private_json
+    from replay_private_restore import scan_progress_path
+
+    output = tmp_path / "result.json"
+    output.write_text(json.dumps({"passed": True}))
+    private_json(scan_progress_path(output), {
+        "scan_state": "events", "ranges_completed": 4, "batch_size": 2,
+        "last_completed_block": 120, "rpc_retries": 3,
+        "private_url": "https://provider.example/private-key", "events": ["private-row"],
+    })
+
+    def timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired("private-command", 10, output="private-output", stderr="private-key")
+
+    monkeypatch.setattr(hosted.subprocess, "run", timeout)
+    result = hosted.launch_worker(phase, tmp_path / "target.json", output, {}, remaining=10)
+    assert result == {
+        "passed": False, "state": state,
+        "scan_progress": {"scan_state": "events", "ranges_completed": 4,
+                          "batch_size": 2, "last_completed_block": 120, "rpc_retries": 3},
+    }
+    assert json.loads(output.read_text()) == result
+    assert "private-key" not in json.dumps(result) and "private-row" not in json.dumps(result)
+
+
+def test_scan_checkpoint_is_atomic_private_bounded_and_rejects_unstructured_values(tmp_path):
+    from manage_rehearsal_resources import private_json
+    from replay_private_restore import read_scan_progress, scan_progress_path
+
+    output = tmp_path / "result.json"
+    path = scan_progress_path(output)
+    assert read_scan_progress(output) == {}
+    private_json(path, {"batch_size": 1000, "rpc_retries": True, "target_block": -1,
+                        "events_count": 2**64, "scan_state": ["private"], "private": "private-key"})
+    assert read_scan_progress(output) == {"batch_size": 1000}
+    assert path.stat().st_mode & 0o777 == 0o600
+    assert not path.with_suffix(path.suffix + ".tmp").exists()
+    for content in ("[1,2]", "partial-json", " " * 8193):
+        path.write_text(content)
+        assert read_scan_progress(output) == {}
+
+
+def test_timeout_console_emits_only_validated_scan_counters():
+    report = {"overall_result": "blocked", "state": "private_reconciliation_not_accepted",
+              "reconciliation": {"state": "reconciliation_timeout", "passed": False,
+                                 "scan_progress": {"batch_size": 1, "rpc_retries": 12,
+                                                   "scan_state": "retry", "private": "private-row-data",
+                                                   "events_count": True, "target_block": -1}}}
+    result = hosted.console_summary(report)
+    assert result["reconciliation"]["scan_progress"] == {
+        "batch_size": 1, "rpc_retries": 12, "scan_state": "retry",
+    }
+    assert "private-row-data" not in json.dumps(result)
+    assert hosted.report_exit_code(report) == 1
 
 
 def test_worker_report_preserves_safe_rpc_diagnostics(tmp_path, monkeypatch):

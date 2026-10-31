@@ -19,6 +19,38 @@ from check_deployment_identity import rpc_failure
 from environment_policy import environment
 from manage_rehearsal_resources import private_json
 
+SCAN_PROGRESS_FIELDS = (
+    "ranges_completed", "last_completed_block", "target_block", "from_block", "to_block",
+    "batch_size", "events_count", "rpc_retries",
+)
+SCAN_STATES = {"events", "retry", "range_completed", "canonical_recheck", "complete"}
+
+
+def scan_progress_path(output):
+    return Path(output).with_suffix(".progress.json")
+
+
+def safe_scan_progress(value):
+    if not isinstance(value, dict):
+        return {}
+    result = {key: value[key] for key in SCAN_PROGRESS_FIELDS
+              if type(value.get(key)) is int and 0 <= value[key] < 2**63}
+    state = value.get("scan_state")
+    if type(state) is str and state in SCAN_STATES:
+        result["scan_state"] = state
+    return result
+
+
+def read_scan_progress(output):
+    """Read only bounded counters from the atomic private worker checkpoint."""
+    try:
+        path = scan_progress_path(output)
+        if path.stat().st_size > 8192:
+            return {}
+        return safe_scan_progress(json.loads(path.read_text()))
+    except (OSError, ValueError, TypeError):
+        return {}
+
 
 class ReplayBlocked(Exception):
     def __init__(self, state, *, error=None, stage=None, start=None, end=None, attempts=None):
@@ -74,21 +106,35 @@ def validate_private_target(manifest, env):
     return expected
 
 
-def confirmed_events(worker, target, target_hash, deadline):
+def confirmed_events(worker, target, target_hash, deadline, *, progress=None):
     from app.core.config import settings
     from app.services.indexer import _hex
 
     if target < settings.indexer_start_block or reconciliation_header(worker, target) != target_hash:
         raise ReplayBlocked("canonical_target_mismatch")
     events, start, headers, failures = [], settings.indexer_start_block + 1, {}, 0
+    max_batch = worker._batch_size
+    ranges, retries = 0, 0
+
+    def record(state, first, last, completed):
+        if progress:
+            progress({"scan_state": state, "ranges_completed": ranges,
+                      "last_completed_block": completed, "target_block": target,
+                      "from_block": first, "to_block": last,
+                      "batch_size": worker._batch_size, "events_count": len(events),
+                      "rpc_retries": retries})
+
     while start <= target:
         if time.monotonic() >= deadline:
             raise ReplayBlocked("reconciliation_timeout")
         end = min(target, start + worker._batch_size - 1)
+        record("events", start, end, start - 1)
         try:
             batch = worker._fetch_events(start, end)
         except Exception as error:
             failures += 1
+            retries += 1
+            record("retry", start, end, start - 1)
             if failures >= 5:
                 raise ReplayBlocked("reconciliation_rpc_failed", error=error,
                                     stage="reconciliation_events", start=start, end=end, attempts=failures) from None
@@ -104,9 +150,17 @@ def confirmed_events(worker, target, target_hash, deadline):
         events.extend(batch)
         if len(events) > 100000:
             raise ReplayBlocked("reconciliation_event_budget_exceeded")
+        ranges += 1
+        # _fetch_events reduces its range after errors. Recover after successful
+        # reads, as normal indexing does, so transient errors cannot permanently
+        # turn the rest of a historical scan into one-block requests.
+        worker._batch_size = min(max_batch, worker._batch_size * 2)
+        record("range_completed", start, end, end)
         start = end + 1
+    record("canonical_recheck", target, target, target)
     if reconciliation_header(worker, target) != target_hash:
         raise ReplayBlocked("canonical_target_mismatch")
+    record("complete", target, target, target)
     return events
 
 
@@ -324,7 +378,10 @@ def execute(args):
         "schema_revision": revision,
     }
     if args.phase == "reconcile":
-        events = confirmed_events(worker, target, target_hash, deadline)
+        events = confirmed_events(
+            worker, target, target_hash, deadline,
+            progress=lambda value: private_json(scan_progress_path(args.output), value),
+        )
         context = {
             **common,
             "candidate_sha": manifest["candidate_sha"],
@@ -336,6 +393,7 @@ def execute(args):
         }
         return {
             **common,
+            "scan_progress": read_scan_progress(args.output),
             **reconcile_private(
                 worker,
                 SessionLocal,
@@ -400,6 +458,8 @@ def main():
         result = {"passed": False, "state": str(error), **error.diagnostics}
     except Exception:
         result = {"passed": False, "state": "private_worker_failed"}
+    if progress := read_scan_progress(args.output):
+        result["scan_progress"] = progress
     private_json(args.output, result)
     print(json.dumps({"passed": result["passed"]}))
     return 0 if result["passed"] else 1
