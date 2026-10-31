@@ -27,7 +27,7 @@ from manage_rehearsal_resources import (
 from recovery_evidence import encrypt_files, key_bytes
 from rehearse_recovery_restore import restore_checkpoint
 from release_gate import assess, github
-from replay_private_restore import read_scan_progress, safe_scan_progress
+from replay_private_restore import read_scan_progress, safe_scan_progress, safe_api_failure
 
 WORKFLOW = "Oionos/Veritras/.github/workflows/recovery-rehearsal.yml@refs/heads/main"
 RECONCILIATION_STATES = {
@@ -63,6 +63,9 @@ def console_summary(report):
             result["reconciliation"]["scan_progress"] = progress
     if report["overall_result"] == "review_required":
         result["recovery_completed"] = False
+    live = report.get("live_readiness")
+    if isinstance(live, dict) and live.get("state") == "private_api_read_failed":
+        result["live_readiness"] = {"state": "private_api_read_failed", **safe_api_failure(live)}
     return result
 
 
