@@ -20,6 +20,7 @@ RPC_STAGES = {
     "registry_code", "tracker_code", "tracker_registry",
     "registry_creation_recheck", "tracker_creation_recheck",
     "reconciliation_events", "reconciliation_header", "replay_poll",
+    "worker_connection", "fixed_target_header", "target_header", "canonical_history_recheck",
 }
 RPC_FAILURES = {
     "TransactionNotFound": "receipt_not_found", "BlockNotFound": "block_not_found",
