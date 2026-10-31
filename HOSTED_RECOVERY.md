@@ -165,6 +165,19 @@ reconciliation worker reports `reconciliation_timeout` with its last validated
 `scan_progress`, rather than losing the phase as a generic interrupted result.
 These counters contain no event rows, provider messages, URLs or credentials.
 
+Private API reads allow at most three attempts for timeouts, throttling and
+temporary server errors, waiting one/two seconds within the remaining recovery
+deadline. The entire read sequence is capped at two minutes. Permission/missing
+route errors and malformed JSON remain immediate failures. Every required route
+must actually return a JSON object successfully, and the worker must still be
+fresh/current with zero lag after the reads.
+
+A failed read reports a fixed `api_route`, numeric `api_http_status` when present,
+`api_failure_kind` and `api_attempts`. Product identifiers, response bodies, URLs
+and exception messages remain private. The report lists successful route labels
+and whether a representative product was available; an empty fixture does not
+claim product detail/timeline/verification coverage.
+
 Do not skip a failed comparison or assume its differences are harmless. Identify
 the failing category, reproduce the cause and review any correction before the
 next drill. Start a new workflow run after a correction; rerunning an old execution
