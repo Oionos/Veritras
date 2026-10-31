@@ -40,6 +40,7 @@ def test_private_replay_survives_two_actual_process_restarts_and_checks_api(tmp_
     expected = environment("testing")
     head = expected["start_block"] + expected["confirmations"] + 2
     calls = []
+    header_throttles = []
 
     class RPC(BaseHTTPRequestHandler):
         def log_message(self, *_):
@@ -49,6 +50,16 @@ def test_private_replay_survives_two_actual_process_restarts_and_checks_api(tmp_
             request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             method = request["method"]
             calls.append(method)
+            if method == "eth_getBlockByNumber" and len(header_throttles) < 2:
+                header_throttles.append(True)
+                body = json.dumps({"jsonrpc": "2.0", "id": request["id"],
+                                   "error": {"code": -32005, "message": "Fixture rate limit"}}).encode()
+                self.send_response(429)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
             result = None
             if method == "web3_clientVersion":
                 result = "ReadOnlyRecoveryFixture"
@@ -167,6 +178,7 @@ def test_private_replay_survives_two_actual_process_restarts_and_checks_api(tmp_
         assert results[-1]["api_reads"]["passed"]
         assert results[-1]["api_reads"]["public_listener"] is False
         assert not any("send" in name.lower() for name in calls)
+        assert len(header_throttles) == 2
     finally:
         server.shutdown()
         server.server_close()

@@ -36,6 +36,7 @@ RECONCILIATION_STATES = {
     "canonical_target_mismatch", "reconciliation_event_budget_exceeded",
     "restored_schema_admission_failed",
     "private_worker_timeout",
+    "private_rpc_failed", "private_rpc_timeout",
 }
 
 
@@ -66,6 +67,10 @@ def console_summary(report):
     live = report.get("live_readiness")
     if isinstance(live, dict) and live.get("state") == "private_api_read_failed":
         result["live_readiness"] = {"state": "private_api_read_failed", **safe_api_failure(live)}
+    elif isinstance(live, dict) and live.get("state") in {"private_rpc_failed", "private_rpc_timeout"}:
+        result["live_readiness"] = {key: live[key] for key in (
+            "state", "rpc_stage", "rpc_failure_kind", "rpc_reason", "rpc_http_status", "rpc_error_code",
+            "from_block", "to_block", "attempts") if key in live}
     return result
 
 
