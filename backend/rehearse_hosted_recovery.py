@@ -27,6 +27,7 @@ from manage_rehearsal_resources import (
 from recovery_evidence import encrypt_files, key_bytes
 from rehearse_recovery_restore import restore_checkpoint
 from release_gate import assess, github
+from replay_private_restore import read_scan_progress, safe_scan_progress
 
 WORKFLOW = "Oionos/Veritras/.github/workflows/recovery-rehearsal.yml@refs/heads/main"
 RECONCILIATION_STATES = {
@@ -34,6 +35,7 @@ RECONCILIATION_STATES = {
     "reconciliation_conflicts", "reconciliation_timeout", "private_worker_failed",
     "canonical_target_mismatch", "reconciliation_event_budget_exceeded",
     "restored_schema_admission_failed",
+    "private_worker_timeout",
 }
 
 
@@ -55,6 +57,10 @@ def console_summary(report):
         result["reconciliation"] = {key: reconciliation[key] for key in
                                      ("state", "rpc_http_status", "rpc_error_code", "rpc_stage",
                                       "rpc_failure_kind", "rpc_reason", "from_block", "to_block", "attempts") if key in reconciliation}
+        # Counters were validated when read from the private checkpoint. Never
+        # copy arbitrary worker/provider fields into the public console.
+        if progress := safe_scan_progress(reconciliation.get("scan_progress")):
+            result["reconciliation"]["scan_progress"] = progress
     if report["overall_result"] == "review_required":
         result["recovery_completed"] = False
     return result
@@ -235,14 +241,24 @@ def launch_worker(
         ]
     if approved:
         command += ["--approved-digest", approved]
-    completed = subprocess.run(
-        command,
-        env=worker_env,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        timeout=max(1, remaining),
-        check=False,
-    )
+    try:
+        completed = subprocess.run(
+            command,
+            env=worker_env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=max(1, remaining),
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        # A killed process might never write its final result. Preserve the last
+        # atomic, numeric checkpoint and report the actual failed deadline.
+        result = {"passed": False,
+                  "state": "reconciliation_timeout" if phase == "reconcile" else "private_worker_timeout"}
+        if progress := read_scan_progress(output):
+            result["scan_progress"] = progress
+        private_json(output, result)
+        return result
     if not output.exists():
         raise RehearsalBlocked("private_worker_report_missing")
     result = json.loads(output.read_text())

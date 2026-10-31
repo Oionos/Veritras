@@ -38,7 +38,7 @@ def test_private_replay_survives_two_actual_process_restarts_and_checks_api(tmp_
     url = source.set(database=database)
     engine = create_engine(url)
     expected = environment("testing")
-    head = expected["start_block"] + expected["confirmations"]
+    head = expected["start_block"] + expected["confirmations"] + 2
     calls = []
 
     class RPC(BaseHTTPRequestHandler):
@@ -160,6 +160,9 @@ def test_private_replay_survives_two_actual_process_restarts_and_checks_api(tmp_
             assert completed.returncode == 0 and result["passed"], result
             results.append(result)
         assert len({result["snapshot_digest"] for result in results[1:4]}) == 1
+        assert results[0]["scan_progress"]["scan_state"] == "complete"
+        assert results[0]["scan_progress"]["ranges_completed"] == 1
+        assert results[0]["scan_progress"]["last_completed_block"] == head - 12
         assert len({result["journal_prefix_digest"] for result in results[1:]}) == 1
         assert results[-1]["api_reads"]["passed"]
         assert results[-1]["api_reads"]["public_listener"] is False

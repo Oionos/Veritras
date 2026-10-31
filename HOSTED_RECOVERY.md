@@ -154,6 +154,17 @@ alone does not mean review is needed. For example, `reconciliation_rpc_failed`
 is a real failure. The worker retries at most five times with 1/2/4/8-second
 backoff, preserves the failed range for retry, and obeys its existing deadline.
 
+Successful historical ranges grow back toward the configured batch limit after
+temporary RPC failures. This prevents throttling from permanently reducing the
+remaining scan to one-block requests. The range limit, five-attempt retry bound,
+canonical-header checks and recovery objective remain enforced.
+
+Workers checkpoint only bounded scan counters in an atomic private file:
+completed ranges/blocks, target, batch size, event count and retry count. A killed
+reconciliation worker reports `reconciliation_timeout` with its last validated
+`scan_progress`, rather than losing the phase as a generic interrupted result.
+These counters contain no event rows, provider messages, URLs or credentials.
+
 Do not skip a failed comparison or assume its differences are harmless. Identify
 the failing category, reproduce the cause and review any correction before the
 next drill. Start a new workflow run after a correction; rerunning an old execution
