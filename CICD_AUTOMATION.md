@@ -49,6 +49,15 @@ The workflow reads main's reviewed policy. For testing it inspects the fetched t
 
 Reports distinguish the verifier's `candidate_sha`, target `release_sha`, expected backend ancestor, and verified observed `backend_sha`. A 24-hour expiry is descriptive metadata for later orchestration, not an activation credential. Every current report explicitly has `authorizes_activation: false`.
 
+The observer waits at most 120 seconds for API startup, a reviewed deployment or
+indexer catch-up, checking every five seconds with a ten-second request-pair
+budget. `health_observation` records attempts, elapsed time and the configured
+deadline. Every attempt reads a new live/ready pair; neither old responses nor
+different release SHAs can be combined. Identity, policy, scope and inconsistent
+or stale progress claims still block the report. A response arriving after the
+deadline cannot pass. Use `--health-deadline 0` for a single API observation.
+The read-only observer's wait does not change the hosted recovery RTO.
+
 RPC failures include a fixed `rpc_stage` and `rpc_failure_kind`, plus numeric HTTP
 or JSON-RPC codes when available. These distinguish invalid endpoint configuration,
 missing historical receipts/blocks, response formatting and contract-call errors.

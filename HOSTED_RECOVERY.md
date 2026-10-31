@@ -123,6 +123,15 @@ The history step runs after a failed readiness check too, but repeats its own
 canonical identity verification before reading logs. A failed readiness step
 still fails the job; a later probe cannot turn it into a successful observation.
 
+If contract identity and history pass but health is
+`invalid_or_unavailable_response`, check the testing API's startup and health
+logs. The observer waits up to 120 seconds for a sleeping API to start and its
+indexer to catch up, using fresh live/ready response pairs. It records
+`health_observation` attempts and elapsed time. Persistent unavailability, wrong
+environment/policy/scope, stale progress or an expired deadline still fail.
+This observer wait does not extend the full recovery objective, which starts
+when the recovery workflow is created.
+
 Identity RPC reads retry temporary missing receipts/blocks, timeouts and
 throttling at most three times, waiting one and two seconds. Authentication
 errors, returned identity mismatches and known permanent range/history errors
