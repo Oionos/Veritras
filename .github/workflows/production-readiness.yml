@@ -58,6 +58,7 @@ jobs:
           python backend/prepare_readiness_report.py \
             --environment "$SELECTED_ENVIRONMENT" \
             --candidate-sha "$CANDIDATE_SHA" --release-sha "$release_sha" --backend-sha "$backend_sha" \
+            --health-deadline 120 \
             --output readiness-report.json
       - name: Inspect historical event RPC calls without recovery resources
         if: ${{ !cancelled() && inputs.inspect_history && steps.readiness.outcome != 'skipped' }}
