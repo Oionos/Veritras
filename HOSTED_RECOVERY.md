@@ -165,6 +165,14 @@ reconciliation worker reports `reconciliation_timeout` with its last validated
 `scan_progress`, rather than losing the phase as a generic interrupted result.
 These counters contain no event rows, provider messages, URLs or credentials.
 
+Required connection, chain-head and canonical-header reads also use finite
+deadline-aware retries for transient throttling or connectivity errors. Each
+read has at most five attempts with one/two/four/eight-second waits. The scan
+records header retries as well as event retries. A retried header must still
+match the event or pinned target hash; unavailable history, authentication
+errors, wrong hashes and expired objectives remain blocking. Final history
+checks after writer shutdown use the same read budget without restarting it.
+
 Private API reads allow at most three attempts for timeouts, throttling and
 temporary server errors, waiting one/two seconds within the remaining recovery
 deadline. The entire read sequence is capped at two minutes. Permission/missing

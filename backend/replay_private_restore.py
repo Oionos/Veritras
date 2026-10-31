@@ -16,7 +16,7 @@ import time
 from urllib.parse import quote
 
 from compare_recovery import checked_url, digest, fingerprint
-from check_deployment_identity import rpc_failure
+from check_deployment_identity import rpc_failure, retryable_rpc_failure
 from environment_policy import environment
 from manage_rehearsal_resources import private_json
 
@@ -24,7 +24,7 @@ SCAN_PROGRESS_FIELDS = (
     "ranges_completed", "last_completed_block", "target_block", "from_block", "to_block",
     "batch_size", "events_count", "rpc_retries",
 )
-SCAN_STATES = {"events", "retry", "range_completed", "canonical_recheck", "complete"}
+SCAN_STATES = {"events", "retry", "header_retry", "range_completed", "canonical_recheck", "complete"}
 API_ROUTES = {"health_ready", "products", "shipments", "analytics_kpis",
               "product_detail", "product_timeline", "product_verification"}
 API_FAILURES = {"http_status", "timeout", "request_failed", "invalid_json",
@@ -97,12 +97,36 @@ def retry_pause(failures, deadline, timeout_state):
     time.sleep(delay)
 
 
-def reconciliation_header(worker, number):
-    try:
-        return worker._header(number)
-    except Exception as error:
-        raise ReplayBlocked("reconciliation_rpc_failed", error=error,
-                            stage="reconciliation_header", start=number, end=number) from None
+def read_rpc(operation, deadline, *, stage, state="private_rpc_failed",
+             timeout_state="private_rpc_timeout", number=None, on_retry=None):
+    """One finite retry budget for each required private recovery RPC read."""
+    for attempt in range(1, 6):
+        if time.monotonic() >= deadline:
+            raise ReplayBlocked(timeout_state)
+        try:
+            result = operation()
+        except Exception as error:
+            failure = ReplayBlocked(state, error=error, stage=stage,
+                                    start=number, end=number, attempts=attempt)
+            if attempt == 5 or not retryable_rpc_failure(error):
+                raise failure from None
+            if on_retry:
+                on_retry()
+            try:
+                retry_pause(attempt, deadline, timeout_state)
+            except ReplayBlocked as expired:
+                expired.diagnostics.update(failure.diagnostics)
+                raise expired from None
+        else:
+            if time.monotonic() > deadline:
+                raise ReplayBlocked(timeout_state)
+            return result
+
+
+def reconciliation_header(worker, number, deadline, *, on_retry=None):
+    return read_rpc(lambda: worker._header(number), deadline,
+                    stage="reconciliation_header", state="reconciliation_rpc_failed",
+                    timeout_state="reconciliation_timeout", number=number, on_retry=on_retry)
 
 
 def validate_private_target(manifest, env):
@@ -134,8 +158,6 @@ def confirmed_events(worker, target, target_hash, deadline, *, progress=None):
     from app.core.config import settings
     from app.services.indexer import _hex
 
-    if target < settings.indexer_start_block or reconciliation_header(worker, target) != target_hash:
-        raise ReplayBlocked("canonical_target_mismatch")
     events, start, headers, failures = [], settings.indexer_start_block + 1, {}, 0
     max_batch = worker._batch_size
     ranges, retries = 0, 0
@@ -148,6 +170,15 @@ def confirmed_events(worker, target, target_hash, deadline, *, progress=None):
                       "batch_size": worker._batch_size, "events_count": len(events),
                       "rpc_retries": retries})
 
+    def header(number):
+        def retried():
+            nonlocal retries
+            retries += 1
+            record("header_retry", number, number, start - 1)
+        return reconciliation_header(worker, number, deadline, on_retry=retried)
+
+    if target < settings.indexer_start_block or header(target) != target_hash:
+        raise ReplayBlocked("canonical_target_mismatch")
     while start <= target:
         if time.monotonic() >= deadline:
             raise ReplayBlocked("reconciliation_timeout")
@@ -168,7 +199,7 @@ def confirmed_events(worker, target, target_hash, deadline, *, progress=None):
         for event in batch:
             number = event["blockNumber"]
             if number not in headers:
-                headers[number] = reconciliation_header(worker, number)
+                headers[number] = header(number)
             if headers[number] != _hex(event["blockHash"]):
                 raise ReplayBlocked("canonical_target_mismatch")
         events.extend(batch)
@@ -182,14 +213,14 @@ def confirmed_events(worker, target, target_hash, deadline, *, progress=None):
         record("range_completed", start, end, end)
         start = end + 1
     record("canonical_recheck", target, target, target)
-    if reconciliation_header(worker, target) != target_hash:
+    if header(target) != target_hash:
         raise ReplayBlocked("canonical_target_mismatch")
     record("complete", target, target, target)
     return events
 
 
 def reconcile_private(
-    worker, session_factory, events, *, context, approved_digest, plan_path
+    worker, session_factory, events, *, context, approved_digest, plan_path, deadline=None
 ):
     import manage_identity
     import manage_indexer
@@ -223,7 +254,8 @@ def reconcile_private(
                 )
             if changes:
                 manage_identity.reconcile(worker, db, events, apply=True)
-                if worker._header(context["target_block"]) != context["target_hash"]:
+                check_deadline = deadline if deadline is not None else time.monotonic() + 30
+                if reconciliation_header(worker, context["target_block"], check_deadline) != context["target_hash"]:
                     raise ReplayBlocked("canonical_target_mismatch")
                 db.commit()
                 summary["applied"] = True
@@ -250,8 +282,8 @@ class PinnedWeb3:
 
 def replay_fixed(worker, target, target_hash, confirmations, deadline):
     if (
-        worker.w3.eth.block_number - confirmations < target
-        or worker._header(target) != target_hash
+        read_rpc(lambda: worker.w3.eth.block_number, deadline, stage="chain_head") - confirmations < target
+        or read_rpc(lambda: worker._header(target), deadline, stage="fixed_target_header", number=target) != target_hash
     ):
         raise ReplayBlocked("canonical_target_mismatch")
     worker.w3 = PinnedWeb3(worker.w3, target + confirmations)
@@ -267,7 +299,7 @@ def replay_fixed(worker, target, target_hash, confirmations, deadline):
             retry_pause(failures, deadline, "replay_timeout")
             continue
         if worker.last_processed_block == target:
-            if worker._header(target) != target_hash:
+            if read_rpc(lambda: worker._header(target), deadline, stage="fixed_target_header", number=target) != target_hash:
                 raise ReplayBlocked("canonical_target_mismatch")
             return
     raise ReplayBlocked("replay_timeout")
@@ -436,13 +468,13 @@ def execute(args):
     if args.phase != "reconcile" and not settings.indexer_enabled:
         raise ReplayBlocked("replay_requires_private_writer")
     worker, deadline = EventIndexer(), time.monotonic() + args.timeout
-    worker._connect()
+    read_rpc(worker._connect, deadline, stage="worker_connection")
     target = args.target_block
     if target is None:
-        target = worker.w3.eth.block_number - expected["confirmations"]
-    target_hash = worker._header(target)
+        target = read_rpc(lambda: worker.w3.eth.block_number, deadline, stage="chain_head") - expected["confirmations"]
+    target_hash = read_rpc(lambda: worker._header(target), deadline, stage="target_header", number=target)
     if (
-        target > worker.w3.eth.block_number - expected["confirmations"]
+        target > read_rpc(lambda: worker.w3.eth.block_number, deadline, stage="chain_head") - expected["confirmations"]
         or args.target_hash
         and args.target_hash != target_hash
     ):
@@ -480,6 +512,7 @@ def execute(args):
                 context=context,
                 approved_digest=args.approved_digest,
                 plan_path=args.output.with_name("reconciliation-plan.json"),
+                deadline=deadline,
             ),
         }
     if args.phase == "fixed":
@@ -499,7 +532,9 @@ def execute(args):
     # stop() sets the cancellation flag; use bounded read-only RPC calls rather
     # than the writer's intentionally cancelled _header() helper after shutdown.
     def canonical_hash(number):
-        return "0x" + worker.w3.eth.get_block(number)["hash"].hex().removeprefix("0x")
+        block = read_rpc(lambda: worker.w3.eth.get_block(number), deadline,
+                         stage="canonical_history_recheck", number=number)
+        return "0x" + block["hash"].hex().removeprefix("0x")
 
     if (
         before != journal_prefix(engine, target)
