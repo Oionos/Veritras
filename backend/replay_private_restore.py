@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import re
 import time
+from urllib.parse import quote
 
 from compare_recovery import checked_url, digest, fingerprint
 from check_deployment_identity import rpc_failure
@@ -24,6 +25,24 @@ SCAN_PROGRESS_FIELDS = (
     "batch_size", "events_count", "rpc_retries",
 )
 SCAN_STATES = {"events", "retry", "range_completed", "canonical_recheck", "complete"}
+API_ROUTES = {"health_ready", "products", "shipments", "analytics_kpis",
+              "product_detail", "product_timeline", "product_verification"}
+API_FAILURES = {"http_status", "timeout", "request_failed", "invalid_json",
+                "invalid_body", "invalid_identifier", "deadline_exceeded"}
+
+
+def safe_api_failure(value):
+    if not isinstance(value, dict):
+        return {}
+    result = {}
+    for field, allowed in (("api_route", API_ROUTES), ("api_failure_kind", API_FAILURES)):
+        if type(value.get(field)) is str and value[field] in allowed:
+            result[field] = value[field]
+    if type(value.get("api_http_status")) is int and 100 <= value["api_http_status"] <= 599:
+        result["api_http_status"] = value["api_http_status"]
+    if type(value.get("api_attempts")) is int and 1 <= value["api_attempts"] <= 3:
+        result["api_attempts"] = value["api_attempts"]
+    return result
 
 
 def scan_progress_path(output):
@@ -53,7 +72,8 @@ def read_scan_progress(output):
 
 
 class ReplayBlocked(Exception):
-    def __init__(self, state, *, error=None, stage=None, start=None, end=None, attempts=None):
+    def __init__(self, state, *, error=None, stage=None, start=None, end=None, attempts=None,
+                 api_route=None, api_status=None, api_failure=None, api_attempts=None):
         super().__init__(state)
         self.diagnostics = {}
         if error is not None:
@@ -64,6 +84,10 @@ class ReplayBlocked(Exception):
             self.diagnostics.update(from_block=start, to_block=end)
         if type(attempts) is int and 1 <= attempts <= 5:
             self.diagnostics["attempts"] = attempts
+        self.diagnostics.update(safe_api_failure({"api_route": api_route,
+                                                "api_http_status": api_status,
+                                                "api_failure_kind": api_failure,
+                                                "api_attempts": api_attempts}))
 
 
 def retry_pause(failures, deadline, timeout_state):
@@ -249,40 +273,87 @@ def replay_fixed(worker, target, target_hash, confirmations, deadline):
     raise ReplayBlocked("replay_timeout")
 
 
-async def api_reads(worker):
+async def api_reads(worker, *, deadline=None):
     import httpx
     import app.main as api
 
     api.indexer = worker
+    deadline = min(deadline if deadline is not None else float("inf"), time.monotonic() + 120)
+    checks, total_attempts = [], 0
     # No lifespan hook: the already-running private writer is the sole owner.
     # No public socket and no second indexer/exception worker is started here.
     async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=api.app),
+        transport=httpx.ASGITransport(app=api.app, raise_app_exceptions=False),
         base_url="https://private-rehearsal.invalid",
         follow_redirects=True,
     ) as client:
-        for route in (
-            "/health/ready",
-            "/products/?limit=1",
-            "/shipments/?limit=1",
-            "/analytics/kpis",
-        ):
-            response = await client.get(route)
-            if response.status_code != 200 or not isinstance(response.json(), dict):
-                raise ReplayBlocked("private_api_read_failed")
-        products = (await client.get("/products/?limit=1")).json()
-        items = products.get("items", [])
+        async def read(path, route):
+            nonlocal total_attempts
+            for attempt in range(1, 4):
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise ReplayBlocked("private_api_read_failed", api_route=route,
+                                        api_failure="deadline_exceeded", api_attempts=attempt)
+                total_attempts += 1
+                status = None
+                try:
+                    response = await asyncio.wait_for(client.get(path), timeout=min(10, remaining))
+                    status = response.status_code
+                except (asyncio.TimeoutError, httpx.TimeoutException):
+                    failure = "timeout"
+                except Exception:
+                    failure = "request_failed"
+                else:
+                    if time.monotonic() > deadline:
+                        raise ReplayBlocked("private_api_read_failed", api_route=route,
+                                            api_failure="deadline_exceeded", api_attempts=attempt)
+                    if status == 200:
+                        try:
+                            body = response.json()
+                        except (ValueError, TypeError):
+                            raise ReplayBlocked("private_api_read_failed", api_route=route,
+                                                api_failure="invalid_json", api_attempts=attempt) from None
+                        if not isinstance(body, dict):
+                            raise ReplayBlocked("private_api_read_failed", api_route=route,
+                                                api_failure="invalid_body", api_attempts=attempt)
+                        checks.append(route)
+                        return body
+                    failure = "http_status"
+                error = ReplayBlocked("private_api_read_failed", api_route=route, api_status=status,
+                                      api_failure=failure, api_attempts=attempt)
+                if attempt == 3 or status is not None and status not in {408, 425, 429, 500, 502, 503, 504}:
+                    raise error
+                delay = attempt
+                if time.monotonic() + delay >= deadline:
+                    raise ReplayBlocked("private_api_read_failed", api_route=route,
+                                        api_failure="deadline_exceeded", api_attempts=attempt) from None
+                await asyncio.sleep(delay)
+
+        await read("/health/ready", "health_ready")
+        products = await read("/products/?limit=1", "products")
+        await read("/shipments/?limit=1", "shipments")
+        await read("/analytics/kpis", "analytics_kpis")
+        items = products.get("items")
+        if not isinstance(items, list):
+            raise ReplayBlocked("private_api_read_failed", api_route="products", api_failure="invalid_body")
         if items:
-            identifier = items[0]["product_id"]
-            for suffix in ("", "/timeline", "/verify"):
-                response = await client.get(f"/products/{identifier}{suffix}")
-                if response.status_code != 200:
-                    raise ReplayBlocked("private_api_read_failed")
+            identifier = items[0].get("product_id") if isinstance(items[0], dict) else None
+            if not isinstance(identifier, str) or not 0 < len(identifier) <= 100:
+                raise ReplayBlocked("private_api_read_failed", api_route="products", api_failure="invalid_identifier")
+            try:
+                identifier = quote(identifier, safe="")
+            except UnicodeError:
+                raise ReplayBlocked("private_api_read_failed", api_route="products", api_failure="invalid_identifier") from None
+            for suffix, route in (("", "product_detail"), ("/timeline", "product_timeline"),
+                                  ("/verify", "product_verification")):
+                await read(f"/products/{identifier}{suffix}", route)
         return {
             "passed": True,
             "representative_product_available": bool(items),
             "transport": "in_process_private_asgi",
             "public_listener": False,
+            "checks": checks,
+            "attempts": total_attempts,
         }
 
 
@@ -298,7 +369,15 @@ def replay_live(worker, deadline):
                 and state["success_age_seconds"] < state["stale_after_seconds"]
                 and state["head_age_seconds"] < state["head_stale_after_seconds"]
             ):
-                reads = asyncio.run(api_reads(worker))
+                reads = asyncio.run(api_reads(worker, deadline=deadline))
+                # A new block can arrive during the API requests. Require a
+                # fresh, current zero-lag observation again before accepting.
+                state = worker.health()
+                if not (state["status"] == "current" and state["ready"]
+                        and state["lag_blocks"] == 0
+                        and state["success_age_seconds"] < state["stale_after_seconds"]
+                        and state["head_age_seconds"] < state["head_stale_after_seconds"]):
+                    continue
                 return {
                     "passed": True,
                     "target_block": state["target_head"],
