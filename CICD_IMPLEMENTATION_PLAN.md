@@ -1,6 +1,6 @@
 # CI/CD implementation preparation
 
-Prepared October 21, 2026; status updated October 30. **Phases A–C are released; full hosted acceptance remains blocked at historical reconciliation RPC reads. Phases D–E are pending.** See [current commands](CICD_AUTOMATION.md) and [hosted recovery setup](HOSTED_RECOVERY.md). Production identity remains blocked until its creation receipts/anchor are verified.
+Prepared October 21, 2026; status updated October 31. **Phases A–C are released; the replacement RPC passed hosted identity and initial historical-log checks. Full hosted recovery acceptance remains pending. Phases D–E are pending.** See [current commands](CICD_AUTOMATION.md) and [hosted recovery setup](HOSTED_RECOVERY.md). Production identity remains blocked until its creation receipts/anchor are verified.
 
 This translates [the next-steps guide](NEXT_STEPS_GUIDE.md) into an implementation backlog. Production indexing remains disabled. Resource creation, reconciliation applies and activation are separate operational actions; preparing this plan does not perform them.
 
@@ -18,7 +18,7 @@ Automate production readiness first, then private recovery and replay, then appr
 
 Each PR stages through persistent testing and protected main. Do not add hosted observers to the eight deployment prerequisites: a job waiting for deployment cannot also be a prerequisite for that deployment.
 
-**Implemented slices: phases A–C.** The read-only observer, strict shared policy, recovery comparison, private dump/restore coordination, hosted orchestration, encryption and guarded resource lifecycle are released with regression coverage. Protected testing environments are configured. [Read-only testing verification](https://github.com/Oionos/Veritras/actions/runs/40857821690) passed. [Recovery run 40859767005](https://github.com/Oionos/Veritras/actions/runs/40859767005) confirmed the CHECK-cast fix: restore comparison matched with zero differences, RPO passed, evidence was encrypted and the temporary branch was deleted. The worker then reported `reconciliation_rpc_failed`, before plan review, restart checks or private reads. Next: diagnose historical RPC requests with the protected read-only probe, correct the failure, then complete a fresh full rehearsal. Full hosted acceptance remains open.
+**Implemented slices: phases A–C.** The read-only observer, strict shared policy, recovery comparison, private dump/restore coordination, hosted orchestration, encryption and guarded resource lifecycle are released with regression coverage. Protected testing environments are configured. [Read-only testing verification](https://github.com/Oionos/Veritras/actions/runs/40857821690) passed. [Recovery run 40859767005](https://github.com/Oionos/Veritras/actions/runs/40859767005) confirmed the CHECK-cast fix: restore comparison matched with zero differences, RPO passed, evidence was encrypted and the temporary branch was deleted. Its historical RPC failure was traced to PublicNode's unavailable old history. After replacing the protected testing RPC, [observer 41033424777, attempt 2](https://github.com/Oionos/Veritras/actions/runs/41033424777/attempts/2) verified both creation receipts and all five initial historical filters (12 events). Its health check failed before Render finished starting; a subsequent bounded local health probe reached current, zero lag. Next: release the observer's bounded startup wait, obtain a complete hosted readiness pass, then complete a fresh full rehearsal. The initial history probe does not establish complete replay, restart checks or private reads. Full hosted acceptance remains open.
 
 ## 2. Current components to reuse
 
@@ -218,7 +218,8 @@ Implementation includes regression coverage for identity mismatches, strict mode
 - [x] Protected testing environments, reviewer controls, objectives and resource limits configured; archived evidence successfully decrypted through the protected inspection job.
 - [x] Testing deployment identity/RPC access passed the protected read-only observer using `recovery-testing` configuration.
 - [x] Hosted dump/restore comparison matches with zero differences; RPO, encrypted evidence and cleanup verified in run 40859767005.
-- [ ] Historical reconciliation RPC reads pass; only a genuine review-required plan can be treated as a non-failing planning outcome.
+- [x] Replacement RPC passes hosted canonical receipts and the initial 1,000-block historical probe (12 events); this does not prove full replay.
+- [ ] Complete hosted readiness passes with the bounded API startup wait; full historical reconciliation succeeds in a fresh rehearsal. Only a genuine review-required plan can be treated as a non-failing planning outcome.
 - [ ] Phase C completes a supervised hosted drill and produces verifiable evidence.
 - [ ] Cancellation/cleanup and failed-rehearsal behavior demonstrated safely.
 - [ ] Phase D provider coordination and write-pause design verified before mutation support is enabled.
@@ -226,4 +227,4 @@ Implementation includes regression coverage for identity mismatches, strict mode
 - [ ] Explicit production activation approval recorded; gated job completes or reports a verified safe recovery state.
 - [ ] Performance, alert delivery, field reporting and business pilot follow the acceptance criteria in the next-steps guide.
 
-**Next operational milestone:** resolve historical reconciliation RPC reads, then complete a fresh supervised hosted drill using [HOSTED_RECOVERY.md](HOSTED_RECOVERY.md). **Next implementation slice:** phase D production activation. Keep production activation gated until hosted evidence, scope and explicit approval prerequisites are demonstrably satisfied.
+**Next operational milestone:** obtain a complete hosted readiness pass, then complete a fresh supervised hosted drill using [HOSTED_RECOVERY.md](HOSTED_RECOVERY.md). **Next implementation slice:** phase D production activation. Keep production activation gated until hosted evidence, scope and explicit approval prerequisites are demonstrably satisfied.

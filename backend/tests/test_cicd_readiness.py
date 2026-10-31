@@ -125,6 +125,7 @@ def test_observer_is_trusted_manual_read_only_and_not_an_admission_prerequisite(
     assert history["if"] == "${{ !cancelled() && inputs.inspect_history && steps.readiness.outcome != 'skipped' }}"
     readiness = next(step for step in job["steps"] if step.get("id") == "readiness")
     assert "prepare_readiness_report.py" in readiness["run"]
+    assert "--health-deadline 120" in readiness["run"]
     assert set(history["env"]) == {"SELECTED_ENVIRONMENT", "SEPOLIA_RPC_URL"}
     commands = "\n".join(step.get("run", "") for step in job["steps"])
     assert "prepare_readiness_report.py" in commands
@@ -510,6 +511,193 @@ def test_missing_identity_cannot_be_hidden_by_healthy_api(policy):
         verify=lambda _: {"verified": False, "state": "deployment_evidence_missing"},
     )
     assert result["overall_result"] == "blocked"
+
+
+class HealthClock:
+    def __init__(self):
+        self.elapsed = 0
+        self.pauses = []
+
+    def monotonic(self):
+        return self.elapsed
+
+    def sleep(self, delay):
+        self.pauses.append(delay)
+        self.elapsed += delay
+
+
+def waited_report(policy, fetch, clock, **kwargs):
+    return build_report(
+        "testing", SHA, SHA, policy=policy, fetch=fetch,
+        verify=lambda _: {"verified": True, "state": "verified"},
+        health_deadline=20, monotonic=clock.monotonic, sleep=clock.sleep, **kwargs,
+    )
+
+
+def test_health_wait_recovers_from_cold_start_and_backfill(policy):
+    clock = HealthClock()
+    live, ready = health(policy["environments"]["testing"])
+    calls = []
+
+    def fetch(url, timeout):
+        calls.append(timeout)
+        assert 0 < timeout <= 10
+        if clock.elapsed == 0:
+            raise TimeoutError("https://private.example/secret")
+        if url.endswith("/live"):
+            return 200, live
+        if clock.elapsed == 5:
+            body = copy.deepcopy(ready)
+            body["indexer"].update(status="catching_up", ready=False, reason="backfill")
+            return 503, body
+        return 200, ready
+
+    result = waited_report(policy, fetch, clock)
+    assert result["overall_result"] == "pass"
+    assert result["health_observation"] == {"attempts": 3, "elapsed_seconds": 10, "deadline_seconds": 20}
+    assert result["runtime_scope_matches"] and result["fresh_chain_head"]
+    assert result["zero_confirmed_target_lag"] and not result["authorizes_activation"]
+    assert "secret" not in json.dumps(result)
+    assert clock.pauses == [5, 5]
+
+
+def test_health_wait_persistent_transport_failure_remains_blocked_and_bounded(policy):
+    clock = HealthClock()
+    calls = []
+
+    def fetch(url, timeout):
+        calls.append(timeout)
+        clock.elapsed += timeout
+        raise TimeoutError("private-error")
+
+    result = waited_report(policy, fetch, clock)
+    assert result["overall_result"] == "blocked"
+    assert result["backend_sha"] is None
+    assert not result["runtime_scope_matches"] and not result["fresh_chain_head"]
+    assert result["health_observation"] == {"attempts": 2, "elapsed_seconds": 20, "deadline_seconds": 20}
+    assert calls == [10, 5] and clock.pauses == [5]
+    assert "private-error" not in json.dumps(result)
+
+
+@pytest.mark.parametrize("change,state", [
+    ("environment", "environment_mismatch"),
+    ("confirmations", "policy_mismatch"),
+    ("cursor", "inconsistent_progress"),
+    ("scope", "current"),
+    ("head", "current"),
+])
+def test_health_wait_does_not_retry_mismatches_or_stale_claims(policy, change, state):
+    clock = HealthClock()
+    live, ready = health(policy["environments"]["testing"])
+    if change == "environment":
+        live["environment"] = "production"
+    elif change == "confirmations":
+        ready["indexer"]["confirmations"] = 0
+    elif change == "cursor":
+        ready["indexer"]["last_processed_block"] = 101
+    elif change == "scope":
+        ready["indexer"]["tracker_address"] = "wrong"
+    else:
+        ready["indexer"]["head_age_seconds"] = 300
+    result = waited_report(policy, lambda url, _: (200, live if url.endswith("/live") else ready), clock)
+    assert result["overall_result"] == "blocked" and result["health"]["state"] == state
+    assert result["health_observation"]["attempts"] == 1 and not clock.pauses
+
+
+def test_health_wait_requires_a_new_complete_pair_and_one_reviewed_sha(policy):
+    clock = HealthClock()
+    live, ready = health(policy["environments"]["testing"])
+    calls = []
+
+    def fetch(url, _):
+        calls.append((clock.elapsed, url))
+        if clock.elapsed == 0:
+            if url.endswith("/ready"):
+                raise ConnectionError("private-error")
+            return 200, live
+        if url.endswith("/live"):
+            return 200, dict(live, release_commit="b" * 40)
+        return 200, ready
+
+    # The first attempt's live SHA must not be combined with a later ready SHA.
+    result = waited_report(policy, fetch, clock, release_sha="b" * 40)
+    assert result["overall_result"] == "blocked"
+    assert result["health"]["state"] == "awaiting_deployment"
+    assert len(calls) == 8 and result["health_observation"]["attempts"] == 4
+    assert clock.elapsed == 20
+
+
+def test_health_wait_can_observe_the_reviewed_release_after_deployment(policy):
+    clock = HealthClock()
+    live, ready = health(policy["environments"]["testing"])
+
+    def fetch(url, _):
+        body = live if url.endswith("/live") else ready
+        return 200, dict(body, release_commit="c" * 40) if clock.elapsed == 0 else body
+
+    result = waited_report(policy, fetch, clock, release_sha="b" * 40)
+    assert result["overall_result"] == "pass" and result["backend_sha"] == SHA
+    assert result["health_observation"]["attempts"] == 2
+
+
+def test_health_wait_rejects_even_valid_responses_that_arrive_after_deadline(policy):
+    clock = HealthClock()
+    live, ready = health(policy["environments"]["testing"])
+
+    def fetch(url, _):
+        clock.elapsed += 11
+        return 200, live if url.endswith("/live") else ready
+
+    result = waited_report(policy, fetch, clock)
+    assert result["overall_result"] == "blocked"
+    assert result["health"] == {"ready": False, "state": "health_deadline_exceeded"}
+    assert result["backend_sha"] is None and not result["runtime_scope_matches"]
+
+
+def test_health_wait_waits_for_strict_zero_lag(policy):
+    clock = HealthClock()
+    live, ready = health(policy["environments"]["testing"])
+
+    def fetch(url, _):
+        body = copy.deepcopy(ready)
+        if clock.elapsed == 0:
+            body["indexer"].update(last_processed_block=99, lag_blocks=1, max_lag_blocks=1)
+        return 200, live if url.endswith("/live") else body
+
+    result = waited_report(policy, fetch, clock)
+    assert result["overall_result"] == "pass" and result["health_observation"]["attempts"] == 2
+
+
+@pytest.mark.parametrize("deadline", [-1, 121, float("nan"), float("inf"), True, "120"])
+def test_invalid_health_wait_bounds_are_rejected_before_network_calls(policy, deadline):
+    def unexpected(*_):
+        pytest.fail("Invalid bounds must not contact the API or RPC")
+    with pytest.raises(ValueError):
+        build_report("testing", SHA, SHA, policy=policy, fetch=unexpected, verify=unexpected,
+                     health_deadline=deadline)
+
+
+@pytest.mark.parametrize("deadline", [None, "0", "30"])
+def test_readiness_cli_passes_a_bounded_health_wait(monkeypatch, tmp_path, capsys, deadline):
+    import sys
+    import prepare_readiness_report as observer
+
+    output = tmp_path / "report.json"
+    argv = ["prepare_readiness_report.py", "--environment", "testing",
+            "--candidate-sha", SHA, "--backend-sha", SHA, "--output", str(output)]
+    if deadline is not None:
+        argv.extend(["--health-deadline", deadline])
+    monkeypatch.setattr(sys, "argv", argv)
+    calls = []
+
+    def build(*args, **kwargs):
+        calls.append(kwargs["health_deadline"])
+        return {"overall_result": "pass", "authorizes_activation": False}
+
+    monkeypatch.setattr(observer, "build_report", build)
+    assert observer.main() == 0
+    assert calls == [120 if deadline is None else float(deadline)]
+    assert json.loads(output.read_text()) == json.loads(capsys.readouterr().out)
 
 
 def test_during_inspection_reorg_is_rejected(policy):
